@@ -7,7 +7,24 @@ import { createPanel, setStatus, setButtonsEnabled, setCounter, setPauseIcon } f
 const RESTRICTED_PROTOCOLS = ['edge:', 'about:', 'file:', 'chrome:', 'moz-extension:'];
 
 function shouldInject() {
-  return !RESTRICTED_PROTOCOLS.includes(window.location.protocol);
+  var proto = window.location.protocol;
+  if (RESTRICTED_PROTOCOLS.includes(proto)) return false;
+
+  // Check site filter
+  var sites = window.__tts_zen_enabled_sites;
+  if (sites) {
+    var host = window.location.hostname;
+    for (var siteId in sites) {
+      if (sites[siteId] === false) continue; // disabled
+      if (siteId === 'generic') continue; // check specific sites first
+      if (host.includes(siteId)) return true; // enabled and matching
+    }
+    // Check generic
+    if (sites['generic'] !== false) return true;
+    return false; // no matching enabled site
+  }
+
+  return true; // no site data loaded yet
 }
 
 // ---- Text Extraction with DOM references ----

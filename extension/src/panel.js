@@ -26,6 +26,13 @@ const PANEL_HTML = `
           <circle cx="12" cy="12" r="3"></circle>
         </svg>
       </button>
+      <button id="tts-zen-sites-btn" title="Gestionar sitios">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="2" y1="12" x2="22" y2="12"></line>
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+        </svg>
+      </button>
       <button id="tts-zen-settings-btn" title="Ajustes">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="3"></circle>
@@ -48,23 +55,6 @@ const PANEL_HTML = `
         <div class="speed-group">
           <input type="range" id="tts-zen-speed" min="50" max="300" value="100" step="10">
           <span id="tts-zen-speed-label">1.0x</span>
-      </div>
-    </div>
-    <div class="setting-row sites-section">
-      <label>Sitios</label>
-      <div id="tts-zen-sites">
-        <div class="site-tag active">
-          <span class="site-icon">W</span> Wattpad
-        </div>
-        <div class="site-tag active">
-          <span class="site-icon">A</span> AO3
-        </div>
-        <div class="site-tag active">
-          <span class="site-icon">F</span> FanFiction
-        </div>
-        <div class="site-tag">
-          <span class="site-icon">+</span> Genérico
-        </div>
       </div>
     </div>
   </div>
@@ -139,6 +129,21 @@ const PANEL_HTML = `
       </button>
     </div>
     <div id="tts-zen-preview-content"></div>
+  </div>
+</div>
+
+<div id="tts-zen-sites-overlay" class="hidden">
+  <div id="tts-zen-sites-modal">
+    <div id="tts-zen-sites-header">
+      <span>Sitios</span>
+      <button id="tts-zen-sites-close">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+    <div id="tts-zen-sites-list"></div>
   </div>
 </div>
 `;
@@ -402,6 +407,62 @@ const PANEL_CSS = `
   background: rgba(167,139,250,0.22); color: #f3f4f6;
 }
 #tts-zen-preview-content .sentence.played { color: #6b7280; }
+
+/* ---- Sites Modal ---- */
+#tts-zen-sites-overlay {
+  position: fixed; inset: 0; z-index: 9999999;
+  background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center;
+  animation: fade-in .2s ease;
+}
+#tts-zen-sites-overlay.hidden { display: none; }
+#tts-zen-sites-modal {
+  width: 360px; max-width: 90vw; background: #1a1a35;
+  border: 1px solid rgba(167,139,250,0.15); border-radius: 16px; overflow: hidden;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.6);
+  animation: modal-in .25s cubic-bezier(0.16,1,0.3,1);
+}
+#tts-zen-sites-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 18px; border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+#tts-zen-sites-header span { font-weight: 600; color: #a78bfa; font-size: 14px; }
+#tts-zen-sites-close {
+  display: flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; background: transparent; border: none;
+  border-radius: 8px; color: #6b7280; cursor: pointer; transition: all .15s ease;
+}
+#tts-zen-sites-close:hover { background: rgba(255,255,255,0.08); color: #d1d5db; }
+#tts-zen-sites-list { padding: 12px 18px; display: flex; flex-direction: column; gap: 6px; max-height: 50vh; overflow-y: auto; }
+
+.site-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.05);
+  transition: all .2s ease;
+}
+.site-row:hover { border-color: rgba(167,139,250,0.2); background: rgba(167,139,250,0.04); }
+.site-row-left { display: flex; align-items: center; gap: 10px; }
+.site-row-icon {
+  display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border-radius: 8px;
+  background: rgba(167,139,250,0.12); color: #a78bfa;
+  font-size: 13px; font-weight: 700;
+}
+.site-row-info { display: flex; flex-direction: column; }
+.site-row-name { font-size: 13px; color: #d1d5db; font-weight: 500; }
+.site-row-domain { font-size: 10px; color: #6b7280; }
+.site-toggle {
+  width: 42px; height: 24px; border-radius: 12px; border: none;
+  cursor: pointer; position: relative; background: rgba(255,255,255,0.1);
+  transition: background .2s ease; flex-shrink: 0;
+}
+.site-toggle.on { background: #7c3aed; }
+.site-toggle::after {
+  content: ''; position: absolute; top: 2px; left: 2px;
+  width: 20px; height: 20px; border-radius: 50%; background: #fff;
+  transition: transform .2s ease;
+}
+.site-toggle.on::after { transform: translateX(18px); }
 `;
 // ---- State ----
 
@@ -534,6 +595,14 @@ export async function createPanel(shadow, handlers) {
   const previewBtn = shadow.getElementById('tts-zen-preview-btn');
   previewBtn.addEventListener('click', function() { showPreview(''); });
 
+  // Sites modal
+  const sitesBtn = shadow.getElementById('tts-zen-sites-btn');
+  sitesBtn.addEventListener('click', showSitesModal);
+  const sitesClose = shadow.getElementById('tts-zen-sites-close');
+  sitesClose.addEventListener('click', hideSitesModal);
+  const sitesOverlay = shadow.getElementById('tts-zen-sites-overlay');
+  sitesOverlay.addEventListener('click', function(e) { if (e.target === sitesOverlay) hideSitesModal(); });
+
   // Preview close
   const previewClose = shadow.getElementById('tts-zen-preview-close');
   previewClose.addEventListener('click', hidePreview);
@@ -570,6 +639,7 @@ export async function createPanel(shadow, handlers) {
 
   await loadSettings();
   await loadCollapsedState();
+  await loadSiteSettings();
   speedSlider.value = Math.round(state.currentRate * 100);
   speedLabel.textContent = state.currentRate.toFixed(1) + 'x';
   loadVoices();
@@ -718,5 +788,79 @@ export function setPauseIcon(isPlaying) {
   var btn = getEl('tts-zen-pause');
   if (!btn) return;
   btn.innerHTML = isPlaying ? PAUSE_ICON : PLAY_ICON;
+}
+
+
+// ---- Site Manager ----
+
+var ALL_SITES = [
+  { id: 'wattpad.com', name: 'Wattpad', icon: 'W', domain: 'wattpad.com' },
+  { id: 'archiveofourown.org', name: 'AO3', icon: 'A', domain: 'archiveofourown.org' },
+  { id: 'fanfiction.net', name: 'FanFiction', icon: 'F', domain: 'fanfiction.net' },
+  { id: 'generic', name: 'Genérico', icon: '+', domain: 'otros sitios' },
+];
+
+// Default: all enabled
+var enabledSites = {};
+
+async function loadSiteSettings() {
+  try {
+    var stored = await browser.storage.local.get('enabledSites');
+    if (stored.enabledSites) {
+      enabledSites = stored.enabledSites;
+    } else {
+      ALL_SITES.forEach(function(s) { enabledSites[s.id] = true; });
+    }
+    window.__tts_zen_enabled_sites = enabledSites;
+  } catch (_) {
+    ALL_SITES.forEach(function(s) { enabledSites[s.id] = true; });
+    window.__tts_zen_enabled_sites = enabledSites;
+  }
+}
+
+async function saveSiteSettings() {
+  try { await browser.storage.local.set({ enabledSites: enabledSites }); } catch (_) {}
+  window.__tts_zen_enabled_sites = enabledSites;
+}
+
+function renderSitesList() {
+  var list = getEl('tts-zen-sites-list');
+  if (!list) return;
+  list.innerHTML = '';
+  ALL_SITES.forEach(function(site) {
+    var enabled = enabledSites[site.id] !== false;
+    var row = document.createElement('div');
+    row.className = 'site-row';
+    row.innerHTML =
+      '<div class="site-row-left">' +
+        '<div class="site-row-icon">' + site.icon + '</div>' +
+        '<div class="site-row-info">' +
+          '<div class="site-row-name">' + site.name + '</div>' +
+          '<div class="site-row-domain">' + site.domain + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<button class="site-toggle' + (enabled ? ' on' : '') + '" data-site="' + site.id + '"></button>';
+
+    var toggle = row.querySelector('.site-toggle');
+    toggle.addEventListener('click', function() {
+      var siteId = this.dataset.site;
+      enabledSites[siteId] = !(enabledSites[siteId] !== false);
+      this.classList.toggle('on', enabledSites[siteId] !== false);
+      saveSiteSettings();
+    });
+
+    list.appendChild(row);
+  });
+}
+
+function showSitesModal() {
+  renderSitesList();
+  var overlay = getEl('tts-zen-sites-overlay');
+  if (overlay) overlay.classList.remove('hidden');
+}
+
+function hideSitesModal() {
+  var overlay = getEl('tts-zen-sites-overlay');
+  if (overlay) overlay.classList.add('hidden');
 }
 
