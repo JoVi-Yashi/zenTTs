@@ -1,4 +1,4 @@
-.PHONY: install-backend backend test install-extension build-extension extension
+.PHONY: install-backend backend test install-extension build-extension extension launcher stop install-desktop
 
 install-backend:
 	cd server && uv sync --group dev
@@ -16,3 +16,19 @@ build-extension:
 	cd extension && npx esbuild src/content.js --bundle --outfile=content.js --format=iife --target=firefox109 --platform=browser --log-level=info
 
 extension: install-extension build-extension
+
+# ── Launcher ───────────────────────────────────────────
+
+launcher:
+	./launcher.sh start
+
+stop:
+	./launcher.sh stop
+
+install-desktop:
+	@mkdir -p "$(HOME)/.local/share/applications"
+	@mkdir -p "$(HOME)/.local/share/icons/hicolor/scalable/apps"
+	@cp tts-zen.desktop "$(HOME)/.local/share/applications/"
+	@cp tts-zen.svg "$(HOME)/.local/share/icons/hicolor/scalable/apps/"
+	@update-desktop-database "$(HOME)/.local/share/applications/" 2>/dev/null || true
+	@echo "✅ TTS-zen instalado en el menú de aplicaciones"

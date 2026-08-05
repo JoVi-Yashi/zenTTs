@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1a1a2e"/>
+      <stop offset="100%" stop-color="#16213e"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="24" fill="url(#bg)"/>
+  <!-- Sound waves -->
+  <path d="M44 50v28" stroke="#a78bfa" stroke-width="5" stroke-linecap="round" fill="none" opacity="0.6"/>
+  <path d="M36 58v12" stroke="#a78bfa" stroke-width="4" stroke-linecap="round" fill="none" opacity="0.4"/>
+  <path d="M52 42v44" stroke="#a78bfa" stroke-width="5" stroke-linecap="round" fill="none" opacity="0.8"/>
+  <path d="M28 64v0" stroke="#a78bfa" stroke-width="4" stroke-linecap="round" fill="none" opacity="0.2"/>
+  <!-- Play triangle -->
+  <polygon points="70,44 70,84 96,64" fill="#a78bfa"/>
+  <!-- Text "ZEN" -->
+  <text x="64" y="112" text-anchor="middle" font-family="sans-serif" font-size="16" font-weight="bold" fill="#a78bfa" opacity="0.8">ZEN</text>
+</svg>
