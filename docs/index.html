@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>zenTTS — Text-to-Speech para Zen Browser</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0a0a1a;color:#d1d5db;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;line-height:1.6;overflow-x:hidden}
+  a{color:#a78bfa;text-decoration:none;transition:color .2s}
+  a:hover{color:#c4b5fd}
+
+  /* Hero */
+  .hero{text-align:center;padding:80px 20px 60px;background:linear-gradient(180deg,#14142b 0%,#0a0a1a 100%);position:relative;overflow:hidden}
+  .hero::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle at 30% 50%,rgba(124,58,237,.08) 0%,transparent 50%),radial-gradient(circle at 70% 20%,rgba(167,139,250,.06) 0%,transparent 50%);animation:float 20s ease-in-out infinite}
+  @keyframes float{0%,100%{transform:translate(0,0)}50%{transform:translate(-2%,2%)}}
+  .hero-content{position:relative;z-index:1}
+  .hero h1{font-size:clamp(36px,8vw,72px);font-weight:800;background:linear-gradient(135deg,#a78bfa,#7c3aed,#c4b5fd);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:16px;letter-spacing:-1px}
+  .hero p{font-size:18px;color:#9ca3af;max-width:600px;margin:0 auto 32px}
+  .hero-buttons{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  .btn{padding:12px 28px;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:all .2s ease;display:inline-flex;align-items:center;gap:8px;text-decoration:none}
+  .btn-primary{background:#7c3aed;color:#fff;border:none;box-shadow:0 4px 20px rgba(124,58,237,.35)}
+  .btn-primary:hover{background:#8b5cf6;color:#fff;transform:translateY(-2px);box-shadow:0 8px 30px rgba(124,58,237,.45)}
+  .btn-outline{background:transparent;color:#a78bfa;border:1px solid rgba(167,139,250,.25)}
+  .btn-outline:hover{background:rgba(167,139,250,.1);border-color:#a78bfa;color:#c4b5fd}
+
+  /* Panel Preview */
+  .preview-section{padding:60px 20px;display:flex;justify-content:center}
+  .panel-preview{width:320px;background:linear-gradient(145deg,#14142b,#1a1a35);border:1px solid rgba(167,139,250,.15);border-radius:16px;padding:0;box-shadow:0 8px 40px rgba(0,0,0,.5),0 0 0 1px rgba(167,139,250,.08);overflow:hidden}
+  .panel-header{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06)}
+  .panel-header-left{display:flex;align-items:center;gap:8px}
+  .panel-dot{width:10px;height:10px;border-radius:50%;background:#fbbf24}
+  .panel-logo{display:flex;align-items:center;gap:6px;font-weight:600;font-size:13px;color:#a78bfa}
+  .panel-header-right{display:flex;gap:6px}
+  .panel-icon-btn{width:28px;height:28px;border-radius:7px;border:1px solid transparent;background:transparent;color:#6b7280;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s}
+  .panel-icon-btn:hover{background:rgba(167,139,250,.1);border-color:rgba(167,139,250,.2);color:#a78bfa}
+  .panel-body{padding:8px 14px 10px}
+  .panel-setting{display:flex;align-items:center;gap:8px;padding:6px 0}
+  .panel-setting label{min-width:62px;font-size:11px;color:#9ca3af}
+  .panel-select{flex:1;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04);color:#d1d5db;font-size:11px}
+  .panel-slider{display:flex;align-items:center;gap:8px;flex:1}
+  .panel-slider input{flex:1;accent-color:#a78bfa}
+  .panel-counter{text-align:center;padding:8px 0 4px;font-size:12px;color:#6b7280}
+  .panel-nav{display:flex;justify-content:center;gap:14px;padding:0 0 6px}
+  .panel-nav-btn{width:32px;height:26px;border-radius:6px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04);color:#9ca3af;display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .panel-controls{display:flex;gap:5px;padding:0}
+  .panel-btn{flex:1;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04);color:#d1d5db;font-size:12px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;transition:all .2s}
+  .panel-btn:hover{background:rgba(255,255,255,.08);border-color:rgba(167,139,250,.3);transform:translateY(-1px)}
+  .panel-btn.primary{background:#7c3aed;border-color:#7c3aed;color:#fff;font-weight:600;box-shadow:0 2px 12px rgba(124,58,237,.3)}
+  .panel-status{padding:6px 14px 10px;font-size:11px;color:#6b7280;text-align:center}
+
+  /* Features */
+  .features{padding:80px 20px;max-width:960px;margin:0 auto}
+  .features h2{font-size:32px;font-weight:700;color:#f3f4f6;text-align:center;margin-bottom:48px}
+  .features-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px}
+  .feature-card{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:24px;transition:all .3s ease}
+  .feature-card:hover{border-color:rgba(167,139,250,.2);background:rgba(167,139,250,.04);transform:translateY(-2px)}
+  .feature-icon{font-size:28px;margin-bottom:12px}
+  .feature-card h3{font-size:16px;color:#f3f4f6;margin-bottom:8px}
+  .feature-card p{font-size:13px;color:#9ca3af;line-height:1.7}
+
+  /* Install */
+  .install{padding:80px 20px;max-width:720px;margin:0 auto}
+  .install h2{font-size:32px;font-weight:700;color:#f3f4f6;text-align:center;margin-bottom:32px}
+  .install ol{counter-reset:step;list-style:none;display:flex;flex-direction:column;gap:20px}
+  .install li{counter-increment:step;display:flex;align-items:flex-start;gap:16px}
+  .install li::before{content:counter(step);display:flex;align-items:center;justify-content:center;min-width:36px;height:36px;border-radius:50%;background:rgba(167,139,250,.15);color:#a78bfa;font-weight:700;font-size:16px;flex-shrink:0}
+  .install li div{flex:1}
+  .install li strong{color:#f3f4f6;display:block;margin-bottom:4px}
+  .install li code{background:rgba(167,139,250,.1);color:#c4b5fd;padding:2px 6px;border-radius:4px;font-size:12px}
+  .install pre{background:#14142b;border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:16px;overflow-x:auto;margin-top:8px;font-size:12px;color:#9ca3af;line-height:1.8}
+
+  /* Branches */
+  .branches{padding:60px 20px;max-width:640px;margin:0 auto;text-align:center}
+  .branches h2{font-size:24px;color:#f3f4f6;margin-bottom:24px}
+  .branch-cards{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .branch-card{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:20px;text-align:left}
+  .branch-card h3{color:#a78bfa;font-size:14px;margin-bottom:8px}
+  .branch-card p{font-size:12px;color:#9ca3af;line-height:1.6}
+
+  /* Footer */
+  footer{text-align:center;padding:40px 20px;color:#4b5563;font-size:13px;border-top:1px solid rgba(255,255,255,.04)}
+  footer a{color:#6b7280}
+
+  @media(max-width:600px){
+    .hero{padding:60px 16px 40px}
+    .hero h1{font-size:32px}
+    .hero p{font-size:15px}
+    .branch-cards{grid-template-columns:1fr}
+    .panel-preview{width:100%;max-width:320px}
+  }
+</style>
+</head>
+<body>
+
+<section class="hero">
+  <div class="hero-content">
+    <h1>zenTTS</h1>
+    <p>Text-to-speech flotante para Zen Browser. Leé cualquier página web con un solo click.</p>
+    <div class="hero-buttons">
+      <a href="https://github.com/JoVi-Yashi/zenTTs" class="btn btn-primary">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+        GitHub
+      </a>
+      <a href="#install" class="btn btn-outline">Instalar</a>
+    </div>
+  </div>
+</section>
+
+<section class="preview-section">
+  <div class="panel-preview">
+    <div class="panel-header">
+      <div class="panel-header-left">
+        <div class="panel-dot"></div>
+        <div class="panel-logo">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+          TTS-zen
+        </div>
+      </div>
+      <div class="panel-header-right">
+        <div class="panel-icon-btn" title="Preview">👁</div>
+        <div class="panel-icon-btn" title="Sitios">🌐</div>
+        <div class="panel-icon-btn" title="Settings">⚙</div>
+      </div>
+    </div>
+    <div class="panel-body">
+      <div class="panel-setting">
+        <label>Voz</label>
+        <select class="panel-select"><option>Microsoft Pablo (Español)</option></select>
+      </div>
+      <div class="panel-setting">
+        <label>Velocidad</label>
+        <div class="panel-slider">
+          <input type="range" value="100" min="50" max="300">
+          <span style="color:#a78bfa;font-size:11px;font-weight:600">1.0x</span>
+        </div>
+      </div>
+    </div>
+    <div class="panel-counter">Línea 3 de 45</div>
+    <div class="panel-nav">
+      <div class="panel-nav-btn">◀</div>
+      <div class="panel-nav-btn">▶</div>
+    </div>
+    <div style="padding:0 14px">
+      <div class="panel-controls">
+        <div class="panel-btn primary">▶ Leer</div>
+        <div class="panel-btn">⏸</div>
+        <div class="panel-btn">⏹</div>
+      </div>
+    </div>
+    <div class="panel-status">Reproduciendo...</div>
+  </div>
+</section>
+
+<section class="features" id="features">
+  <h2>Características</h2>
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon">🎯</div>
+      <h3>Shadow DOM nativo</h3>
+      <p>El panel flotante usa Shadow DOM. El CSS del sitio nunca interfiere con la herramienta.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🔊</div>
+      <h3>SpeechSynthesis</h3>
+      <p>TTS nativo del navegador. Cero dependencias, cero servidores. Funciona apenas cargás la extensión.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📍</div>
+      <h3>Highlighting en página</h3>
+      <p>Resalta el párrafo actual en la página mientras se reproduce. Como Edge, pero en Zen.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📖</div>
+      <h3>Extractores por sitio</h3>
+      <p>Wattpad, AO3, FanFiction, Webnovel — cada uno con su propio extractor optimizado.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🌐</div>
+      <h3>Site Manager</h3>
+      <p>Activá o desactivá la herramienta por dominio. Con favicons reales y toggles.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🎨</div>
+      <h3>Preview sincronizado</h3>
+      <p>Pop-up con el texto extraído, subrayado en tiempo real al ritmo del audio.</p>
+    </div>
+  </div>
+</section>
+
+<section class="install" id="install">
+  <h2>Instalación</h2>
+  <ol>
+    <li>
+      <div>
+        <strong>Clonar el repo</strong>
+        <pre>git clone git@github.com:JoVi-Yashi/zenTTs.git
+cd zenTTs</pre>
+      </div>
+    </li>
+    <li>
+      <div>
+        <strong>Buildear la extensión</strong>
+        <pre>cd extension && npm install && cd ..
+make build-extension</pre>
+      </div>
+    </li>
+    <li>
+      <div>
+        <strong>Cargar en Zen</strong>
+        <p style="color:#9ca3af;font-size:13px;margin-top:4px">Andá a <code>about:debugging</code> → <strong>Cargar complemento temporal</strong> → seleccioná <code>extension/manifest.json</code></p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <strong>Flatpak (opcional)</strong>
+        <p style="color:#9ca3af;font-size:13px;margin-top:4px">Si Zen está en Flatpak, necesita acceso al filesystem:</p>
+        <pre>flatpak override --user --filesystem=$HOME/Proyectos/zenTTs app.zen_browser.zen</pre>
+      </div>
+    </li>
+  </ol>
+</section>
+
+<section class="branches">
+  <h2>Versiones disponibles</h2>
+  <div class="branch-cards">
+    <div class="branch-card">
+      <h3>main</h3>
+      <p>SpeechSynthesis nativo. Sin dependencias, sin server. Listo para usar.</p>
+      <p style="margin-top:8px;font-size:11px;color:#6b7280">Voces del sistema</p>
+    </div>
+    <div class="branch-card">
+      <h3>feat/edge-tts-server</h3>
+      <p>edge-tts con 45 voces neurales. Calidad Microsoft. Requiere server Python local.</p>
+      <p style="margin-top:8px;font-size:11px;color:#6b7280">Python + FastAPI + uv</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p>zenTTS · <a href="https://github.com/JoVi-Yashi/zenTTs">GitHub</a> · MIT</p>
+</footer>
+
+</body>
+</html>
