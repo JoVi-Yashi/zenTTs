@@ -2911,15 +2911,18 @@
   function updateHighlight(idx) {
     if (idx < 0 || idx >= sentenceData.length) return;
     var s = sentenceData[idx];
-    var prevActive = document.querySelector("#tts-zen-preview-content .sentence.active");
-    if (prevActive) {
-      prevActive.classList.remove("active");
-      prevActive.classList.add("played");
-    }
-    var prevEl = document.getElementById("tts-zen-preview-s-" + idx);
-    if (prevEl) {
-      prevEl.classList.add("active");
-      prevEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    var host = document.getElementById("tts-zen-host");
+    if (host && host.shadowRoot) {
+      var prevActive = host.shadowRoot.querySelector("#tts-zen-preview-content .sentence.active");
+      if (prevActive) {
+        prevActive.classList.remove("active");
+        prevActive.classList.add("played");
+      }
+      var prevEl = host.shadowRoot.getElementById("tts-zen-preview-s-" + idx);
+      if (prevEl) {
+        prevEl.classList.add("active");
+        prevEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
     }
     for (var i = 0; i < extractedRefs.length; i++) {
       var ref = extractedRefs[i];
