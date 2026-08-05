@@ -494,57 +494,57 @@ async function saveSettings() {
 // ---- Voice Loading ----
 
 async function loadVoices() {
-  try {
-    let response;
-    for (let i = 0; i < 3; i++) {
-      try {
-        response = await browser.runtime.sendMessage({ action: 'get_voices' });
-        break;
-      } catch (err) {
-        if (err.message?.includes('receiving end does not exist') && i < 2) {
-          await new Promise(r => setTimeout(r, 200));
-          continue;
-        }
-        throw err;
-      }
-    }
-    if (response?.success) {
-      state.voices = response.voices;
-      populateVoiceDropdown();
-    }
-  } catch (_) {}
+  // Use browser's built-in speech synthesis voices
+  var voices = speechSynthesis.getVoices();
+  if (voices.length > 0) {
+    state.voices = voices.map(function(v) {
+      return { name: v.name, lang: v.lang, voiceURI: v.voiceURI, default: v.default };
+    });
+    populateVoiceDropdown();
+    return;
+  }
+
+  // Voices might not be loaded yet on first call
+  speechSynthesis.onvoiceschanged = function() {
+    var v = speechSynthesis.getVoices();
+    state.voices = v.map(function(x) {
+      return { name: x.name, lang: x.lang, voiceURI: x.voiceURI, default: x.default };
+    });
+    populateVoiceDropdown();
+  };
 }
 
 function populateVoiceDropdown() {
-  const select = getEl('tts-zen-voice');
+  var select = getEl('tts-zen-voice');
   if (!select) return;
   select.innerHTML = '';
-  const groups = {};
-  for (const v of state.voices) {
-    const country = v.locale.split('-')[1] || v.locale;
-    if (!groups[country]) groups[country] = [];
-    groups[country].push(v);
-  }
-  const names = { ES: 'España', MX: 'México', AR: 'Argentina', CO: 'Colombia',
-    CL: 'Chile', PE: 'Perú', VE: 'Venezuela', US: 'EEUU', BO: 'Bolivia',
-    CR: 'Costa Rica', CU: 'Cuba', DO: 'Dominicana', EC: 'Ecuador',
-    SV: 'El Salvador', GQ: 'Guinea Ecuatorial', GT: 'Guatemala',
-    HN: 'Honduras', NI: 'Nicaragua', PA: 'Panamá', PY: 'Paraguay',
-    PR: 'Puerto Rico', UY: 'Uruguay' };
-  for (const [country, voices] of Object.entries(groups)) {
-    const optgroup = document.createElement('optgroup');
-    optgroup.label = names[country] || country;
-    for (const v of voices) {
-      const opt = document.createElement('option');
+
+  // Group by language
+  var groups = {};
+  state.voices.forEach(function(v) {
+    var lang = v.lang || 'desconocido';
+    if (!groups[lang]) groups[lang] = [];
+    groups[lang].push(v);
+  });
+
+  var langNames = { 'es-ES': 'Español', 'es-MX': 'Español (MX)', 'es-US': 'Español (US)',
+    'es': 'Español', 'en-US': 'English', 'en-GB': 'English (UK)', 'en': 'English',
+    'fr-FR': 'Français', 'de-DE': 'Deutsch', 'it-IT': 'Italiano', 'pt-BR': 'Português' };
+
+  Object.keys(groups).sort().forEach(function(lang) {
+    var voices = groups[lang];
+    var label = langNames[lang] || lang;
+    var optgroup = document.createElement('optgroup');
+    optgroup.label = label;
+    voices.forEach(function(v) {
+      var opt = document.createElement('option');
       opt.value = v.name;
-      const short = v.friendly.replace('Microsoft ', '').replace(' Online (Natural)', '');
-      opt.textContent = short + ' (' + (v.gender === 'Female' ? 'F' : 'M') + ')';
-      if (v.name === state.currentVoice) opt.selected = true;
+      opt.textContent = v.name + (v.default ? ' (default)' : '');
+      if (v.name === state.currentVoice || v.default) opt.selected = true;
       optgroup.appendChild(opt);
-    }
+    });
     select.appendChild(optgroup);
-  }
-  select.value = state.currentVoice;
+  });
 }
 
 // ---- UI Helpers ----

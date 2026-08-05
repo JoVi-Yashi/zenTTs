@@ -2573,75 +2573,59 @@
     }
   }
   async function loadVoices() {
-    try {
-      let response;
-      for (let i = 0; i < 3; i++) {
-        try {
-          response = await browser.runtime.sendMessage({ action: "get_voices" });
-          break;
-        } catch (err) {
-          if (err.message?.includes("receiving end does not exist") && i < 2) {
-            await new Promise((r) => setTimeout(r, 200));
-            continue;
-          }
-          throw err;
-        }
-      }
-      if (response?.success) {
-        state.voices = response.voices;
-        populateVoiceDropdown();
-      }
-    } catch (_) {
+    var voices = speechSynthesis.getVoices();
+    if (voices.length > 0) {
+      state.voices = voices.map(function(v) {
+        return { name: v.name, lang: v.lang, voiceURI: v.voiceURI, default: v.default };
+      });
+      populateVoiceDropdown();
+      return;
     }
+    speechSynthesis.onvoiceschanged = function() {
+      var v = speechSynthesis.getVoices();
+      state.voices = v.map(function(x) {
+        return { name: x.name, lang: x.lang, voiceURI: x.voiceURI, default: x.default };
+      });
+      populateVoiceDropdown();
+    };
   }
   function populateVoiceDropdown() {
-    const select = getEl("tts-zen-voice");
+    var select = getEl("tts-zen-voice");
     if (!select) return;
     select.innerHTML = "";
-    const groups = {};
-    for (const v of state.voices) {
-      const country = v.locale.split("-")[1] || v.locale;
-      if (!groups[country]) groups[country] = [];
-      groups[country].push(v);
-    }
-    const names = {
-      ES: "Espa\xF1a",
-      MX: "M\xE9xico",
-      AR: "Argentina",
-      CO: "Colombia",
-      CL: "Chile",
-      PE: "Per\xFA",
-      VE: "Venezuela",
-      US: "EEUU",
-      BO: "Bolivia",
-      CR: "Costa Rica",
-      CU: "Cuba",
-      DO: "Dominicana",
-      EC: "Ecuador",
-      SV: "El Salvador",
-      GQ: "Guinea Ecuatorial",
-      GT: "Guatemala",
-      HN: "Honduras",
-      NI: "Nicaragua",
-      PA: "Panam\xE1",
-      PY: "Paraguay",
-      PR: "Puerto Rico",
-      UY: "Uruguay"
+    var groups = {};
+    state.voices.forEach(function(v) {
+      var lang = v.lang || "desconocido";
+      if (!groups[lang]) groups[lang] = [];
+      groups[lang].push(v);
+    });
+    var langNames = {
+      "es-ES": "Espa\xF1ol",
+      "es-MX": "Espa\xF1ol (MX)",
+      "es-US": "Espa\xF1ol (US)",
+      "es": "Espa\xF1ol",
+      "en-US": "English",
+      "en-GB": "English (UK)",
+      "en": "English",
+      "fr-FR": "Fran\xE7ais",
+      "de-DE": "Deutsch",
+      "it-IT": "Italiano",
+      "pt-BR": "Portugu\xEAs"
     };
-    for (const [country, voices] of Object.entries(groups)) {
-      const optgroup = document.createElement("optgroup");
-      optgroup.label = names[country] || country;
-      for (const v of voices) {
-        const opt = document.createElement("option");
+    Object.keys(groups).sort().forEach(function(lang) {
+      var voices = groups[lang];
+      var label = langNames[lang] || lang;
+      var optgroup = document.createElement("optgroup");
+      optgroup.label = label;
+      voices.forEach(function(v) {
+        var opt = document.createElement("option");
         opt.value = v.name;
-        const short = v.friendly.replace("Microsoft ", "").replace(" Online (Natural)", "");
-        opt.textContent = short + " (" + (v.gender === "Female" ? "F" : "M") + ")";
-        if (v.name === state.currentVoice) opt.selected = true;
+        opt.textContent = v.name + (v.default ? " (default)" : "");
+        if (v.name === state.currentVoice || v.default) opt.selected = true;
         optgroup.appendChild(opt);
-      }
+      });
       select.appendChild(optgroup);
-    }
-    select.value = state.currentVoice;
+    });
   }
   function getEl(id) {
     const host = document.getElementById("tts-zen-host");
@@ -3096,147 +3080,86 @@
       currentHighlight = null;
     }
   }
-  var audio = null;
-  var extractedRefs = [];
   var sentenceData = [];
-  var chunkQueue = [];
-  var chunkIndex = 0;
-  var totalSentences = 0;
-  var sentenceOffset = 0;
-  function stopAudio() {
-    chunkQueue = [];
-    chunkIndex = 0;
-    totalSentences = 0;
-    sentenceOffset = 0;
-    if (audio) {
-      audio.pause();
-      if (audio.src?.startsWith("blob:")) URL.revokeObjectURL(audio.src);
-      audio = null;
-    }
+  var currentSentenceIdx = -1;
+  var extractedRefs = [];
+  var isSpeaking = false;
+  var isPaused = false;
+  function splitIntoSentences(text) {
+    var parts = text.match(/[^.!?…\n]+[.!?…]*(\n|$)?/g) || [text];
+    return parts.map(function(p) {
+      return p.trim();
+    }).filter(function(p) {
+      return p.length > 0;
+    });
+  }
+  function stopSpeech() {
+    speechSynthesis.cancel();
+    isSpeaking = false;
+    isPaused = false;
+    currentSentenceIdx = -1;
     clearHighlight();
     window.__tts_zen_sentences = [];
   }
-  function splitIntoChunks(text, maxLen) {
-    var chunks = [];
-    var paragraphs = text.split("\n\n");
-    var current = "";
-    for (var i = 0; i < paragraphs.length; i++) {
-      var p = paragraphs[i].trim();
-      if (!p) continue;
-      if (current && current.length + p.length > maxLen) {
-        chunks.push(current.trim());
-        current = p;
-      } else {
-        current = current ? current + "\n\n" + p : p;
-      }
+  function speakSentence(idx) {
+    if (idx >= sentenceData.length) {
+      setStatus("Listo");
+      setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
+      setPauseIcon(false);
+      isSpeaking = false;
+      return;
     }
-    if (current.trim()) chunks.push(current.trim());
-    return chunks.length > 0 ? chunks : [text];
-  }
-  async function fetchChunk(text) {
+    currentSentenceIdx = idx;
+    var text = sentenceData[idx].text;
     var st = window.__tts_zen_state || {};
-    var voice = st.currentVoice || "es-ES-AlvaroNeural";
-    var rateVal = st.currentRate || 1;
-    var rate = Math.round((rateVal - 1) * 100) + "%";
-    var rateStr = rateVal >= 1 ? "+" + rate : rate;
-    var response = await sendMessageWithRetry({
-      action: "read_page_sync",
-      text,
-      voice,
-      rate: rateStr
-    });
-    if (!response || !response.success) {
-      throw new Error(response?.error || "TTS chunk failed");
+    var rate = st.currentRate || 1;
+    var utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = rate;
+    utterance.lang = "es-ES";
+    var voices = speechSynthesis.getVoices();
+    var selectedVoice = st.currentVoice || "";
+    if (selectedVoice && voices.length > 0) {
+      var match = voices.find(function(v) {
+        return v.name === selectedVoice || v.voiceURI === selectedVoice;
+      });
+      if (match) utterance.voice = match;
     }
-    return response;
+    utterance.onstart = function() {
+      updateHighlight(idx);
+      setCounter(idx + 1, sentenceData.length);
+      setStatus("Reproduciendo...");
+    };
+    utterance.onend = function() {
+      if (!isSpeaking) return;
+      speakSentence(idx + 1);
+    };
+    utterance.onerror = function(e) {
+      if (e.error === "canceled" || e.error === "interrupted") return;
+      setStatus("Error de voz: " + e.error, true);
+      setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
+      isSpeaking = false;
+    };
+    speechSynthesis.speak(utterance);
   }
-  function playChunk(chunkData) {
-    var sentences = chunkData.sentences;
-    var duration = sentences.length > 0 ? sentences[sentences.length - 1].end : 0;
-    for (var i = 0; i < sentences.length; i++) {
-      sentences[i].start += sentenceOffset;
-      sentences[i].end += sentenceOffset;
-    }
-    sentenceData = sentenceData.concat(sentences);
-    totalSentences = sentenceData.length;
+  function startSpeechPlayback(text) {
+    stopSpeech();
+    var rawSentences = splitIntoSentences(text);
+    sentenceData = rawSentences.map(function(s, i) {
+      return { text: s, start: i, end: i + 1 };
+    });
     window.__tts_zen_sentences = sentenceData;
-    var binary = atob(chunkData.audio);
-    var bytes = new Uint8Array(binary.length);
-    for (var i2 = 0; i2 < binary.length; i2++) bytes[i2] = binary.charCodeAt(i2);
-    var blob = new Blob([bytes], { type: "audio/mpeg" });
-    var url = URL.createObjectURL(blob);
-    if (audio) {
-      URL.revokeObjectURL(audio.src);
-    }
-    audio = new Audio(url);
-    var lastIdx = -1;
-    audio.addEventListener("timeupdate", function() {
-      if (!audio || !sentenceData.length) return;
-      var t = audio.currentTime + sentenceOffset;
-      var found = -1;
-      for (var i3 = 0; i3 < sentenceData.length; i3++) {
-        if (t >= sentenceData[i3].start && t < sentenceData[i3].end) {
-          found = i3;
-          break;
-        }
-      }
-      if (found !== -1 && found !== lastIdx) {
-        lastIdx = found;
-        updateHighlight(found);
-      }
-    });
-    audio.addEventListener("ended", function() {
-      sentenceOffset += duration;
-      URL.revokeObjectURL(audio.src);
-      audio = null;
-      chunkIndex++;
-      if (chunkIndex < chunkQueue.length) {
-        setStatus("Reproduciendo... (" + (chunkIndex + 1) + "/" + chunkQueue.length + ")");
-        playChunk(chunkQueue[chunkIndex]);
-      } else {
-        setStatus("Listo");
-        setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
-        setPauseIcon(false);
-        sentenceOffset = 0;
-      }
-    });
-    audio.addEventListener("error", function() {
-      setStatus("Error de reproduccion", true);
-      setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
-      stopAudio();
-    });
-    audio.play().then(function() {
-      setStatus("Reproduciendo... (" + (chunkIndex + 1) + "/" + chunkQueue.length + ")");
-      setButtonsEnabled({ read: false, pause: true, stop: true, prev: true, next: true });
-      setPauseIcon(true);
-    }).catch(function(err) {
-      setStatus("Error: " + err.message, true);
-      setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
-      stopAudio();
-    });
-  }
-  async function startChunkedPlayback(text) {
-    var chunks = splitIntoChunks(text, 2e3);
-    chunkQueue = new Array(chunks.length);
-    chunkIndex = 0;
-    sentenceOffset = 0;
-    sentenceData = [];
-    setStatus("Generando audio... (1/" + chunks.length + ")");
-    chunkQueue[0] = await fetchChunk(chunks[0]);
-    playChunk(chunkQueue[0]);
-    for (var i = 1; i < chunks.length; i++) {
-      setStatus("Reproduciendo... cargando (" + (i + 1) + "/" + chunks.length + ")");
-      chunkQueue[i] = await fetchChunk(chunks[i]);
-    }
+    isSpeaking = true;
+    setButtonsEnabled({ read: false, pause: true, stop: true, prev: true, next: true });
+    setPauseIcon(true);
+    speakSentence(0);
   }
   function jumpToSentence(idx) {
     if (idx < 0 || idx >= sentenceData.length) return;
-    if (!audio && chunkIndex < chunkQueue.length) return;
-    var targetTime = sentenceData[idx].start;
-    if (audio && targetTime >= sentenceOffset) {
-      audio.currentTime = targetTime - sentenceOffset;
-      updateHighlight(idx);
-    }
+    speechSynthesis.cancel();
+    isSpeaking = true;
+    setButtonsEnabled({ read: false, pause: true, stop: true, prev: true, next: true });
+    setPauseIcon(true);
+    speakSentence(idx);
   }
   function updateHighlight(idx) {
     if (idx < 0 || idx >= sentenceData.length) return;
@@ -3287,81 +3210,46 @@
       content.appendChild(p);
     }
   }
-  async function sendMessageWithRetry(message, maxRetries = 3) {
-    for (let i = 0; i < maxRetries; i++) {
-      try {
-        return await browser.runtime.sendMessage(message);
-      } catch (err) {
-        if (err.message?.includes("receiving end does not exist") && i < maxRetries - 1) {
-          await new Promise((r) => setTimeout(r, 200));
-          continue;
-        }
-        throw err;
-      }
-    }
-  }
   async function dispatchReadPage(extractFn) {
-    const result = extractFn();
+    var result = extractFn();
     if (!result || !result.text) {
       setStatus("No se encontr\xF3 texto en esta p\xE1gina", true);
       return;
     }
     extractedRefs = result.refs || [];
-    const text = result.text;
+    var text = result.text;
     window.__tts_zen_last_text = text;
-    setStatus("Extrayendo texto...");
-    setButtonsEnabled({ read: false, pause: false, stop: false, prev: false, next: false });
-    try {
-      if (!browser || !browser.runtime || !browser.runtime.sendMessage) {
-        throw new Error("Extension API not available \u2014 reload the extension in about:debugging");
-      }
-      await startChunkedPlayback(text);
-    } catch (err) {
-      setStatus("Error: " + err.message, true);
-      setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
-    }
+    setStatus("Iniciando lectura...");
+    startSpeechPlayback(text);
   }
   function handlePause() {
-    if (!audio) return;
-    if (audio.paused) {
-      audio.play().then(function() {
-        setStatus("Reproduciendo...");
-        setPauseIcon(true);
-      });
+    if (!isSpeaking) return;
+    if (isPaused) {
+      speechSynthesis.resume();
+      isPaused = false;
+      setStatus("Reproduciendo...");
+      setPauseIcon(true);
     } else {
-      audio.pause();
+      speechSynthesis.pause();
+      isPaused = true;
       setStatus("Pausado");
       setPauseIcon(false);
     }
   }
   function handleStop() {
-    stopAudio();
+    stopSpeech();
     setStatus("Detenido");
     setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
     setPauseIcon(false);
   }
   function handlePrev() {
     if (!sentenceData.length) return;
-    var t = audio ? sentenceOffset + audio.currentTime : sentenceOffset;
-    var idx = -1;
-    for (var i = sentenceData.length - 1; i >= 0; i--) {
-      if (sentenceData[i].start < t - 0.5) {
-        idx = i;
-        break;
-      }
-    }
-    jumpToSentence(Math.max(0, idx));
+    var idx = Math.max(0, currentSentenceIdx - 2);
+    jumpToSentence(idx);
   }
   function handleNext() {
     if (!sentenceData.length) return;
-    var t = audio ? sentenceOffset + audio.currentTime : sentenceOffset;
-    var idx = sentenceData.length - 1;
-    for (var i = 0; i < sentenceData.length; i++) {
-      if (sentenceData[i].start > t + 0.1) {
-        idx = i;
-        break;
-      }
-    }
+    var idx = Math.min(sentenceData.length - 1, currentSentenceIdx + 1);
     jumpToSentence(idx);
   }
   window.__tts_zen_state = { currentVoice: "es-ES-AlvaroNeural", currentRate: 1 };

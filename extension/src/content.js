@@ -189,180 +189,112 @@ function clearHighlight() {
   }
 }
 
-// ---- Audio Player ----
+// ---- SpeechSynthesis Player ----
 
-let audio = null;
-let extractedRefs = [];
 let sentenceData = [];
-let chunkQueue = [];
-let chunkIndex = 0;
-let totalSentences = 0;
-let sentenceOffset = 0;
+let currentSentenceIdx = -1;
+let extractedRefs = [];
+let isSpeaking = false;
+let isPaused = false;
 
-function stopAudio() {
-  chunkQueue = [];
-  chunkIndex = 0;
-  totalSentences = 0;
-  sentenceOffset = 0;
-  if (audio) {
-    audio.pause();
-    if (audio.src?.startsWith('blob:')) URL.revokeObjectURL(audio.src);
-    audio = null;
-  }
+function splitIntoSentences(text) {
+  // Split by sentence-ending punctuation, keeping delimiters
+  var parts = text.match(/[^.!?…\n]+[.!?…]*(\n|$)?/g) || [text];
+  return parts.map(function(p) { return p.trim(); }).filter(function(p) { return p.length > 0; });
+}
+
+function stopSpeech() {
+  speechSynthesis.cancel();
+  isSpeaking = false;
+  isPaused = false;
+  currentSentenceIdx = -1;
   clearHighlight();
   window.__tts_zen_sentences = [];
 }
 
-function splitIntoChunks(text, maxLen) {
-  var chunks = [];
-  var paragraphs = text.split('\n\n');
-  var current = '';
-  for (var i = 0; i < paragraphs.length; i++) {
-    var p = paragraphs[i].trim();
-    if (!p) continue;
-    if (current && (current.length + p.length > maxLen)) {
-      chunks.push(current.trim());
-      current = p;
-    } else {
-      current = current ? current + '\n\n' + p : p;
-    }
+function speakSentence(idx) {
+  if (idx >= sentenceData.length) {
+    // Finished all sentences
+    setStatus('Listo');
+    setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
+    setPauseIcon(false);
+    isSpeaking = false;
+    return;
   }
-  if (current.trim()) chunks.push(current.trim());
-  return chunks.length > 0 ? chunks : [text];
-}
 
-async function fetchChunk(text) {
+  currentSentenceIdx = idx;
+  var text = sentenceData[idx].text;
   var st = window.__tts_zen_state || {};
-  var voice = st.currentVoice || 'es-ES-AlvaroNeural';
-  var rateVal = st.currentRate || 1.0;
-  var rate = Math.round((rateVal - 1) * 100) + '%';
-  var rateStr = rateVal >= 1 ? '+' + rate : rate;
+  var rate = st.currentRate || 1.0;
 
-  var response = await sendMessageWithRetry({
-    action: 'read_page_sync', text: text, voice: voice, rate: rateStr,
-  });
-  if (!response || !response.success) {
-    throw new Error(response?.error || 'TTS chunk failed');
+  var utterance = new SpeechSynthesisUtterance(text);
+  utterance.rate = rate;
+  utterance.lang = 'es-ES';
+
+  // Try to find a matching voice
+  var voices = speechSynthesis.getVoices();
+  var selectedVoice = st.currentVoice || '';
+  if (selectedVoice && voices.length > 0) {
+    var match = voices.find(function(v) { return v.name === selectedVoice || v.voiceURI === selectedVoice; });
+    if (match) utterance.voice = match;
   }
-  return response;
+
+  utterance.onstart = function() {
+    updateHighlight(idx);
+    setCounter(idx + 1, sentenceData.length);
+    setStatus('Reproduciendo...');
+  };
+
+  utterance.onend = function() {
+    if (!isSpeaking) return;
+    speakSentence(idx + 1);
+  };
+
+  utterance.onerror = function(e) {
+    if (e.error === 'canceled' || e.error === 'interrupted') return;
+    setStatus('Error de voz: ' + e.error, true);
+    setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
+    isSpeaking = false;
+  };
+
+  speechSynthesis.speak(utterance);
 }
 
-function playChunk(chunkData) {
-  // Offset sentence timings by total previous audio duration
-  var sentences = chunkData.sentences;
-  var duration = sentences.length > 0 ? sentences[sentences.length - 1].end : 0;
-  for (var i = 0; i < sentences.length; i++) {
-    sentences[i].start += sentenceOffset;
-    sentences[i].end += sentenceOffset;
-  }
+function startSpeechPlayback(text) {
+  stopSpeech();
 
-  sentenceData = sentenceData.concat(sentences);
-  totalSentences = sentenceData.length;
-  window.__tts_zen_sentences = sentenceData; // for preview popup sync
-
-  // Decode base64 audio
-  var binary = atob(chunkData.audio);
-  var bytes = new Uint8Array(binary.length);
-  for (var i2 = 0; i2 < binary.length; i2++) bytes[i2] = binary.charCodeAt(i2);
-  var blob = new Blob([bytes], { type: 'audio/mpeg' });
-  var url = URL.createObjectURL(blob);
-
-  if (audio) {
-    URL.revokeObjectURL(audio.src);
-  }
-  audio = new Audio(url);
-  var lastIdx = -1;
-
-  audio.addEventListener('timeupdate', function() {
-    if (!audio || !sentenceData.length) return;
-    var t = audio.currentTime + sentenceOffset;
-    var found = -1;
-    for (var i3 = 0; i3 < sentenceData.length; i3++) {
-      if (t >= sentenceData[i3].start && t < sentenceData[i3].end) { found = i3; break; }
-    }
-    if (found !== -1 && found !== lastIdx) {
-      lastIdx = found;
-      updateHighlight(found);
-    }
+  // Split into sentences and build data array
+  var rawSentences = splitIntoSentences(text);
+  sentenceData = rawSentences.map(function(s, i) {
+    return { text: s, start: i, end: i + 1 };
   });
+  window.__tts_zen_sentences = sentenceData;
 
-  audio.addEventListener('ended', function() {
-    sentenceOffset += duration;
-    URL.revokeObjectURL(audio.src);
-    audio = null;
+  isSpeaking = true;
+  setButtonsEnabled({ read: false, pause: true, stop: true, prev: true, next: true });
+  setPauseIcon(true);
 
-    chunkIndex++;
-    if (chunkIndex < chunkQueue.length) {
-      // Pre-fetched, play next
-      setStatus('Reproduciendo... (' + (chunkIndex + 1) + '/' + chunkQueue.length + ')');
-      playChunk(chunkQueue[chunkIndex]);
-    } else {
-      // All done
-      setStatus('Listo');
-      setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
-      setPauseIcon(false);
-      sentenceOffset = 0;
-    }
-  });
-
-  audio.addEventListener('error', function() {
-    setStatus('Error de reproduccion', true);
-    setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
-    stopAudio();
-  });
-
-  audio.play().then(function() {
-    setStatus('Reproduciendo... (' + (chunkIndex + 1) + '/' + chunkQueue.length + ')');
-    setButtonsEnabled({ read: false, pause: true, stop: true, prev: true, next: true });
-    setPauseIcon(true);
-  }).catch(function(err) {
-    setStatus('Error: ' + err.message, true);
-    setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
-    stopAudio();
-  });
-}
-
-async function startChunkedPlayback(text) {
-  var chunks = splitIntoChunks(text, 2000);
-  chunkQueue = new Array(chunks.length);
-  chunkIndex = 0;
-  sentenceOffset = 0;
-  sentenceData = [];
-
-  // Fetch first chunk and start playing
-  setStatus('Generando audio... (1/' + chunks.length + ')');
-  chunkQueue[0] = await fetchChunk(chunks[0]);
-  playChunk(chunkQueue[0]);
-
-  // Pre-fetch remaining chunks in background
-  for (var i = 1; i < chunks.length; i++) {
-    setStatus('Reproduciendo... cargando (' + (i + 1) + '/' + chunks.length + ')');
-    chunkQueue[i] = await fetchChunk(chunks[i]);
-  }
+  speakSentence(0);
 }
 
 function jumpToSentence(idx) {
   if (idx < 0 || idx >= sentenceData.length) return;
-  if (!audio && chunkIndex < chunkQueue.length) return;
-
-  var targetTime = sentenceData[idx].start;
-  // Find which chunk contains this sentence and seek
-  if (audio && targetTime >= sentenceOffset) {
-    audio.currentTime = targetTime - sentenceOffset;
-    updateHighlight(idx);
-  }
+  speechSynthesis.cancel();
+  isSpeaking = true;
+  setButtonsEnabled({ read: false, pause: true, stop: true, prev: true, next: true });
+  setPauseIcon(true);
+  speakSentence(idx);
 }
 
 function updateHighlight(idx) {
   if (idx < 0 || idx >= sentenceData.length) return;
   var s = sentenceData[idx];
 
-  // Update preview popup highlight if open (inside Shadow DOM)
+  // Update preview popup highlight if open
   var host = document.getElementById('tts-zen-host');
   if (host && host.shadowRoot) {
     var overlay = host.shadowRoot.getElementById('tts-zen-preview-overlay');
     if (overlay && !overlay.classList.contains('hidden')) {
-      // Refresh preview content with latest sentences
       refreshPreviewContent(host.shadowRoot);
       var prevActive = host.shadowRoot.querySelector('#tts-zen-preview-content .sentence.active');
       if (prevActive) { prevActive.classList.remove('active'); prevActive.classList.add('played'); }
@@ -406,60 +338,40 @@ function refreshPreviewContent(shadow) {
   }
 }
 
-async function sendMessageWithRetry(message, maxRetries = 3) {
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      return await browser.runtime.sendMessage(message);
-    } catch (err) {
-      if (err.message?.includes('receiving end does not exist') && i < maxRetries - 1) {
-        await new Promise(r => setTimeout(r, 200));
-        continue;
-      }
-      throw err;
-    }
-  }
-}
-
 async function dispatchReadPage(extractFn) {
-  const result = extractFn();
+  var result = extractFn();
   if (!result || !result.text) {
     setStatus('No se encontró texto en esta página', true);
     return;
   }
 
   extractedRefs = result.refs || [];
-  const text = result.text;
-  window.__tts_zen_last_text = text; // for preview modal
+  var text = result.text;
+  window.__tts_zen_last_text = text;
 
-  setStatus('Extrayendo texto...');
-  setButtonsEnabled({ read: false, pause: false, stop: false, prev: false, next: false });
-
-  try {
-    if (!browser || !browser.runtime || !browser.runtime.sendMessage) {
-      throw new Error('Extension API not available — reload the extension in about:debugging');
-    }
-    await startChunkedPlayback(text);
-  } catch (err) {
-    setStatus('Error: ' + err.message, true);
-    setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
-  }
+  setStatus('Iniciando lectura...');
+  startSpeechPlayback(text);
 }
 
 // ---- Audio Controls ----
 
 function handlePause() {
-  if (!audio) return;
-  if (audio.paused) {
-    audio.play().then(function() { setStatus('Reproduciendo...'); setPauseIcon(true); });
+  if (!isSpeaking) return;
+  if (isPaused) {
+    speechSynthesis.resume();
+    isPaused = false;
+    setStatus('Reproduciendo...');
+    setPauseIcon(true);
   } else {
-    audio.pause();
+    speechSynthesis.pause();
+    isPaused = true;
     setStatus('Pausado');
     setPauseIcon(false);
   }
 }
 
 function handleStop() {
-  stopAudio();
+  stopSpeech();
   setStatus('Detenido');
   setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
   setPauseIcon(false);
@@ -467,21 +379,13 @@ function handleStop() {
 
 function handlePrev() {
   if (!sentenceData.length) return;
-  var t = audio ? (sentenceOffset + audio.currentTime) : sentenceOffset;
-  var idx = -1;
-  for (var i = sentenceData.length - 1; i >= 0; i--) {
-    if (sentenceData[i].start < t - 0.5) { idx = i; break; }
-  }
-  jumpToSentence(Math.max(0, idx));
+  var idx = Math.max(0, currentSentenceIdx - 2);
+  jumpToSentence(idx);
 }
 
 function handleNext() {
   if (!sentenceData.length) return;
-  var t = audio ? (sentenceOffset + audio.currentTime) : sentenceOffset;
-  var idx = sentenceData.length - 1;
-  for (var i = 0; i < sentenceData.length; i++) {
-    if (sentenceData[i].start > t + 0.1) { idx = i; break; }
-  }
+  var idx = Math.min(sentenceData.length - 1, currentSentenceIdx + 1);
   jumpToSentence(idx);
 }
 
