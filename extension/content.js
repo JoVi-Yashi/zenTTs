@@ -2482,7 +2482,7 @@
       if (site.test && site.test()) {
         const text = site.extract();
         if (text && text.trim().length > 50) {
-          return mapParagraphsToText();
+          return { text, refs: [] };
         }
       }
     }

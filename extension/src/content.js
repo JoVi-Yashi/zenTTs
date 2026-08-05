@@ -20,8 +20,7 @@ function extractTextWithRefs() {
     if (site.test && site.test()) {
       const text = site.extract();
       if (text && text.trim().length > 50) {
-        // For site extractors, try to map to visible paragraphs
-        return mapParagraphsToText();
+        return { text, refs: [] };
       }
     }
   }
