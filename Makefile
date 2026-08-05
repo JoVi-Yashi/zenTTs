@@ -13,7 +13,7 @@ install-extension:
 	cd extension && npm install
 
 build-extension:
-	cd extension && npx esbuild src/content.js --bundle --outfile=content.js --format=iife --target=firefox109 --platform=browser --log-level=info
+	cd extension && npx esbuild src/content.js --bundle --outfile=content.js --format=iife --target=es2020 --platform=browser --log-level=info
 
 extension: install-extension build-extension
 

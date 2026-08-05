@@ -2254,6 +2254,7 @@
     audio.addEventListener("ended", () => {
       setStatus("Ready");
       setButtonsEnabled({ read: true, pause: false, stop: false });
+      URL.revokeObjectURL(audio.src);
       audio = null;
     });
     audio.addEventListener("error", () => {
