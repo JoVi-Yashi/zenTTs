@@ -2849,6 +2849,7 @@
     { id: "wattpad.com", name: "Wattpad", domain: "wattpad.com" },
     { id: "archiveofourown.org", name: "AO3", domain: "archiveofourown.org" },
     { id: "fanfiction.net", name: "FanFiction", domain: "fanfiction.net" },
+    { id: "webnovel.com", name: "Webnovel", domain: "webnovel.com" },
     { id: "generic", name: "Gen\xE9rico", domain: "otros sitios" }
   ];
   function faviconUrl(domain) {
@@ -2886,7 +2887,7 @@
   }
   async function saveSiteSettings() {
     var custom = ALL_SITES.filter(function(s) {
-      return !["wattpad.com", "archiveofourown.org", "fanfiction.net", "generic"].includes(s.id);
+      return !["wattpad.com", "archiveofourown.org", "fanfiction.net", "webnovel.com", "generic"].includes(s.id);
     });
     try {
       await browser.storage.local.set({ enabledSites, customSites: custom });
@@ -3033,6 +3034,13 @@
       extract: () => {
         const story = document.querySelector(".storytext, #storytext");
         return story?.textContent || null;
+      }
+    },
+    {
+      test: () => window.location.hostname.includes("webnovel.com"),
+      extract: () => {
+        const content = document.querySelector('.cha-content, .chapter-content, .read-content, [class*="cha-words"]');
+        return content?.textContent || null;
       }
     }
   ];
@@ -3343,7 +3351,7 @@
     jumpToSentence(idx);
   }
   window.__tts_zen_state = { currentVoice: "es-ES-AlvaroNeural", currentRate: 1 };
-  window.__tts_zen_enabled_sites = { "wattpad.com": true, "archiveofourown.org": true, "fanfiction.net": true, "generic": true };
+  window.__tts_zen_enabled_sites = { "wattpad.com": true, "archiveofourown.org": true, "fanfiction.net": true, "webnovel.com": true, "generic": true };
   function injectPanel() {
     const host = document.createElement("div");
     host.id = "tts-zen-host";

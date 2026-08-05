@@ -133,6 +133,13 @@ const SITE_EXTRACTORS = [
       return story?.textContent || null;
     }
   },
+  {
+    test: () => window.location.hostname.includes('webnovel.com'),
+    extract: () => {
+      const content = document.querySelector('.cha-content, .chapter-content, .read-content, [class*="cha-words"]');
+      return content?.textContent || null;
+    }
+  },
 ];
 
 // ---- DOM Highlighting ----
@@ -483,7 +490,7 @@ function handleNext() {
 // State shared with panel via global
 window.__tts_zen_state = { currentVoice: 'es-ES-AlvaroNeural', currentRate: 1.0 };
 // Default enabled sites (panel.js overrides from storage after async load)
-window.__tts_zen_enabled_sites = { 'wattpad.com': true, 'archiveofourown.org': true, 'fanfiction.net': true, 'generic': true };
+window.__tts_zen_enabled_sites = { 'wattpad.com': true, 'archiveofourown.org': true, 'fanfiction.net': true, 'webnovel.com': true, 'generic': true };
 
 // ---- Initialization ----
 

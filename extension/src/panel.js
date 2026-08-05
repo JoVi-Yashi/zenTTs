@@ -800,6 +800,7 @@ var ALL_SITES = [
   { id: 'wattpad.com', name: 'Wattpad', domain: 'wattpad.com' },
   { id: 'archiveofourown.org', name: 'AO3', domain: 'archiveofourown.org' },
   { id: 'fanfiction.net', name: 'FanFiction', domain: 'fanfiction.net' },
+  { id: 'webnovel.com', name: 'Webnovel', domain: 'webnovel.com' },
   { id: 'generic', name: 'Genérico', domain: 'otros sitios' },
 ];
 
@@ -836,7 +837,7 @@ async function loadSiteSettings() {
 
 async function saveSiteSettings() {
   var custom = ALL_SITES.filter(function(s) {
-    return !['wattpad.com', 'archiveofourown.org', 'fanfiction.net', 'generic'].includes(s.id);
+    return !['wattpad.com', 'archiveofourown.org', 'fanfiction.net', 'webnovel.com', 'generic'].includes(s.id);
   });
   try { await browser.storage.local.set({ enabledSites: enabledSites, customSites: custom }); } catch (_) {}
   window.__tts_zen_enabled_sites = enabledSites;
