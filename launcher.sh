@@ -9,317 +9,179 @@ PORT=8765
 mkdir -p "$(dirname "$PID_FILE")"
 
 # ── Colores ──────────────────────────────────────────────
-C_RESET='\033[0m'
-C_BOLD='\033[1m'
-C_DIM='\033[2m'
-C_PURPLE='\033[38;5;141m'
-C_GREEN='\033[38;5;114m'
-C_RED='\033[38;5;203m'
-C_YELLOW='\033[38;5;221m'
-C_GRAY='\033[38;5;243m'
-C_WHITE='\033[38;5;255m'
-C_BG='\033[48;5;235m'
+R='\033[0m'; B='\033[1m'; D='\033[2m'
+P='\033[38;5;141m'; G='\033[38;5;114m'; E='\033[38;5;203m'
+Y='\033[38;5;221m'; K='\033[38;5;243m'; W='\033[38;5;255m'
+BG='\033[48;5;237m'; BS='\033[48;5;99m'; BW='\033[48;5;240m'; BR='\033[48;5;95m'
 
-# ── Iconos Unicode ───────────────────────────────────────
-ICON_SPEAKER='🔊'
-ICON_CHECK='✓'
-ICON_CROSS='✗'
-ICON_CLOCK='◷'
-ICON_GEAR='⚙'
-ICON_ROCKET='🚀'
-ICON_STOP='■'
-ICON_PLAY='▶'
-ICON_LINK='🔗'
+# ── Terminal setup ───────────────────────────────────────
+setup_term() { printf '\033[?25l\033[?1049h'; stty -echo 2>/dev/null || true; }
+reset_term() { printf '\033[?25h\033[?1049l'; stty echo 2>/dev/null || true; }
+trap 'reset_term' EXIT
 
 # ── Utilidades ───────────────────────────────────────────
 
-divider() {
-    printf "${C_DIM}%$(( ${COLUMNS:-80} - 2 ))s${C_RESET}\n" '' | tr ' ' '─'
+center() {
+    local text="$1" color="${2:-}" width=40
+    local pad=$(( (width - ${#text}) / 2 ))
+    printf "  ${P}│${R}%*s${color}%s${R}%*s${P}│${R}\n" "$pad" "" "$text" "$(( width - pad - ${#text} ))" ""
 }
-
-section() {
-    echo ""
-    printf "  ${C_PURPLE}${C_BOLD}%s${C_RESET}\n" "$1"
-    divider
-}
-
-dim() { printf "${C_DIM}%s${C_RESET}" "$1"; }
-green() { printf "${C_GREEN}%s${C_RESET}" "$1"; }
-red() { printf "${C_RED}%s${C_RESET}" "$1"; }
-purple() { printf "${C_PURPLE}%s${C_RESET}" "$1"; }
-bold() { printf "${C_BOLD}%s${C_RESET}" "$1"; }
-
-# ── Funciones ────────────────────────────────────────────
 
 running() {
-    local pid
-    pid=$(pgrep -f "uvicorn tts_zen.main:app" 2>/dev/null | head -1)
-    if [ -n "$pid" ]; then
-        echo "$pid"
-        return 0
-    fi
+    local pid=$(pgrep -f "uvicorn tts_zen.main:app" 2>/dev/null | head -1)
+    if [ -n "$pid" ]; then echo "$pid"; return 0; fi
     if [ -f "$PID_FILE" ]; then
         pid=$(cat "$PID_FILE" 2>/dev/null || true)
-        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
-            echo "$pid"
-            return 0
-        fi
+        [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null && echo "$pid" && return 0
     fi
     return 1
 }
 
 stop_server() {
-    local pid dead
-    printf "  $(dim 'Deteniendo servidor...') "
-    pid=$(pgrep -f "uvicorn tts_zen.main:app" 2>/dev/null || true)
-    dead=true
-    if [ -n "$pid" ]; then
-        kill "$pid" 2>/dev/null || true
-        sleep 0.5
-        kill -9 "$pid" 2>/dev/null || true
-        if ! kill -0 "$pid" 2>/dev/null; then dead=true; fi
-    fi
+    local pid=$(pgrep -f "uvicorn tts_zen.main:app" 2>/dev/null || true)
+    [ -n "$pid" ] && { kill "$pid" 2>/dev/null; sleep 0.5; kill -9 "$pid" 2>/dev/null; }
     rm -f "$PID_FILE"
-    if $dead; then
-        printf "$(green '✓') $(dim 'detenido')\n"
+}
+
+# ── UI Components ────────────────────────────────────────
+
+# Arrow key sequences
+UP=$'\033[A'; DOWN=$'\033[B'; ENTER=$'\n'; ESC=$'\033'
+TAB=$'\t'; SPACE=' '
+
+menu_item() {
+    local label="$1" desc="$2" selected="$3"
+    if $selected; then
+        printf "  ${P}│${R}  ${BS}${B}  %-18s${R} ${D}%-20s${R}${P}│${R}\n" "$label" "$desc"
     else
-        printf "$(red '✗') $(dim 'no se pudo detener')\n"
+        printf "  ${P}│${R}  ${K}  %-18s${R} ${D}%-20s${R}${P}│${R}\n" "  $label" "$desc"
     fi
 }
 
-wait_for_server() {
-    local i
-    for i in $(seq 1 20); do
-        if curl -s "http://127.0.0.1:$PORT/health" > /dev/null 2>&1; then
-            return 0
+redraw() {
+    local selected_idx="$1" status_text="$2" status_color="$3" extra="$4"
+
+    clear
+
+    # Header
+    echo ""
+    printf "  ${P}${B}╭────────────────── TTS-zen ──────────────────╮${R}\n"
+    printf "  ${P}${B}│${R}             ${W}${B}Texto a voz${R}                      ${P}${B}│${R}\n"
+    printf "  ${P}${B}│${R}        ${K}edge-tts · Zen Browser${R}               ${P}${B}│${R}\n"
+    printf "  ${P}${B}╰────────────────────────────────────────────╯${R}\n"
+    echo ""
+
+    # Status
+    local pid health
+    if pid=$(running 2>/dev/null); then
+        if curl -s "http://127.0.0.1:$PORT/health" &>/dev/null; then
+            status_text="● CORRIENDO en localhost:$PORT"
+            status_color="$G"
+            health="  ${G}✓${R} ${K}saludable  ${R}  PID ${K}${pid}${R}"
+        else
+            status_text="● CORRIENDO (sin respuesta)"
+            status_color="$Y"
+            health="  ${Y}⚠${R} ${K}pid ${pid}, sin respuesta${R}"
         fi
-        printf "\r  $(dim '⏳ esperando') $(dim '%ds...')" "$((i/2))"
+    else
+        status_text="● DETENIDO"
+        status_color="$E"
+        health="  ${E}✗${R} ${K}servidor sin iniciar${R}"
+    fi
+
+    printf "  ${P}┌─ Estado ─────────────────────────────────────┐${R}\n"
+    printf "  ${P}│${R}  ${status_color}${B}%-44s${R} ${P}│${R}\n" "$status_text"
+    printf "  ${P}│${R}  ${health}%$((40 - ${#health} + 15))s${P}│${R}\n" ""
+    printf "  ${P}└──────────────────────────────────────────────┘${R}\n"
+    echo ""
+
+    # Extra message
+    [ -n "$extra" ] && printf "  %s\n" "$extra" && echo ""
+
+    # Menu
+    local items=("▶ Iniciar servidor"     "Arranca en background" \
+                 "■ Detener servidor"     "Frena el server" \
+                 "↻ Refrescar estado"     "Actualizar estado" \
+                 "🌐 Abrir Zen Browser"    "Inicia server + Zen")
+    local labels=("start" "stop" "status" "open")
+
+    printf "  ${P}┌─ Acciones ───────────────────────────────────┐${R}\n"
+    for i in "${!labels[@]}"; do
+        local name="${items[$((i*2))]}"
+        local desc="${items[$((i*2+1))]}"
+        local sel=false
+        [ "$i" -eq "$selected_idx" ] && sel=true
+        menu_item "$name" "$desc" "$sel"
+    done
+    printf "  ${P}│${R}                                                ${P}│${R}\n"
+    printf "  ${P}│${R}  ${K}↑↓ mover  ${R} ${K}1-4 tecla  ${R} ${K}Enter elegir  ${R} ${K}q salir${R}          ${P}│${R}\n"
+    printf "  ${P}└──────────────────────────────────────────────┘${R}\n"
+}
+
+# ── Actions ──────────────────────────────────────────────
+
+action_start() {
+    if running &>/dev/null; then return; fi
+    cd "$PROJECT_DIR/server"
+    nohup uv run uvicorn tts_zen.main:app --port "$PORT" --host 127.0.0.1 > "$LOG_FILE" 2>&1 &
+    echo "$!" > "$PID_FILE"
+    for i in $(seq 1 15); do
+        curl -s "http://127.0.0.1:$PORT/health" &>/dev/null && break
         sleep 0.3
     done
-    printf "\r  $(red '✗') $(red 'timeout')\n"
-    return 1
+    command -v notify-send &>/dev/null && notify-send -i audio-card "TTS-zen" "Servidor listo en localhost:$PORT" 2>/dev/null || true
 }
 
-show_header() {
-    clear 2>/dev/null || true
-    echo ""
-    printf "  ${C_PURPLE}${C_BOLD}╭─────────────────────────────────────────╮${C_RESET}\n"
-    printf "  ${C_PURPLE}${C_BOLD}│${C_RESET}              ${C_WHITE}${C_BOLD}TTS-zen${C_RESET}                       ${C_PURPLE}${C_BOLD}│${C_RESET}\n"
-    printf "  ${C_PURPLE}${C_BOLD}│${C_RESET}     ${C_DIM}Texto a voz · edge-tts · Zen${C_RESET}          ${C_PURPLE}${C_BOLD}│${C_RESET}\n"
-    printf "  ${C_PURPLE}${C_BOLD}╰─────────────────────────────────────────╯${C_RESET}\n"
+action_stop() { stop_server; }
+
+action_open() {
+    action_start
+    sleep 0.5
+    flatpak run app.zen_browser.zen &>/dev/null &
 }
 
-show_status_box() {
-    local running_pid health status_text color
+# ── Main Loop ────────────────────────────────────────────
 
-    if running_pid=$(running 2>/dev/null); then
-        color="$C_GREEN"
-        if curl -s "http://127.0.0.1:$PORT/health" > /dev/null 2>&1; then
-            health="$(green '✓') $(dim 'saludable')"
-            status_text="$(bold 'CORRIENDO')"
-        else
-            health="$(yellow '⚠') $(dim 'sin respuesta')"
-            status_text="$(bold 'CORRIENDO') $(dim '(sin respuesta)')"
-        fi
-    else
-        color="$C_RED"
-        health="$(red '✗') $(dim 'sin conexión')"
-        status_text="$(bold 'DETENIDO')"
-    fi
+main() {
+    setup_term
+    local selected=0 extra=""
 
-    echo ""
-    printf "  ${C_PURPLE}┌─ Estado ─────────────────────────────────┐${C_RESET}\n"
-    printf "  ${C_PURPLE}│${C_RESET}                                           ${C_PURPLE}│${C_RESET}\n"
-    printf "  ${C_PURPLE}│${C_RESET}   Servidor: ${color}${C_BOLD}%-32s${C_RESET} ${C_PURPLE}│${C_RESET}\n" "$status_text"
-    printf "  ${C_PURPLE}│${C_RESET}   Health:   %-40s ${C_PURPLE}│${C_RESET}\n" "$health"
-    if [ -n "$running_pid" ]; then
-        printf "  ${C_PURPLE}│${C_RESET}   PID:      ${C_DIM}%-36s${C_RESET} ${C_PURPLE}│${C_RESET}\n" "$running_pid"
-    fi
-    printf "  ${C_PURPLE}│${C_RESET}   Puerto:   ${C_DIM}localhost:%-29s${C_RESET} ${C_PURPLE}│${C_RESET}\n" "$PORT"
-    printf "  ${C_PURPLE}│${C_RESET}                                            ${C_PURPLE}│${C_RESET}\n"
-    printf "  ${C_PURPLE}└────────────────────────────────────────────┘${C_RESET}\n"
-}
-
-show_help() {
-    echo ""
-    printf "  ${C_PURPLE}${C_BOLD}Comandos:${C_RESET}\n"
-    printf "    ${C_BOLD}start${C_RESET}   ${C_DIM}Iniciar servidor en background${C_RESET}\n"
-    printf "    ${C_BOLD}stop${C_RESET}    ${C_DIM}Detener servidor${C_RESET}\n"
-    printf "    ${C_BOLD}status${C_RESET}  ${C_DIM}Mostrar estado${C_RESET}\n"
-    printf "    ${C_BOLD}open${C_RESET}    ${C_DIM}Iniciar + abrir Zen Browser${C_RESET}\n"
-    printf "    ${C_BOLD}help${C_RESET}    ${C_DIM}Esta ayuda${C_RESET}\n"
-    printf "    ${C_BOLD}quit${C_RESET}    ${C_DIM}Salir${C_RESET}\n"
-}
-
-interactive_mode() {
-    show_header
-    show_status_box
-    show_help
-    echo ""
     while true; do
-        printf "  ${C_PURPLE}${C_BOLD}tts-zen${C_RESET} ${C_DIM}>${C_RESET} "
-        read -r cmd
-        case "${cmd:-}" in
-            start)
-                show_header
-                if running &>/dev/null; then
-                    show_status_box
-                    echo ""
-                    printf "  $(green '✓') $(dim 'Ya está corriendo.')\n"
-                else
-                    echo ""
-                    printf "  $(dim 'Iniciando servidor...') "
-                    cd "$PROJECT_DIR/server"
-                    nohup uv run uvicorn tts_zen.main:app --port "$PORT" --host 127.0.0.1 \
-                        > "$LOG_FILE" 2>&1 &
-                    pid=$!
-                    echo "$pid" > "$PID_FILE"
-                    if wait_for_server; then
-                        printf "\r  $(green '✓') $(dim 'servidor listo')\n"
-                        if command -v notify-send &>/dev/null; then
-                            notify-send -i audio-card "TTS-zen listo" "localhost:$PORT" 2>/dev/null || true
-                        fi
-                    else
-                        echo ""
-                        printf "  $(red '✗') $(red 'No respondió a tiempo')\n"
-                    fi
-                    show_status_box
-                fi
-                echo ""
+        redraw "$selected" "" "" "$extra"
+        extra=""
+
+        IFS= read -rsn1 key
+        case "$key" in
+            $'\033')
+                read -rsn2 -t 0.001 key2 || true
+                case "$key2" in
+                    '[A') selected=$(( (selected - 1 + 4) % 4 )) ;;  # Up
+                    '[B') selected=$(( (selected + 1) % 4 )) ;;      # Down
+                esac
                 ;;
-            stop)
-                show_header
-                stop_server
-                show_status_box
-                echo ""
+            '')  # Enter
+                case $selected in
+                    0) extra="  ${G}Iniciando servidor...${R}"; action_start
+                       if running &>/dev/null; then extra="  ${G}✓ Servidor listo en localhost:$PORT${R}"
+                       else extra="  ${E}✗ Error al iniciar${R}"; fi ;;
+                    1) extra="  ${K}Deteniendo...${R}"; action_stop
+                       extra="  ${G}✓ Servidor detenido${R}" ;;
+                    2) extra="  ${K}Actualizando...${R}" ;;
+                    3) extra="  ${G}Abriendo Zen Browser...${R}"; action_open
+                       extra="  ${G}✓ Zen Browser abierto${R}" ;;
+                esac
                 ;;
-            status)
-                show_header
-                show_status_box
-                echo ""
-                ;;
-            open)
-                if ! running &>/dev/null; then
-                    echo ""
-                    printf "  $(dim 'Iniciando servidor...') "
-                    cd "$PROJECT_DIR/server"
-                    nohup uv run uvicorn tts_zen.main:app --port "$PORT" --host 127.0.0.1 \
-                        > "$LOG_FILE" 2>&1 &
-                    pid=$!
-                    echo "$pid" > "$PID_FILE"
-                    wait_for_server
-                    printf "\r  $(green '✓') $(dim 'servidor listo')\n"
-                fi
-                echo ""
-                printf "  $(dim 'Abriendo Zen Browser...') "
-                if flatpak list 2>/dev/null | grep -qi zen; then
-                    flatpak run app.zen_browser.zen &>/dev/null &
-                    printf "$(green '✓')\n"
-                else
-                    printf "$(yellow '?') $(dim 'no encontrado')\n"
-                fi
-                show_status_box
-                echo ""
-                ;;
-            help|--help|-h)
-                show_header
-                show_status_box
-                show_help
-                echo ""
-                ;;
-            quit|exit|q)
-                echo ""
-                printf "  $(dim 'Chau!')\n"
-                echo ""
-                break
-                ;;
-            "")
-                ;;
-            *)
-                printf "  $(red '✗') $(dim 'comando desconocido:')\n" "$cmd"
-                printf "  $(dim 'Probá: start, stop, status, open, quit')\n"
-                echo ""
-                ;;
+            q|Q) break ;;
+            1) selected=0; extra="  ${K}▶ Iniciar servidor...${R}"; action_start
+                if running &>/dev/null; then extra="  ${G}✓ Servidor listo en localhost:$PORT${R}"
+                else extra="  ${E}✗ Error al iniciar${R}"; fi ;;
+            2) selected=1; extra="  ${K}■ Deteniendo...${R}"; action_stop
+                extra="  ${G}✓ Servidor detenido${R}" ;;
+            3) selected=2; extra="  ${K}↻ Refrescando...${R}" ;;
+            4) selected=3; extra="  ${G}🌐 Abriendo Zen...${R}"; action_open
+                extra="  ${G}✓ Zen Browser abierto${R}" ;;
         esac
     done
 }
 
-# ── Main ────────────────────────────────────────────────
-
-show_header
-
-case "${1:-status}" in
-    start)
-        if running &>/dev/null; then
-            show_status_box
-            echo ""
-            printf "  $(green '✓') $(dim 'El servidor ya está corriendo.')\n"
-            echo ""
-            exit 0
-        fi
-
-        echo ""
-        printf "  $(dim 'Iniciando servidor...') "
-        cd "$PROJECT_DIR/server"
-
-        nohup uv run uvicorn tts_zen.main:app --port "$PORT" --host 127.0.0.1 \
-            > "$LOG_FILE" 2>&1 &
-        pid=$!
-        echo "$pid" > "$PID_FILE"
-
-        if ! wait_for_server; then
-            echo ""
-            printf "  $(red '✗') $(red 'El servidor no respondió a tiempo')\n"
-            printf "  $(dim 'Log: %s')\n" "$LOG_FILE"
-            exit 1
-        fi
-
-        printf "\r  $(green '✓') $(dim 'servidor listo')\n"
-        show_status_box
-        section "Extensión"
-        printf "  $(dim 'Cargala en Zen: %s → Cargar complemento temporal')\n" "about:debugging"
-        printf "  $(dim 'Archivo: %s/extension/manifest.json')\n" "$PROJECT_DIR"
-        echo ""
-        if command -v notify-send &>/dev/null; then
-            notify-send -i audio-card "TTS-zen listo" "localhost:$PORT · $(date +%H:%M)" 2>/dev/null || true
-        fi
-        ;;
-
-    stop)
-        stop_server
-        show_status_box
-        echo ""
-        ;;
-
-    status)
-        show_status_box
-        show_help
-        ;;
-
-    open)
-        if ! running &>/dev/null; then
-            "$0" start || exit 1
-        fi
-        echo ""
-        printf "  $(dim 'Abriendo Zen Browser...') "
-        if command -v zen-browser &>/dev/null; then
-            zen-browser &>/dev/null &
-            printf "$(green '✓')\n"
-        elif flatpak list 2>/dev/null | grep -qi zen; then
-            flatpak run app.zen_browser.zen &>/dev/null &
-            printf "$(green '✓')\n"
-        else
-            printf "$(yellow '?') $(dim 'no se encontró Zen')\n"
-        fi
-        echo ""
-        ;;
-
-    help|--help|-h)
-        show_help
-        echo ""
-        ;;
-
-    *)
-        interactive_mode
-        ;;
-esac
+main
