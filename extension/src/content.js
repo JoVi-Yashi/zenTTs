@@ -76,8 +76,16 @@ const SITE_EXTRACTORS = [
   {
     test: () => window.location.hostname.includes('wattpad.com'),
     extract: () => {
-      // Blacklist: elements to exclude
-      const blacklist = '#header, #funbar, footer, .right-rail, .comments, .ad-container, [class*="ad-"], [id*="ad-"]';
+      // Blacklist: Wattpad UI elements to exclude from extraction
+      const blacklist = [
+        '#header', '#funbar', 'footer',
+        '#header-item-search', '#go-premium-button', '#profile-dropdown',
+        '#community-dropdown',
+        '.right-rail', '.comments', '.list-inline',
+        '.dropdown-menu', '[data-toggle="dropdown"]',
+        '.ad-container', '[class*="ad-"]', '[id*="ad-"]',
+        'nav', '.navbar', '.nav',
+      ].join(',');
       document.querySelectorAll(blacklist).forEach(el => {
         el.setAttribute('data-tts-zen-excluded', '');
       });
