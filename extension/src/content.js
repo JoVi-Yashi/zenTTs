@@ -76,27 +76,41 @@ const SITE_EXTRACTORS = [
   {
     test: () => window.location.hostname.includes('wattpad.com'),
     extract: () => {
+      // Blacklist: elements to exclude
+      const blacklist = '#header, #funbar, footer, .right-rail, .comments, .ad-container, [class*="ad-"], [id*="ad-"]';
+      document.querySelectorAll(blacklist).forEach(el => {
+        el.setAttribute('data-tts-zen-excluded', '');
+      });
+
       // Target the reading panel
       const readingPanel = document.querySelector('.panel-reading');
       if (!readingPanel) return mapParagraphsToText()?.text || null;
 
-      // Get all pre elements inside the reading panel
-      const pres = readingPanel.querySelectorAll('pre');
+      // Clone and clean the reading panel
+      const clone = readingPanel.cloneNode(true);
+      clone.querySelectorAll(blacklist + ', [data-tts-zen-excluded]').forEach(el => el.remove());
+
+      // Get all pre elements inside the cleaned clone
+      const pres = clone.querySelectorAll('pre');
       if (pres.length === 0) return mapParagraphsToText()?.text || null;
 
       const parts = [];
       for (const pre of pres) {
-        // Get all p elements inside each pre
         const ps = pre.querySelectorAll('p');
         for (const p of ps) {
           // Remove comment-count spans
-          const clone = p.cloneNode(true);
-          const spam = clone.querySelectorAll('span.fa-comment-count, span.fa-wp-neutral-2, [class*="fa-comment"]');
-          spam.forEach(s => s.remove());
-          const txt = clone.textContent.trim();
+          const pClone = p.cloneNode(true);
+          pClone.querySelectorAll('span.fa-comment-count, span.fa-wp-neutral-2, [class*="fa-comment"]').forEach(s => s.remove());
+          const txt = pClone.textContent.trim();
           if (txt.length > 1) parts.push(txt);
         }
       }
+
+      // Cleanup temp attributes
+      document.querySelectorAll('[data-tts-zen-excluded]').forEach(el => {
+        el.removeAttribute('data-tts-zen-excluded');
+      });
+
       return parts.length > 0 ? parts.join('\n\n') : null;
     }
   },

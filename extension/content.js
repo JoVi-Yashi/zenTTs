@@ -2522,21 +2522,29 @@
     {
       test: () => window.location.hostname.includes("wattpad.com"),
       extract: () => {
+        const blacklist = '#header, #funbar, footer, .right-rail, .comments, .ad-container, [class*="ad-"], [id*="ad-"]';
+        document.querySelectorAll(blacklist).forEach((el) => {
+          el.setAttribute("data-tts-zen-excluded", "");
+        });
         const readingPanel = document.querySelector(".panel-reading");
         if (!readingPanel) return mapParagraphsToText()?.text || null;
-        const pres = readingPanel.querySelectorAll("pre");
+        const clone = readingPanel.cloneNode(true);
+        clone.querySelectorAll(blacklist + ", [data-tts-zen-excluded]").forEach((el) => el.remove());
+        const pres = clone.querySelectorAll("pre");
         if (pres.length === 0) return mapParagraphsToText()?.text || null;
         const parts = [];
         for (const pre of pres) {
           const ps = pre.querySelectorAll("p");
           for (const p of ps) {
-            const clone = p.cloneNode(true);
-            const spam = clone.querySelectorAll('span.fa-comment-count, span.fa-wp-neutral-2, [class*="fa-comment"]');
-            spam.forEach((s) => s.remove());
-            const txt = clone.textContent.trim();
+            const pClone = p.cloneNode(true);
+            pClone.querySelectorAll('span.fa-comment-count, span.fa-wp-neutral-2, [class*="fa-comment"]').forEach((s) => s.remove());
+            const txt = pClone.textContent.trim();
             if (txt.length > 1) parts.push(txt);
           }
         }
+        document.querySelectorAll("[data-tts-zen-excluded]").forEach((el) => {
+          el.removeAttribute("data-tts-zen-excluded");
+        });
         return parts.length > 0 ? parts.join("\n\n") : null;
       }
     },
