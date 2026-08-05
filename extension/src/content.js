@@ -386,6 +386,7 @@ async function dispatchReadPage(extractFn) {
 
   extractedRefs = result.refs || [];
   const text = result.text;
+  window.__tts_zen_last_text = text; // for preview modal
 
   setStatus('Extrayendo texto...');
   setButtonsEnabled({ read: false, pause: false, stop: false, prev: false, next: false });
