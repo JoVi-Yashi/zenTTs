@@ -1,6 +1,8 @@
 // TTS-zen Background Event Page (Firefox MV3)
 // Proxies content-script messages to local FastAPI server on localhost:8765
 
+console.log('[TTS-zen] Background loaded');
+
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   switch (message.action) {
     case 'get_voices':

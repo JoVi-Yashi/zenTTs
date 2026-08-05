@@ -2668,6 +2668,9 @@
     setStatus("Generando audio...");
     setButtonsEnabled({ read: false, pause: false, stop: false, prev: false, next: false });
     try {
+      if (!browser || !browser.runtime || !browser.runtime.sendMessage) {
+        throw new Error("Extension API not available \u2014 reload the extension in about:debugging");
+      }
       const response = await browser.runtime.sendMessage({
         action: "read_page_sync",
         text,
