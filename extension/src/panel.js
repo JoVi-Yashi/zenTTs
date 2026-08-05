@@ -553,20 +553,34 @@ export function showPreview(text) {
   const content = getEl('tts-zen-preview-content');
   if (!overlay || !content) return;
 
-  // Render sentences if we have them (for highlighting), otherwise plain text
   var sentences = window.__tts_zen_sentences || [];
+  content.innerHTML = '';
+
   if (sentences.length > 0) {
-    content.innerHTML = '';
+    // Render with sentence spans for highlighting sync
     for (var i = 0; i < sentences.length; i++) {
+      var p = document.createElement('p');
+      p.style.margin = '0 0 6px 0';
+      p.style.lineHeight = '1.6';
       var span = document.createElement('span');
       span.className = 'sentence';
       span.id = 'tts-zen-preview-s-' + i;
-      span.textContent = sentences[i].text + ' ';
-      content.appendChild(span);
+      span.textContent = sentences[i].text;
+      p.appendChild(span);
+      content.appendChild(p);
     }
   } else {
-    content.innerHTML = '';
-    content.textContent = lastExtractedText || 'No hay texto extraido aun. Hace click en Leer primero.';
+    // No sentences yet — show extracted text with paragraph breaks
+    var paragraphs = (lastExtractedText || 'No hay texto extraido aun. Hace click en Leer primero.')
+      .split(/\n\n+/)
+      .filter(function(l) { return l.trim(); });
+    for (var j = 0; j < paragraphs.length; j++) {
+      var p2 = document.createElement('p');
+      p2.style.margin = '0 0 10px 0';
+      p2.style.lineHeight = '1.7';
+      p2.textContent = paragraphs[j].trim();
+      content.appendChild(p2);
+    }
   }
   overlay.classList.remove('hidden');
 }
