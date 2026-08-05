@@ -327,6 +327,15 @@ const PANEL_CSS = `
 }
 #tts-zen-preview-content::-webkit-scrollbar { width: 4px; }
 #tts-zen-preview-content::-webkit-scrollbar-thumb { background: rgba(167,139,250,0.2); border-radius: 2px; }
+
+#tts-zen-preview-content .sentence {
+  transition: background .25s ease, color .3s ease;
+  border-radius: 3px; padding: 1px 2px;
+}
+#tts-zen-preview-content .sentence.active {
+  background: rgba(167,139,250,0.22); color: #f3f4f6;
+}
+#tts-zen-preview-content .sentence.played { color: #6b7280; }
 `;
 // ---- State ----
 
@@ -543,7 +552,22 @@ export function showPreview(text) {
   const overlay = getEl('tts-zen-preview-overlay');
   const content = getEl('tts-zen-preview-content');
   if (!overlay || !content) return;
-  content.textContent = lastExtractedText || 'No hay texto extraido aun. Hace click en Leer primero.';
+
+  // Render sentences if we have them (for highlighting), otherwise plain text
+  var sentences = window.__tts_zen_sentences || [];
+  if (sentences.length > 0) {
+    content.innerHTML = '';
+    for (var i = 0; i < sentences.length; i++) {
+      var span = document.createElement('span');
+      span.className = 'sentence';
+      span.id = 'tts-zen-preview-s-' + i;
+      span.textContent = sentences[i].text + ' ';
+      content.appendChild(span);
+    }
+  } else {
+    content.innerHTML = '';
+    content.textContent = lastExtractedText || 'No hay texto extraido aun. Hace click en Leer primero.';
+  }
   overlay.classList.remove('hidden');
 }
 

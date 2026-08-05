@@ -188,6 +188,7 @@ function stopAudio() {
     audio = null;
   }
   clearHighlight();
+  window.__tts_zen_sentences = [];
 }
 
 function splitIntoChunks(text, maxLen) {
@@ -235,6 +236,7 @@ function playChunk(chunkData) {
 
   sentenceData = sentenceData.concat(sentences);
   totalSentences = sentenceData.length;
+  window.__tts_zen_sentences = sentenceData; // for preview popup sync
 
   // Decode base64 audio
   var binary = atob(chunkData.audio);
@@ -331,7 +333,16 @@ function updateHighlight(idx) {
   if (idx < 0 || idx >= sentenceData.length) return;
   var s = sentenceData[idx];
 
-  // Search for this sentence in the extracted DOM refs
+  // Update preview popup highlight if open
+  var prevActive = document.querySelector('#tts-zen-preview-content .sentence.active');
+  if (prevActive) { prevActive.classList.remove('active'); prevActive.classList.add('played'); }
+  var prevEl = document.getElementById('tts-zen-preview-s-' + idx);
+  if (prevEl) {
+    prevEl.classList.add('active');
+    prevEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  // Page-level highlight
   for (var i = 0; i < extractedRefs.length; i++) {
     var ref = extractedRefs[i];
     var refText = ref.el.textContent.trim();
