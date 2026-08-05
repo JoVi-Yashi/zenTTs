@@ -97,26 +97,17 @@ const SITE_EXTRACTORS = [
       console.log('[TTS-zen] Wattpad extractor running...');
       const panel = document.querySelector('.panel-reading');
       console.log('[TTS-zen] .panel-reading found:', !!panel);
-      if (!panel) {
-        // Try waiting for it (SPA dynamic render)
-        console.log('[TTS-zen] .panel-reading not found — trying fallback');
-        return mapParagraphsToText()?.text || null;
-      }
+      if (!panel) return mapParagraphsToText()?.text || null;
 
-      const pres = panel.querySelectorAll('pre');
-      console.log('[TTS-zen] pre elements in panel:', pres.length);
-      if (pres.length === 0) return null;
-
-      const parts = [];
-      for (const pre of pres) {
-        const clone = pre.cloneNode(true);
-        clone.querySelectorAll('span').forEach(s => s.remove());
-        const txt = clone.textContent.trim();
-        if (txt.length > 80) parts.push(txt);
+      // Strategy: get ALL paragraph-level text from the reading panel,
+      // then filter out short/UI fragments
+      const allText = panel.textContent || '';
+      const lines = allText.split('\n').map(l => l.trim()).filter(l => l.length > 40);
+      console.log('[TTS-zen] Long text lines found:', lines.length);
+      if (lines.length > 0) {
+        console.log('[TTS-zen] First line:', lines[0].substring(0, 80));
       }
-      console.log('[TTS-zen] Story paragraphs extracted:', parts.length);
-      console.log('[TTS-zen] First 100 chars:', (parts[0] || '').substring(0, 100));
-      return parts.length > 0 ? parts.join('\n\n') : null;
+      return lines.length > 0 ? lines.join('\n\n') : null;
     }
   },
   {
