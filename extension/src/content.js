@@ -12,18 +12,37 @@ function shouldInject() {
 
 // ---- Text Extraction with DOM references ----
 
+async function waitForElement(selector, timeout = 10000) {
+  const el = document.querySelector(selector);
+  if (el) return el;
+  return new Promise((resolve) => {
+    const start = Date.now();
+    const observer = new MutationObserver(() => {
+      const found = document.querySelector(selector);
+      if (found) { observer.disconnect(); resolve(found); }
+      else if (Date.now() - start > timeout) { observer.disconnect(); resolve(null); }
+    });
+    observer.observe(document.body || document.documentElement, { childList: true, subtree: true });
+  });
+}
+
 function extractTextWithRefs() {
   const result = { text: '', refs: [] };
 
   // Try site-specific extractors first — they return text with paragraph breaks
   for (const site of SITE_EXTRACTORS) {
     if (site.test && site.test()) {
+      console.log('[TTS-zen] Site extractor matched');
       const text = site.extract();
+      console.log('[TTS-zen] Extracted text length:', text?.length || 0);
       if (text && text.trim().length > 50) {
+        console.log('[TTS-zen] Using site extractor result');
         return { text, refs: [] };
       }
+      console.log('[TTS-zen] Site extractor returned null/short — falling to generic');
     }
   }
+  console.log('[TTS-zen] No site match — using generic mapParagraphsToText');
 
   // Generic: map visible paragraphs
   return mapParagraphsToText();
@@ -75,12 +94,17 @@ const SITE_EXTRACTORS = [
   {
     test: () => window.location.hostname.includes('wattpad.com'),
     extract: () => {
-      // Wattpad story content is in <pre> elements inside the reading panel.
-      // UI text (nav, metadata, ToC) is outside .panel-reading or in short <pre>s.
+      console.log('[TTS-zen] Wattpad extractor running...');
       const panel = document.querySelector('.panel-reading');
-      if (!panel) return null;
+      console.log('[TTS-zen] .panel-reading found:', !!panel);
+      if (!panel) {
+        // Try waiting for it (SPA dynamic render)
+        console.log('[TTS-zen] .panel-reading not found — trying fallback');
+        return mapParagraphsToText()?.text || null;
+      }
 
       const pres = panel.querySelectorAll('pre');
+      console.log('[TTS-zen] pre elements in panel:', pres.length);
       if (pres.length === 0) return null;
 
       const parts = [];
@@ -88,9 +112,10 @@ const SITE_EXTRACTORS = [
         const clone = pre.cloneNode(true);
         clone.querySelectorAll('span').forEach(s => s.remove());
         const txt = clone.textContent.trim();
-        // Story paragraphs are long; UI fragments are short
         if (txt.length > 80) parts.push(txt);
       }
+      console.log('[TTS-zen] Story paragraphs extracted:', parts.length);
+      console.log('[TTS-zen] First 100 chars:', (parts[0] || '').substring(0, 100));
       return parts.length > 0 ? parts.join('\n\n') : null;
     }
   },

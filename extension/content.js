@@ -2480,12 +2480,17 @@
     const result = { text: "", refs: [] };
     for (const site of SITE_EXTRACTORS) {
       if (site.test && site.test()) {
+        console.log("[TTS-zen] Site extractor matched");
         const text = site.extract();
+        console.log("[TTS-zen] Extracted text length:", text?.length || 0);
         if (text && text.trim().length > 50) {
+          console.log("[TTS-zen] Using site extractor result");
           return { text, refs: [] };
         }
+        console.log("[TTS-zen] Site extractor returned null/short \u2014 falling to generic");
       }
     }
+    console.log("[TTS-zen] No site match \u2014 using generic mapParagraphsToText");
     return mapParagraphsToText();
   }
   function mapParagraphsToText() {
@@ -2522,9 +2527,15 @@
     {
       test: () => window.location.hostname.includes("wattpad.com"),
       extract: () => {
+        console.log("[TTS-zen] Wattpad extractor running...");
         const panel = document.querySelector(".panel-reading");
-        if (!panel) return null;
+        console.log("[TTS-zen] .panel-reading found:", !!panel);
+        if (!panel) {
+          console.log("[TTS-zen] .panel-reading not found \u2014 trying fallback");
+          return mapParagraphsToText()?.text || null;
+        }
         const pres = panel.querySelectorAll("pre");
+        console.log("[TTS-zen] pre elements in panel:", pres.length);
         if (pres.length === 0) return null;
         const parts = [];
         for (const pre of pres) {
@@ -2533,6 +2544,8 @@
           const txt = clone.textContent.trim();
           if (txt.length > 80) parts.push(txt);
         }
+        console.log("[TTS-zen] Story paragraphs extracted:", parts.length);
+        console.log("[TTS-zen] First 100 chars:", (parts[0] || "").substring(0, 100));
         return parts.length > 0 ? parts.join("\n\n") : null;
       }
     },
