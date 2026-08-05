@@ -173,7 +173,7 @@ function handleStop() {
 function injectPanel() {
   const host = document.createElement('div');
   host.id = 'tts-zen-host';
-  host.style.all = 'initial';
+  host.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:999999;pointer-events:none;';
   document.body.appendChild(host);
 
   const shadow = host.attachShadow({ mode: 'open' });
@@ -185,11 +185,14 @@ function injectPanel() {
 }
 
 // ---- Entry Point ----
-if (shouldInject()) {
-  // Wait for body to be ready
+function tryInject() {
   if (document.body) {
     injectPanel();
   } else {
-    document.addEventListener('DOMContentLoaded', injectPanel);
+    requestAnimationFrame(tryInject);
   }
+}
+
+if (shouldInject()) {
+  tryInject();
 }
