@@ -76,59 +76,19 @@ const SITE_EXTRACTORS = [
   {
     test: () => window.location.hostname.includes('wattpad.com'),
     extract: () => {
-      // Blacklist: Wattpad UI elements to exclude from extraction
-      const blacklist = [
-        '#header', '#funbar', 'footer',
-        '#header-item-search', '#go-premium-button', '#profile-dropdown',
-        '#community-dropdown',
-        '.right-rail', '.comments', '.list-inline',
-        '.dropdown-menu', '[data-toggle="dropdown"]',
-        '.ad-container', '[class*="ad-"]', '[id*="ad-"]',
-        'nav', '.navbar', '.nav',
-        '.story-header', '.story-actions', '.tag-list',
-        '.recommended-stories', '.btn-group',
-      ].join(',');
-
-      // Mark UI elements on live DOM, then clone and clean
-      document.querySelectorAll(blacklist + ', .panel-reading .btn, .panel-reading script, .panel-reading noscript').forEach(el => {
-        el.setAttribute('data-tts-zen-excluded', '1');
-      });
-
-      const readingPanel = document.querySelector('.panel-reading');
-      if (!readingPanel) {
-        document.querySelectorAll('[data-tts-zen-excluded]').forEach(el => el.removeAttribute('data-tts-zen-excluded'));
-        return mapParagraphsToText()?.text || null;
-      }
-
-      const clone = readingPanel.cloneNode(true);
-      clone.querySelectorAll('[data-tts-zen-excluded]').forEach(el => el.remove());
-
-      // Extract only <pre> content (actual story paragraphs)
-      const pres = clone.querySelectorAll('pre');
-      if (pres.length === 0) {
-        document.querySelectorAll('[data-tts-zen-excluded]').forEach(el => el.removeAttribute('data-tts-zen-excluded'));
-        return mapParagraphsToText()?.text || null;
-      }
+      // Wattpad stores story text EXCLUSIVELY in <pre> elements.
+      // UI elements (headers, nav, metadata) are never inside <pre>.
+      const pres = document.querySelectorAll('pre');
+      if (pres.length === 0) return null;
 
       const parts = [];
       for (const pre of pres) {
-        const ps = pre.querySelectorAll('p');
-        for (const p of ps) {
-          // Remove ALL spans (num-comment, icons, etc.)
-          const pClone = p.cloneNode(true);
-          pClone.querySelectorAll('span').forEach(s => s.remove());
-          const txt = pClone.textContent.trim();
-          if (txt.length > 2) parts.push(txt);
-        }
-        if (ps.length === 0 && pre.textContent.trim().length > 10) {
-          parts.push(pre.textContent.trim());
-        }
+        // Clone and strip ALL spans (comment counts, icons)
+        const clone = pre.cloneNode(true);
+        clone.querySelectorAll('span').forEach(s => s.remove());
+        const txt = clone.textContent.trim();
+        if (txt.length > 20) parts.push(txt);
       }
-
-      document.querySelectorAll('[data-tts-zen-excluded]').forEach(el => {
-        el.removeAttribute('data-tts-zen-excluded');
-      });
-
       return parts.length > 0 ? parts.join('\n\n') : null;
     }
   },
