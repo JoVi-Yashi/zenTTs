@@ -32,17 +32,12 @@ function extractTextWithRefs() {
   // Try site-specific extractors first — they return text with paragraph breaks
   for (const site of SITE_EXTRACTORS) {
     if (site.test && site.test()) {
-      console.log('[TTS-zen] Site extractor matched');
       const text = site.extract();
-      console.log('[TTS-zen] Extracted text length:', text?.length || 0);
       if (text && text.trim().length > 50) {
-        console.log('[TTS-zen] Using site extractor result');
         return { text, refs: [] };
       }
-      console.log('[TTS-zen] Site extractor returned null/short — falling to generic');
     }
   }
-  console.log('[TTS-zen] No site match — using generic mapParagraphsToText');
 
   // Generic: map visible paragraphs
   return mapParagraphsToText();
@@ -94,32 +89,19 @@ const SITE_EXTRACTORS = [
   {
     test: () => window.location.hostname.includes('wattpad.com'),
     extract: () => {
-      console.log('[TTS-zen] Wattpad extractor running...');
-
-      // Wattpad story text is the LONGEST text block on the page.
-      // Strategy: get textContent from all major containers, pick the longest.
-      const containers = document.querySelectorAll(
-        'pre, .panel-reading, #story-reading, #story-container, main, article, [class*="story"], [class*="reading"], [class*="chapter"], [class*="part"]'
+      // Story content is in: .panel.panel-reading (NOT .text-center) > pre > p[data-p-id]
+      // The header panel has .text-center class and contains metadata, not story
+      const paragraphs = document.querySelectorAll(
+        '.panel.panel-reading:not(.text-center) pre p[data-p-id]'
       );
-      let best = '';
-      for (const c of containers) {
-        const txt = c.textContent.trim();
-        if (txt.length > best.length) best = txt;
-      }
+      if (paragraphs.length === 0) return null;
 
-      console.log('[TTS-zen] Longest container text:', best.length, 'chars');
-      if (best.length < 200) {
-        // Last resort: body.innerText, split by paragraphs
-        const body = (document.body?.innerText || '').split('\n').filter(l => l.trim().length > 40).join('\n\n');
-        console.log('[TTS-zen] Body fallback:', body.length, 'chars');
-        return body || null;
+      const parts = [];
+      for (const p of paragraphs) {
+        const txt = p.textContent.trim();
+        if (txt.length > 20) parts.push(txt);
       }
-
-      // Split into lines and filter short/UI fragments
-      const lines = best.split('\n').map(l => l.trim()).filter(l => l.length > 30);
-      console.log('[TTS-zen] Filtered lines:', lines.length);
-      if (lines.length > 0) console.log('[TTS-zen] First:', lines[0].substring(0, 80));
-      return lines.length > 0 ? lines.join('\n\n') : null;
+      return parts.length > 0 ? parts.join('\n\n') : null;
     }
   },
   {

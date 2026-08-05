@@ -2639,17 +2639,12 @@
     const result = { text: "", refs: [] };
     for (const site of SITE_EXTRACTORS) {
       if (site.test && site.test()) {
-        console.log("[TTS-zen] Site extractor matched");
         const text = site.extract();
-        console.log("[TTS-zen] Extracted text length:", text?.length || 0);
         if (text && text.trim().length > 50) {
-          console.log("[TTS-zen] Using site extractor result");
           return { text, refs: [] };
         }
-        console.log("[TTS-zen] Site extractor returned null/short \u2014 falling to generic");
       }
     }
-    console.log("[TTS-zen] No site match \u2014 using generic mapParagraphsToText");
     return mapParagraphsToText();
   }
   function mapParagraphsToText() {
@@ -2686,25 +2681,16 @@
     {
       test: () => window.location.hostname.includes("wattpad.com"),
       extract: () => {
-        console.log("[TTS-zen] Wattpad extractor running...");
-        const containers = document.querySelectorAll(
-          'pre, .panel-reading, #story-reading, #story-container, main, article, [class*="story"], [class*="reading"], [class*="chapter"], [class*="part"]'
+        const paragraphs = document.querySelectorAll(
+          ".panel.panel-reading:not(.text-center) pre p[data-p-id]"
         );
-        let best = "";
-        for (const c of containers) {
-          const txt = c.textContent.trim();
-          if (txt.length > best.length) best = txt;
+        if (paragraphs.length === 0) return null;
+        const parts = [];
+        for (const p of paragraphs) {
+          const txt = p.textContent.trim();
+          if (txt.length > 20) parts.push(txt);
         }
-        console.log("[TTS-zen] Longest container text:", best.length, "chars");
-        if (best.length < 200) {
-          const body = (document.body?.innerText || "").split("\n").filter((l) => l.trim().length > 40).join("\n\n");
-          console.log("[TTS-zen] Body fallback:", body.length, "chars");
-          return body || null;
-        }
-        const lines = best.split("\n").map((l) => l.trim()).filter((l) => l.length > 30);
-        console.log("[TTS-zen] Filtered lines:", lines.length);
-        if (lines.length > 0) console.log("[TTS-zen] First:", lines[0].substring(0, 80));
-        return lines.length > 0 ? lines.join("\n\n") : null;
+        return parts.length > 0 ? parts.join("\n\n") : null;
       }
     },
     {
