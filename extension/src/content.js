@@ -26,12 +26,25 @@ function stripTags(text) {
 
 const SITE_EXTRACTORS = [
   {
-    // Wattpad — story content is in pre elements inside the reader
+    // Wattpad — story content in multiple possible container types
     test: () => window.location.hostname.includes('wattpad.com'),
     extract: () => {
-      const parts = document.querySelectorAll('pre');
-      if (parts.length > 0) {
-        return Array.from(parts).map(p => p.textContent).join('\n\n');
+      // New reader: pre elements with story text
+      const pres = document.querySelectorAll('pre');
+      if (pres.length > 0) {
+        const text = Array.from(pres).map(p => p.textContent).join('\n\n');
+        if (text.trim().length > 100) return text;
+      }
+      // Old reader / fallback: paragraph containers
+      for (const sel of ['.story-text', '.panel-reading', '[data-page-id]']) {
+        const el = document.querySelector(sel);
+        if (el) {
+          const ps = el.querySelectorAll('p');
+          if (ps.length > 0) {
+            return Array.from(ps).map(p => p.textContent).join('\n\n');
+          }
+          if (el.textContent.trim().length > 100) return el.textContent;
+        }
       }
       return null;
     }

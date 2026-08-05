@@ -3,6 +3,12 @@
 
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   switch (message.action) {
+    case 'get_voices':
+      handleGetVoices()
+        .then(sendResponse)
+        .catch(err => sendResponse({ success: false, error: err.message }));
+      return true;
+
     case 'read_page':
       handleReadPage(message.text, message.voice, message.rate)
         .then(sendResponse)
@@ -26,6 +32,15 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return false;
   }
 });
+
+async function handleGetVoices() {
+  const resp = await fetch('http://localhost:8765/voices?locale=es-');
+  if (!resp.ok) {
+    throw new Error(`Voices fetch failed: ${resp.status}`);
+  }
+  const voices = await resp.json();
+  return { success: true, voices };
+}
 
 async function handleReadPage(text, voice, rate) {
   const body = { text };

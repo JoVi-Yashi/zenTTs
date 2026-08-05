@@ -2091,17 +2091,29 @@
   var PANEL_HTML = `
 <div id="tts-zen-panel">
   <div id="tts-zen-header">
-    <span id="tts-zen-logo">\u{1F399}\uFE0F TTS-zen</span>
-    <button id="tts-zen-settings-btn" title="Settings">\u2699\uFE0F</button>
+    <span id="tts-zen-logo">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+        <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+        <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+      </svg>
+      TTS-zen
+    </span>
+    <button id="tts-zen-settings-btn" title="Ajustes">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+      </svg>
+    </button>
   </div>
 
   <div id="tts-zen-settings" class="collapsed">
     <div class="setting-row">
-      <label for="tts-zen-voice">Voz</label>
+      <label>Voz</label>
       <select id="tts-zen-voice"></select>
     </div>
     <div class="setting-row">
-      <label for="tts-zen-speed">Velocidad</label>
+      <label>Velocidad</label>
       <div class="speed-group">
         <input type="range" id="tts-zen-speed" min="50" max="300" value="100" step="10">
         <span id="tts-zen-speed-label">1.0x</span>
@@ -2114,9 +2126,23 @@
   </div>
 
   <div id="tts-zen-controls">
-    <button id="tts-zen-read">\u25B6\uFE0F Leer</button>
-    <button id="tts-zen-pause" disabled>\u23F8\uFE0F</button>
-    <button id="tts-zen-stop" disabled>\u23F9\uFE0F</button>
+    <button id="tts-zen-read" class="primary">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+        <polygon points="5,3 19,12 5,21"></polygon>
+      </svg>
+      Leer
+    </button>
+    <button id="tts-zen-pause" disabled>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+        <rect x="6" y="4" width="4" height="16"></rect>
+        <rect x="14" y="4" width="4" height="16"></rect>
+      </svg>
+    </button>
+    <button id="tts-zen-stop" disabled>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+        <rect x="4" y="4" width="16" height="16" rx="2"></rect>
+      </svg>
+    </button>
   </div>
 
   <div id="tts-zen-status">Listo</div>
@@ -2126,184 +2152,340 @@
 :host {
   all: initial;
 }
+
 #tts-zen-panel {
   position: fixed;
-  bottom: 20px;
-  right: 20px;
+  bottom: 24px;
+  right: 24px;
   z-index: 999999;
-  background: #1a1a2e;
-  color: #e0e0e0;
-  border-radius: 14px;
-  padding: 0;
+  width: 340px;
+  max-height: 70vh;
+  background: linear-gradient(145deg, #14142b 0%, #1a1a35 100%);
+  border: 1px solid rgba(167, 139, 250, 0.12);
+  border-radius: 16px;
+  color: #d1d5db;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   font-size: 13px;
-  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.6);
-  width: 320px;
-  max-height: 70vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  box-shadow:
+    0 0 0 1px rgba(167, 139, 250, 0.05),
+    0 8px 40px rgba(0, 0, 0, 0.5),
+    0 2px 8px rgba(0, 0, 0, 0.3);
   user-select: none;
+  animation: panel-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
 }
+
+#tts-zen-panel:hover {
+  border-color: rgba(167, 139, 250, 0.25);
+  box-shadow:
+    0 0 0 1px rgba(167, 139, 250, 0.1),
+    0 12px 48px rgba(0, 0, 0, 0.55),
+    0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ---- Header ---- */
 
 #tts-zen-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 14px 10px;
-  border-bottom: 1px solid #2a2a45;
-}
-#tts-zen-logo {
-  font-weight: 700;
-  font-size: 14px;
-  color: #a78bfa;
-}
-#tts-zen-settings-btn {
-  background: none;
-  border: none;
-  color: #888;
-  font-size: 16px;
-  cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 6px;
-  transition: background 0.15s;
-}
-#tts-zen-settings-btn:hover {
-  background: #2a2a40;
-  color: #a78bfa;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
+#tts-zen-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  color: #a78bfa;
+  letter-spacing: 0.2px;
+}
+
+#tts-zen-logo svg {
+  color: #a78bfa;
+  transition: transform 0.3s ease;
+}
+
+#tts-zen-settings-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+#tts-zen-settings-btn:hover {
+  background: rgba(167, 139, 250, 0.1);
+  border-color: rgba(167, 139, 250, 0.2);
+  color: #a78bfa;
+  transform: rotate(30deg);
+}
+
+/* ---- Settings ---- */
+
 #tts-zen-settings {
-  padding: 10px 14px;
-  border-bottom: 1px solid #2a2a45;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+  animation: settings-in 0.2s ease;
 }
+
 #tts-zen-settings.collapsed {
   display: none;
 }
+
+@keyframes settings-in {
+  from { opacity: 0; max-height: 0; }
+  to { opacity: 1; max-height: 200px; }
+}
+
 .setting-row {
   display: flex;
   align-items: center;
   gap: 10px;
 }
+
 .setting-row label {
-  min-width: 70px;
+  min-width: 68px;
   font-size: 12px;
-  color: #999;
+  color: #9ca3af;
+  font-weight: 500;
 }
+
 .setting-row select {
   flex: 1;
-  padding: 6px 8px;
-  border-radius: 6px;
-  border: 1px solid #3f3f5e;
-  background: #2a2a40;
-  color: #e0e0e0;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: #d1d5db;
   font-size: 12px;
   cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s ease, background 0.2s ease;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239ca3af' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 28px;
 }
+
+.setting-row select:hover {
+  border-color: rgba(167, 139, 250, 0.3);
+}
+
+.setting-row select:focus {
+  border-color: #a78bfa;
+  background: rgba(167, 139, 250, 0.06);
+}
+
 .speed-group {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex: 1;
 }
+
 .speed-group input[type="range"] {
   flex: 1;
-  accent-color: #a78bfa;
+  height: 6px;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+  transition: background 0.2s ease;
 }
+
+.speed-group input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #a78bfa;
+  cursor: pointer;
+  border: 2px solid #1a1a35;
+  box-shadow: 0 2px 8px rgba(167, 139, 250, 0.4);
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+.speed-group input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 4px 12px rgba(167, 139, 250, 0.6);
+}
+
 #tts-zen-speed-label {
   font-size: 12px;
   color: #a78bfa;
   font-weight: 600;
   min-width: 36px;
   text-align: right;
+  font-variant-numeric: tabular-nums;
 }
+
+/* ---- Text Display ---- */
 
 #tts-zen-text-display {
   flex: 1;
   overflow-y: auto;
-  padding: 12px 14px;
-  max-height: 300px;
-  background: #12122a;
-  border-bottom: 1px solid #2a2a45;
+  padding: 14px 16px;
+  max-height: 320px;
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  scroll-behavior: smooth;
 }
+
 #tts-zen-text-display::-webkit-scrollbar {
   width: 4px;
 }
+
+#tts-zen-text-display::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 #tts-zen-text-display::-webkit-scrollbar-thumb {
-  background: #3f3f5e;
+  background: rgba(167, 139, 250, 0.2);
   border-radius: 2px;
 }
-#tts-zen-text-content {
-  line-height: 1.7;
-  font-size: 13px;
-  color: #ccc;
+
+#tts-zen-text-display::-webkit-scrollbar-thumb:hover {
+  background: rgba(167, 139, 250, 0.4);
 }
+
+#tts-zen-text-content {
+  line-height: 1.75;
+  font-size: 13px;
+  color: #9ca3af;
+}
+
 #tts-zen-text-content .sentence {
   display: inline;
-  transition: background 0.2s, color 0.2s;
+  transition: color 0.3s ease, background 0.25s ease, text-decoration-color 0.3s ease;
   border-radius: 3px;
-  padding: 1px 0;
-}
-#tts-zen-text-content .sentence.active {
-  background: rgba(167, 139, 250, 0.25);
-  color: #fff;
+  padding: 1px 2px;
   text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 2px;
+}
+
+#tts-zen-text-content .sentence.active {
+  color: #f3f4f6;
+  background: rgba(167, 139, 250, 0.18);
   text-decoration-color: #a78bfa;
-  text-underline-offset: 2px;
+  box-shadow: 0 0 0 2px rgba(167, 139, 250, 0.15);
 }
+
 #tts-zen-text-content .sentence.played {
-  color: #888;
+  color: #6b7280;
 }
+
+/* ---- Controls ---- */
 
 #tts-zen-controls {
   display: flex;
-  gap: 6px;
-  padding: 10px 14px;
-}
-#tts-zen-controls button {
-  flex: 1;
-  padding: 9px 10px;
-  border: 1px solid #3f3f5e;
-  border-radius: 8px;
-  background: #2a2a40;
-  color: #e0e0e0;
-  font-size: 13px;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
-}
-#tts-zen-controls button:hover:not(:disabled) {
-  background: #38385a;
-  border-color: #7c3aed;
-}
-#tts-zen-controls button:active:not(:disabled) {
-  background: #4a4a70;
-}
-#tts-zen-controls button:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-#tts-zen-read {
-  background: #7c3aed !important;
-  border-color: #7c3aed !important;
-  color: #fff !important;
-}
-#tts-zen-read:hover:not(:disabled) {
-  background: #8b5cf6 !important;
-}
-#tts-zen-read:disabled {
-  background: #4a3080 !important;
-  border-color: #4a3080 !important;
+  gap: 8px;
+  padding: 12px 16px;
 }
 
-#tts-zen-status {
-  padding: 6px 14px 10px;
-  font-size: 11px;
-  color: #666;
-  text-align: center;
+#tts-zen-controls button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #d1d5db;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  outline: none;
 }
+
+#tts-zen-controls button svg {
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+#tts-zen-controls button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(167, 139, 250, 0.3);
+  transform: translateY(-1px);
+}
+
+#tts-zen-controls button:hover:not(:disabled) svg {
+  transform: scale(1.1);
+}
+
+#tts-zen-controls button:active:not(:disabled) {
+  transform: translateY(0) scale(0.97);
+  transition: all 0.1s ease;
+}
+
+#tts-zen-controls button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  transform: none;
+}
+
+#tts-zen-controls button.primary {
+  background: #7c3aed;
+  border-color: #7c3aed;
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 2px 12px rgba(124, 58, 237, 0.3);
+}
+
+#tts-zen-controls button.primary:hover:not(:disabled) {
+  background: #8b5cf6;
+  border-color: #8b5cf6;
+  box-shadow: 0 4px 20px rgba(124, 58, 237, 0.45);
+}
+
+#tts-zen-controls button.primary:active:not(:disabled) {
+  background: #6d28d9;
+  box-shadow: 0 1px 6px rgba(124, 58, 237, 0.3);
+}
+
+/* ---- Status ---- */
+
+#tts-zen-status {
+  padding: 6px 16px 12px;
+  font-size: 11px;
+  color: #6b7280;
+  text-align: center;
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+
 #tts-zen-status.error {
   color: #f87171;
 }
@@ -2318,7 +2500,6 @@
     paused: false
   };
   var audio = null;
-  var timeUpdateInterval = null;
   async function loadSettings() {
     try {
       const stored = await browser.storage.local.get(["voice", "rate"]);
@@ -2329,18 +2510,15 @@
   }
   async function saveSettings() {
     try {
-      await browser.storage.local.set({
-        voice: state.currentVoice,
-        rate: state.currentRate
-      });
+      await browser.storage.local.set({ voice: state.currentVoice, rate: state.currentRate });
     } catch (_) {
     }
   }
   async function loadVoices() {
     try {
-      const resp = await fetch("http://localhost:8765/voices?locale=es-");
-      if (resp.ok) {
-        state.voices = await resp.json();
+      const response = await browser.runtime.sendMessage({ action: "get_voices" });
+      if (response.success) {
+        state.voices = response.voices;
         populateVoiceDropdown();
       }
     } catch (_) {
@@ -2357,12 +2535,14 @@
       groups[country].push(v);
     }
     for (const [country, voices] of Object.entries(groups)) {
+      const names = { ES: "Espa\xF1a", MX: "M\xE9xico", AR: "Argentina", CO: "Colombia", CL: "Chile", PE: "Per\xFA", VE: "Venezuela", US: "EEUU", BO: "Bolivia", CR: "Costa Rica", CU: "Cuba", DO: "Dominicana", EC: "Ecuador", SV: "El Salvador", GQ: "Guinea Ecuatorial", GT: "Guatemala", HN: "Honduras", NI: "Nicaragua", PA: "Panam\xE1", PY: "Paraguay", PR: "Puerto Rico", UY: "Uruguay" };
+      const label = names[country] || country;
       const optgroup = document.createElement("optgroup");
-      optgroup.label = country === "ES" ? "\u{1F1EA}\u{1F1F8} Espa\xF1a" : country === "MX" ? "\u{1F1F2}\u{1F1FD} M\xE9xico" : country === "AR" ? "\u{1F1E6}\u{1F1F7} Argentina" : country === "CO" ? "\u{1F1E8}\u{1F1F4} Colombia" : country === "CL" ? "\u{1F1E8}\u{1F1F1} Chile" : country === "PE" ? "\u{1F1F5}\u{1F1EA} Per\xFA" : country === "VE" ? "\u{1F1FB}\u{1F1EA} Venezuela" : country === "US" ? "\u{1F1FA}\u{1F1F8} EEUU" : country;
+      optgroup.label = label;
       for (const v of voices) {
         const opt = document.createElement("option");
         opt.value = v.name;
-        opt.textContent = `${v.friendly.split(" - ")[0].replace("Microsoft ", "")} (${v.gender === "Female" ? "\u2640" : "\u2642"})`;
+        opt.textContent = v.friendly.replace("Microsoft ", "").replace(" Online (Natural)", "");
         if (v.name === state.currentVoice) opt.selected = true;
         optgroup.appendChild(opt);
       }
@@ -2383,7 +2563,7 @@
   }
   function setButtonsEnabled({ read, pause, stop }) {
     for (const [action, enabled] of [["read", read], ["pause", pause], ["stop", stop]]) {
-      const btn = getEl(`tts-zen-${action}`);
+      const btn = getEl("tts-zen-" + action);
       if (btn) btn.disabled = !enabled;
     }
   }
@@ -2394,38 +2574,30 @@
     for (let i = 0; i < sentences.length; i++) {
       const span = document.createElement("span");
       span.className = "sentence";
-      span.id = `tts-zen-s-${i}`;
+      span.id = "tts-zen-s-" + i;
       span.textContent = sentences[i].text + " ";
       container.appendChild(span);
     }
   }
   function highlightSentence(idx) {
-    const prev = getEl("tts-zen-text-content")?.querySelector(".sentence.active");
-    if (prev) {
-      prev.classList.remove("active");
-      prev.classList.add("played");
+    const prev = getEl("tts-zen-text-content");
+    if (!prev) return;
+    const active = prev.querySelector(".sentence.active");
+    if (active) {
+      active.classList.remove("active");
+      active.classList.add("played");
     }
-    const el = getEl(`tts-zen-s-${idx}`);
-    if (el) {
-      el.classList.add("active");
-    }
+    const el = getEl("tts-zen-s-" + idx);
+    if (el) el.classList.add("active");
   }
   function scrollToSentence(idx) {
-    const el = getEl(`tts-zen-s-${idx}`);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    }
+    const el = getEl("tts-zen-s-" + idx);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
   function stopAudio() {
-    if (timeUpdateInterval) {
-      clearInterval(timeUpdateInterval);
-      timeUpdateInterval = null;
-    }
     if (audio) {
       audio.pause();
-      if (audio.src && audio.src.startsWith("blob:")) {
-        URL.revokeObjectURL(audio.src);
-      }
+      if (audio.src && audio.src.startsWith("blob:")) URL.revokeObjectURL(audio.src);
       audio = null;
     }
     state.playing = false;
@@ -2439,9 +2611,7 @@
     displaySentences(sentences);
     const binary = atob(audioB64);
     const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      bytes[i] = binary.charCodeAt(i);
-    }
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
     const blob = new Blob([bytes], { type: "audio/mpeg" });
     const url = URL.createObjectURL(blob);
     audio = new Audio(url);
@@ -2463,7 +2633,7 @@
     });
     audio.addEventListener("ended", () => {
       highlightSentence(state.sentences.length - 1);
-      setStatus("\u2705 Listo");
+      setStatus("Listo");
       setButtonsEnabled({ read: true, pause: false, stop: false });
       URL.revokeObjectURL(audio.src);
       audio = null;
@@ -2476,10 +2646,10 @@
     });
     audio.play().then(() => {
       state.playing = true;
-      setStatus("\u25B6\uFE0F Reproduciendo...");
+      setStatus("Reproduciendo...");
       setButtonsEnabled({ read: false, pause: true, stop: true });
     }).catch((err) => {
-      setStatus(`Error: ${err.message}`, true);
+      setStatus("Error: " + err.message, true);
       setButtonsEnabled({ read: true, pause: false, stop: false });
       stopAudio();
     });
@@ -2491,9 +2661,9 @@
       return;
     }
     const voice = state.currentVoice;
-    const rate = `${Math.round((state.currentRate - 1) * 100)}%`;
-    const rateStr = state.currentRate >= 1 ? `+${rate}` : rate;
-    setStatus("\u{1F3A4} Generando audio...");
+    const rate = Math.round((state.currentRate - 1) * 100) + "%";
+    const rateStr = state.currentRate >= 1 ? "+" + rate : rate;
+    setStatus("Generando audio...");
     setButtonsEnabled({ read: false, pause: false, stop: false });
     try {
       const response = await browser.runtime.sendMessage({
@@ -2505,11 +2675,11 @@
       if (response.success) {
         playAudioSync(response.audio, response.sentences);
       } else {
-        setStatus(`Error: ${response.error}`, true);
+        setStatus("Error: " + response.error, true);
         setButtonsEnabled({ read: true, pause: false, stop: false });
       }
     } catch (err) {
-      setStatus(`Error de conexi\xF3n: ${err.message}`, true);
+      setStatus("Error de conexi\xF3n: " + err.message, true);
       setButtonsEnabled({ read: true, pause: false, stop: false });
     }
   }
@@ -2518,18 +2688,18 @@
     if (audio.paused) {
       audio.play().then(() => {
         state.paused = false;
-        setStatus("\u25B6\uFE0F Reproduciendo...");
+        setStatus("Reproduciendo...");
       });
     } else {
       audio.pause();
       state.paused = true;
-      setStatus("\u23F8\uFE0F Pausado");
+      setStatus("Pausado");
     }
   }
   function handleStop() {
     stopAudio();
     highlightSentence(-1);
-    setStatus("\u23F9\uFE0F Detenido");
+    setStatus("Detenido");
     setButtonsEnabled({ read: true, pause: false, stop: false });
   }
   async function createPanel(shadow, handlers) {
@@ -2541,9 +2711,7 @@
     shadow.appendChild(container);
     const settingsBtn = shadow.getElementById("tts-zen-settings-btn");
     const settingsPanel = shadow.getElementById("tts-zen-settings");
-    settingsBtn.addEventListener("click", () => {
-      settingsPanel.classList.toggle("collapsed");
-    });
+    settingsBtn.addEventListener("click", () => settingsPanel.classList.toggle("collapsed"));
     const voiceSelect = shadow.getElementById("tts-zen-voice");
     voiceSelect.addEventListener("change", () => {
       state.currentVoice = voiceSelect.value;
@@ -2579,12 +2747,23 @@
   }
   var SITE_EXTRACTORS = [
     {
-      // Wattpad — story content is in pre elements inside the reader
+      // Wattpad — story content in multiple possible container types
       test: () => window.location.hostname.includes("wattpad.com"),
       extract: () => {
-        const parts = document.querySelectorAll("pre");
-        if (parts.length > 0) {
-          return Array.from(parts).map((p) => p.textContent).join("\n\n");
+        const pres = document.querySelectorAll("pre");
+        if (pres.length > 0) {
+          const text = Array.from(pres).map((p) => p.textContent).join("\n\n");
+          if (text.trim().length > 100) return text;
+        }
+        for (const sel of [".story-text", ".panel-reading", "[data-page-id]"]) {
+          const el = document.querySelector(sel);
+          if (el) {
+            const ps = el.querySelectorAll("p");
+            if (ps.length > 0) {
+              return Array.from(ps).map((p) => p.textContent).join("\n\n");
+            }
+            if (el.textContent.trim().length > 100) return el.textContent;
+          }
         }
         return null;
       }
