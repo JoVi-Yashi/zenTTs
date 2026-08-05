@@ -338,12 +338,17 @@ function updateHighlight(idx) {
   // Update preview popup highlight if open (inside Shadow DOM)
   var host = document.getElementById('tts-zen-host');
   if (host && host.shadowRoot) {
-    var prevActive = host.shadowRoot.querySelector('#tts-zen-preview-content .sentence.active');
-    if (prevActive) { prevActive.classList.remove('active'); prevActive.classList.add('played'); }
-    var prevEl = host.shadowRoot.getElementById('tts-zen-preview-s-' + idx);
-    if (prevEl) {
-      prevEl.classList.add('active');
-      prevEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    var overlay = host.shadowRoot.getElementById('tts-zen-preview-overlay');
+    if (overlay && !overlay.classList.contains('hidden')) {
+      // Refresh preview content with latest sentences
+      refreshPreviewContent(host.shadowRoot);
+      var prevActive = host.shadowRoot.querySelector('#tts-zen-preview-content .sentence.active');
+      if (prevActive) { prevActive.classList.remove('active'); prevActive.classList.add('played'); }
+      var prevEl = host.shadowRoot.getElementById('tts-zen-preview-s-' + idx);
+      if (prevEl) {
+        prevEl.classList.add('active');
+        prevEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
     }
   }
 
@@ -359,6 +364,24 @@ function updateHighlight(idx) {
     }
   }
   setCounter(idx + 1, sentenceData.length);
+}
+
+function refreshPreviewContent(shadow) {
+  var content = shadow.getElementById('tts-zen-preview-content');
+  if (!content) return;
+  var sentences = window.__tts_zen_sentences || [];
+  if (sentences.length === 0) return;
+  content.innerHTML = '';
+  for (var i = 0; i < sentences.length; i++) {
+    var p = document.createElement('p');
+    p.style.cssText = 'margin:0 0 6px 0;line-height:inherit;';
+    var span = document.createElement('span');
+    span.className = 'sentence';
+    span.id = 'tts-zen-preview-s-' + i;
+    span.textContent = sentences[i].text;
+    p.appendChild(span);
+    content.appendChild(p);
+  }
 }
 
 async function sendMessageWithRetry(message, maxRetries = 3) {

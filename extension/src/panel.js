@@ -48,9 +48,26 @@ const PANEL_HTML = `
         <div class="speed-group">
           <input type="range" id="tts-zen-speed" min="50" max="300" value="100" step="10">
           <span id="tts-zen-speed-label">1.0x</span>
+      </div>
+    </div>
+    <div class="setting-row sites-section">
+      <label>Sitios</label>
+      <div id="tts-zen-sites">
+        <div class="site-tag active">
+          <span class="site-icon">W</span> Wattpad
+        </div>
+        <div class="site-tag active">
+          <span class="site-icon">A</span> AO3
+        </div>
+        <div class="site-tag active">
+          <span class="site-icon">F</span> FanFiction
+        </div>
+        <div class="site-tag">
+          <span class="site-icon">+</span> Genérico
         </div>
       </div>
     </div>
+  </div>
 
     <div id="tts-zen-counter">—</div>
 
@@ -336,6 +353,31 @@ const PANEL_CSS = `
 .preview-tool:hover { background: rgba(167,139,250,0.12); border-color: rgba(167,139,250,0.25); color: #d1d5db; }
 .preview-tool.active { background: rgba(167,139,250,0.18); border-color: #a78bfa; color: #a78bfa; }
 .tool-sep { width: 1px; height: 16px; background: rgba(255,255,255,0.08); margin: 0 2px; }
+
+/* ---- Site Tags ---- */
+.sites-section { align-items: flex-start !important; }
+#tts-zen-sites {
+  display: flex; flex-wrap: wrap; gap: 5px; flex: 1;
+}
+.site-tag {
+  display: flex; align-items: center; gap: 5px;
+  padding: 4px 9px; border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.03);
+  color: #6b7280; font-size: 10px; font-weight: 500;
+  transition: all .2s ease; cursor: default;
+}
+.site-tag.active {
+  border-color: rgba(167,139,250,0.2);
+  background: rgba(167,139,250,0.08);
+  color: #a78bfa;
+}
+.site-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: rgba(167,139,250,0.15); font-size: 10px; font-weight: 700;
+}
+.site-tag.active .site-icon { background: rgba(167,139,250,0.3); }
 #tts-zen-preview-close {
   display: flex; align-items: center; justify-content: center;
   width: 30px; height: 30px; background: transparent; border: none;
@@ -576,19 +618,23 @@ let lastExtractedText = '';
 
 export function showPreview(text) {
   lastExtractedText = text || lastExtractedText || window.__tts_zen_last_text || '';
-  const overlay = getEl('tts-zen-preview-overlay');
-  const content = getEl('tts-zen-preview-content');
+  var overlay = getEl('tts-zen-preview-overlay');
+  var content = getEl('tts-zen-preview-content');
   if (!overlay || !content) return;
 
+  renderPreviewContent(content);
+  applyPreviewStyle();
+  overlay.classList.remove('hidden');
+}
+
+function renderPreviewContent(content) {
   var sentences = window.__tts_zen_sentences || [];
   content.innerHTML = '';
 
   if (sentences.length > 0) {
-    // Render with sentence spans for highlighting sync
     for (var i = 0; i < sentences.length; i++) {
       var p = document.createElement('p');
-      p.style.margin = '0 0 6px 0';
-      p.style.lineHeight = '1.6';
+      p.style.cssText = 'margin:0 0 6px 0;line-height:inherit;';
       var span = document.createElement('span');
       span.className = 'sentence';
       span.id = 'tts-zen-preview-s-' + i;
@@ -597,19 +643,24 @@ export function showPreview(text) {
       content.appendChild(p);
     }
   } else {
-    // No sentences yet — show extracted text with paragraph breaks
-    var paragraphs = (lastExtractedText || 'No hay texto extraido aun. Hace click en Leer primero.')
+    var paragraphs = (lastExtractedText || 'Sin texto — click en Leer primero.')
       .split(/\n\n+/)
       .filter(function(l) { return l.trim(); });
     for (var j = 0; j < paragraphs.length; j++) {
       var p2 = document.createElement('p');
-      p2.style.margin = '0 0 10px 0';
-      p2.style.lineHeight = '1.7';
+      p2.style.cssText = 'margin:0 0 10px 0;line-height:inherit;';
       p2.textContent = paragraphs[j].trim();
       content.appendChild(p2);
     }
   }
-  overlay.classList.remove('hidden');
+}
+
+// Update preview if already open (called from content.js during playback)
+export function updatePreviewSentences() {
+  var overlay = getEl('tts-zen-preview-overlay');
+  if (!overlay || overlay.classList.contains('hidden')) return;
+  var content = getEl('tts-zen-preview-content');
+  if (content) renderPreviewContent(content);
 }
 
 function hidePreview() {
@@ -627,12 +678,12 @@ var previewSpacing = 1.7;
 function applyPreviewStyle() {
   var content = getEl('tts-zen-preview-content');
   if (!content) return;
-  var family = previewFont === 'serif' ? 'Georgia, serif' :
-               previewFont === 'mono' ? 'monospace' :
-               '-apple-system, BlinkMacSystemFont, sans-serif';
-  content.style.fontFamily = family;
-  content.style.fontSize = previewSize + 'px';
-  content.style.lineHeight = previewSpacing;
+  var family = previewFont === 'serif' ? '"Georgia", "Times New Roman", serif' :
+               previewFont === 'mono' ? '"JetBrains Mono", "Fira Code", monospace' :
+               '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+  content.style.setProperty('font-family', family, 'important');
+  content.style.setProperty('font-size', previewSize + 'px', 'important');
+  content.style.setProperty('line-height', String(previewSpacing), 'important');
 }
 
 function setupPreviewTools(shadow) {
