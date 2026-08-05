@@ -1,7 +1,7 @@
 // TTS-zen Content Script
 // Injects floating panel, extracts text with DOM references for page highlighting
 import { Readability } from '@mozilla/readability';
-import { createPanel, setStatus, setButtonsEnabled, setCounter } from './panel.js';
+import { createPanel, setStatus, setButtonsEnabled, setCounter, setPauseIcon } from './panel.js';
 
 // ---- URL Guard ----
 const RESTRICTED_PROTOCOLS = ['edge:', 'about:', 'file:', 'chrome:', 'moz-extension:'];
@@ -278,6 +278,7 @@ function playChunk(chunkData) {
       // All done
       setStatus('Listo');
       setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
+      setPauseIcon(false);
       sentenceOffset = 0;
     }
   });
@@ -291,6 +292,7 @@ function playChunk(chunkData) {
   audio.play().then(function() {
     setStatus('Reproduciendo... (' + (chunkIndex + 1) + '/' + chunkQueue.length + ')');
     setButtonsEnabled({ read: false, pause: true, stop: true, prev: true, next: true });
+    setPauseIcon(true);
   }).catch(function(err) {
     setStatus('Error: ' + err.message, true);
     setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
@@ -403,10 +405,11 @@ async function dispatchReadPage(extractFn) {
 function handlePause() {
   if (!audio) return;
   if (audio.paused) {
-    audio.play().then(() => setStatus('Reproduciendo...'));
+    audio.play().then(function() { setStatus('Reproduciendo...'); setPauseIcon(true); });
   } else {
     audio.pause();
     setStatus('Pausado');
+    setPauseIcon(false);
   }
 }
 
@@ -414,6 +417,7 @@ function handleStop() {
   stopAudio();
   setStatus('Detenido');
   setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
+  setPauseIcon(false);
 }
 
 function handlePrev() {

@@ -102,7 +102,18 @@ const PANEL_HTML = `
 <div id="tts-zen-preview-overlay" class="hidden">
   <div id="tts-zen-preview-modal">
     <div id="tts-zen-preview-header">
-      <span>Texto extraído</span>
+      <span>Texto extraido</span>
+      <div id="tts-zen-preview-tools">
+        <button class="preview-tool" data-font="serif" title="Serif">Serif</button>
+        <button class="preview-tool active" data-font="sans" title="Sans">Sans</button>
+        <button class="preview-tool" data-font="mono" title="Mono">Mono</button>
+        <span class="tool-sep"></span>
+        <button class="preview-tool" data-size="down" title="Reducir">A-</button>
+        <button class="preview-tool" data-size="up" title="Aumentar">A+</button>
+        <span class="tool-sep"></span>
+        <button class="preview-tool" data-spacing="down" title="Menos espacio">-</button>
+        <button class="preview-tool" data-spacing="up" title="Mas espacio">+</button>
+      </div>
       <button id="tts-zen-preview-close">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
           <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -309,9 +320,22 @@ const PANEL_CSS = `
 
 #tts-zen-preview-header {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 14px 18px; border-bottom: 1px solid rgba(255,255,255,0.06);
+  padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,0.06);
+  flex-wrap: wrap; gap: 6px;
 }
-#tts-zen-preview-header span { font-weight: 600; color: #a78bfa; font-size: 14px; }
+#tts-zen-preview-header span { font-weight: 600; color: #a78bfa; font-size: 13px; }
+#tts-zen-preview-tools {
+  display: flex; align-items: center; gap: 4px;
+}
+.preview-tool {
+  padding: 3px 7px; border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 5px; background: rgba(255,255,255,0.04);
+  color: #9ca3af; font-size: 10px; cursor: pointer;
+  transition: all .15s ease; font-family: inherit;
+}
+.preview-tool:hover { background: rgba(167,139,250,0.12); border-color: rgba(167,139,250,0.25); color: #d1d5db; }
+.preview-tool.active { background: rgba(167,139,250,0.18); border-color: #a78bfa; color: #a78bfa; }
+.tool-sep { width: 1px; height: 16px; background: rgba(255,255,255,0.08); margin: 0 2px; }
 #tts-zen-preview-close {
   display: flex; align-items: center; justify-content: center;
   width: 30px; height: 30px; background: transparent; border: none;
@@ -472,6 +496,9 @@ export async function createPanel(shadow, handlers) {
   const previewClose = shadow.getElementById('tts-zen-preview-close');
   previewClose.addEventListener('click', hidePreview);
 
+  // Preview typography tools
+  setupPreviewTools(shadow);
+
   // Overlay click to close
   const overlay = shadow.getElementById('tts-zen-preview-overlay');
   overlay.addEventListener('click', function(e) { if (e.target === overlay) hidePreview(); });
@@ -588,5 +615,57 @@ export function showPreview(text) {
 function hidePreview() {
   const overlay = getEl('tts-zen-preview-overlay');
   if (overlay) overlay.classList.add('hidden');
+}
+
+
+// ---- Preview Typography ----
+
+var previewFont = 'sans';
+var previewSize = 14;
+var previewSpacing = 1.7;
+
+function applyPreviewStyle() {
+  var content = getEl('tts-zen-preview-content');
+  if (!content) return;
+  var family = previewFont === 'serif' ? 'Georgia, serif' :
+               previewFont === 'mono' ? 'monospace' :
+               '-apple-system, BlinkMacSystemFont, sans-serif';
+  content.style.fontFamily = family;
+  content.style.fontSize = previewSize + 'px';
+  content.style.lineHeight = previewSpacing;
+}
+
+function setupPreviewTools(shadow) {
+  var tools = shadow.querySelectorAll('.preview-tool');
+  tools.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var font = this.dataset.font;
+      var size = this.dataset.size;
+      var spacing = this.dataset.spacing;
+
+      if (font) {
+        previewFont = font;
+        tools.forEach(function(b) { if (b.dataset.font) b.classList.remove('active'); });
+        this.classList.add('active');
+      }
+      if (size === 'up') previewSize = Math.min(24, previewSize + 1);
+      if (size === 'down') previewSize = Math.max(11, previewSize - 1);
+      if (spacing === 'up') previewSpacing = Math.min(2.8, +(previewSpacing + 0.1).toFixed(1));
+      if (spacing === 'down') previewSpacing = Math.max(1.2, +(previewSpacing - 0.1).toFixed(1));
+
+      applyPreviewStyle();
+    });
+  });
+}
+
+// ---- Pause/Play Icon Toggle ----
+
+var PLAY_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5,3 19,12 5,21"></polygon></svg>';
+var PAUSE_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>';
+
+export function setPauseIcon(isPlaying) {
+  var btn = getEl('tts-zen-pause');
+  if (!btn) return;
+  btn.innerHTML = isPlaying ? PAUSE_ICON : PLAY_ICON;
 }
 
