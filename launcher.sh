@@ -148,6 +148,100 @@ show_help() {
     printf "    ${C_BOLD}status${C_RESET}  ${C_DIM}Mostrar estado${C_RESET}\n"
     printf "    ${C_BOLD}open${C_RESET}    ${C_DIM}Iniciar + abrir Zen Browser${C_RESET}\n"
     printf "    ${C_BOLD}help${C_RESET}    ${C_DIM}Esta ayuda${C_RESET}\n"
+    printf "    ${C_BOLD}quit${C_RESET}    ${C_DIM}Salir${C_RESET}\n"
+}
+
+interactive_mode() {
+    show_header
+    show_status_box
+    show_help
+    echo ""
+    while true; do
+        printf "  ${C_PURPLE}${C_BOLD}tts-zen${C_RESET} ${C_DIM}>${C_RESET} "
+        read -r cmd
+        case "${cmd:-}" in
+            start)
+                show_header
+                if running &>/dev/null; then
+                    show_status_box
+                    echo ""
+                    printf "  $(green '✓') $(dim 'Ya está corriendo.')\n"
+                else
+                    echo ""
+                    printf "  $(dim 'Iniciando servidor...') "
+                    cd "$PROJECT_DIR/server"
+                    nohup uv run uvicorn tts_zen.main:app --port "$PORT" --host 127.0.0.1 \
+                        > "$LOG_FILE" 2>&1 &
+                    pid=$!
+                    echo "$pid" > "$PID_FILE"
+                    if wait_for_server; then
+                        printf "\r  $(green '✓') $(dim 'servidor listo')\n"
+                        if command -v notify-send &>/dev/null; then
+                            notify-send -i audio-card "TTS-zen listo" "localhost:$PORT" 2>/dev/null || true
+                        fi
+                    else
+                        echo ""
+                        printf "  $(red '✗') $(red 'No respondió a tiempo')\n"
+                    fi
+                    show_status_box
+                fi
+                echo ""
+                ;;
+            stop)
+                show_header
+                stop_server
+                show_status_box
+                echo ""
+                ;;
+            status)
+                show_header
+                show_status_box
+                echo ""
+                ;;
+            open)
+                if ! running &>/dev/null; then
+                    echo ""
+                    printf "  $(dim 'Iniciando servidor...') "
+                    cd "$PROJECT_DIR/server"
+                    nohup uv run uvicorn tts_zen.main:app --port "$PORT" --host 127.0.0.1 \
+                        > "$LOG_FILE" 2>&1 &
+                    pid=$!
+                    echo "$pid" > "$PID_FILE"
+                    wait_for_server
+                    printf "\r  $(green '✓') $(dim 'servidor listo')\n"
+                fi
+                echo ""
+                printf "  $(dim 'Abriendo Zen Browser...') "
+                if flatpak list 2>/dev/null | grep -qi zen; then
+                    flatpak run app.zen_browser.zen &>/dev/null &
+                    printf "$(green '✓')\n"
+                else
+                    printf "$(yellow '?') $(dim 'no encontrado')\n"
+                fi
+                show_status_box
+                echo ""
+                ;;
+            help|--help|-h)
+                show_header
+                show_status_box
+                show_help
+                echo ""
+                ;;
+            quit|exit|q)
+                echo ""
+                printf "  $(dim 'Chau!')\n"
+                echo ""
+                break
+                ;;
+            "")
+                ;;
+            *)
+                printf "  $(red '✗') $(dim 'comando desconocido:')\n" "$cmd"
+                printf "  $(dim 'Probá: start, stop, status, open, quit')\n"
+                echo ""
+                ;;
+        esac
+    done
 }
 
 # ── Main ────────────────────────────────────────────────
@@ -226,7 +320,6 @@ case "${1:-status}" in
         ;;
 
     *)
-        show_help
-        echo ""
+        interactive_mode
         ;;
 esac
