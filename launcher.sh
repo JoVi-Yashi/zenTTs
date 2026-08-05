@@ -132,7 +132,7 @@ action_start() {
     command -v notify-send &>/dev/null && notify-send -i audio-card "TTS-zen" "Servidor listo en localhost:$PORT" 2>/dev/null || true
 }
 
-action_stop() { stop_server; }
+action_stop() { stop_server; sleep 0.5; }
 
 action_open() {
     action_start
