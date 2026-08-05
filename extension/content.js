@@ -2521,7 +2521,24 @@
   var SITE_EXTRACTORS = [
     {
       test: () => window.location.hostname.includes("wattpad.com"),
-      extract: () => mapParagraphsToText()?.text || null
+      extract: () => {
+        const readingPanel = document.querySelector(".panel-reading");
+        if (!readingPanel) return mapParagraphsToText()?.text || null;
+        const pres = readingPanel.querySelectorAll("pre");
+        if (pres.length === 0) return mapParagraphsToText()?.text || null;
+        const parts = [];
+        for (const pre of pres) {
+          const ps = pre.querySelectorAll("p");
+          for (const p of ps) {
+            const clone = p.cloneNode(true);
+            const spam = clone.querySelectorAll('span.fa-comment-count, span.fa-wp-neutral-2, [class*="fa-comment"]');
+            spam.forEach((s) => s.remove());
+            const txt = clone.textContent.trim();
+            if (txt.length > 1) parts.push(txt);
+          }
+        }
+        return parts.length > 0 ? parts.join("\n\n") : null;
+      }
     },
     {
       test: () => window.location.hostname.includes("archiveofourown.org"),
@@ -2579,7 +2596,15 @@
   var audio = null;
   var extractedRefs = [];
   var sentenceData = [];
+  var chunkQueue = [];
+  var chunkIndex = 0;
+  var totalSentences = 0;
+  var sentenceOffset = 0;
   function stopAudio() {
+    chunkQueue = [];
+    chunkIndex = 0;
+    totalSentences = 0;
+    sentenceOffset = 0;
     if (audio) {
       audio.pause();
       if (audio.src?.startsWith("blob:")) URL.revokeObjectURL(audio.src);
@@ -2587,54 +2612,66 @@
     }
     clearHighlight();
   }
-  function jumpToSentence(idx) {
-    if (idx < 0 || idx >= sentenceData.length) return;
-    if (!audio) return;
-    const targetTime = sentenceData[idx].start;
-    audio.currentTime = targetTime;
-    updateHighlight(idx);
-  }
-  function updateHighlight(idx) {
-    if (idx < 0 || idx >= sentenceData.length) return;
-    const s = sentenceData[idx];
-    const fullText = extractedRefs.map((r) => {
-      return Array.from(document.querySelectorAll("p, pre, h1, h2, h3, h4, h5, h6, li, td, th, blockquote")).filter((el) => {
-        const style = window.getComputedStyle(el);
-        return style.display !== "none" && style.visibility !== "hidden" && el.textContent.trim().length > 1;
-      }).map((el) => el.textContent.trim()).join("\n\n");
-    }).join("");
-    let pos = 0;
-    for (const ref of extractedRefs) {
-      const refText = ref.el.textContent.trim();
-      if (refText.indexOf(s.text) !== -1) {
-        const localPos = refText.indexOf(s.text);
-        highlightOnPage([ref], localPos, s.text.length);
-        setCounter(idx + 1, sentenceData.length);
-        return;
+  function splitIntoChunks(text, maxLen) {
+    var chunks = [];
+    var paragraphs = text.split("\n\n");
+    var current = "";
+    for (var i = 0; i < paragraphs.length; i++) {
+      var p = paragraphs[i].trim();
+      if (!p) continue;
+      if (current && current.length + p.length > maxLen) {
+        chunks.push(current.trim());
+        current = p;
+      } else {
+        current = current ? current + "\n\n" + p : p;
       }
     }
-    if (extractedRefs.length > 0) {
-      highlightOnPage(extractedRefs, pos, s.text.length);
-    }
-    setCounter(idx + 1, sentenceData.length);
+    if (current.trim()) chunks.push(current.trim());
+    return chunks.length > 0 ? chunks : [text];
   }
-  function playAudioSync(audioB64, sentences) {
-    stopAudio();
-    sentenceData = sentences;
-    const binary = atob(audioB64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    const blob = new Blob([bytes], { type: "audio/mpeg" });
-    const url = URL.createObjectURL(blob);
+  async function fetchChunk(text) {
+    var st = window.__tts_zen_state || {};
+    var voice = st.currentVoice || "es-ES-AlvaroNeural";
+    var rateVal = st.currentRate || 1;
+    var rate = Math.round((rateVal - 1) * 100) + "%";
+    var rateStr = rateVal >= 1 ? "+" + rate : rate;
+    var response = await sendMessageWithRetry({
+      action: "read_page_sync",
+      text,
+      voice,
+      rate: rateStr
+    });
+    if (!response || !response.success) {
+      throw new Error(response?.error || "TTS chunk failed");
+    }
+    return response;
+  }
+  function playChunk(chunkData) {
+    var sentences = chunkData.sentences;
+    var duration = sentences.length > 0 ? sentences[sentences.length - 1].end : 0;
+    for (var i = 0; i < sentences.length; i++) {
+      sentences[i].start += sentenceOffset;
+      sentences[i].end += sentenceOffset;
+    }
+    sentenceData = sentenceData.concat(sentences);
+    totalSentences = sentenceData.length;
+    var binary = atob(chunkData.audio);
+    var bytes = new Uint8Array(binary.length);
+    for (var i2 = 0; i2 < binary.length; i2++) bytes[i2] = binary.charCodeAt(i2);
+    var blob = new Blob([bytes], { type: "audio/mpeg" });
+    var url = URL.createObjectURL(blob);
+    if (audio) {
+      URL.revokeObjectURL(audio.src);
+    }
     audio = new Audio(url);
-    let lastIdx = -1;
-    audio.addEventListener("timeupdate", () => {
+    var lastIdx = -1;
+    audio.addEventListener("timeupdate", function() {
       if (!audio || !sentenceData.length) return;
-      const t = audio.currentTime;
-      let found = -1;
-      for (let i = 0; i < sentenceData.length; i++) {
-        if (t >= sentenceData[i].start && t < sentenceData[i].end) {
-          found = i;
+      var t = audio.currentTime + sentenceOffset;
+      var found = -1;
+      for (var i3 = 0; i3 < sentenceData.length; i3++) {
+        if (t >= sentenceData[i3].start && t < sentenceData[i3].end) {
+          found = i3;
           break;
         }
       }
@@ -2643,26 +2680,71 @@
         updateHighlight(found);
       }
     });
-    audio.addEventListener("ended", () => {
-      updateHighlight(sentenceData.length - 1);
-      setStatus("Listo");
-      setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
+    audio.addEventListener("ended", function() {
+      sentenceOffset += duration;
       URL.revokeObjectURL(audio.src);
       audio = null;
+      chunkIndex++;
+      if (chunkIndex < chunkQueue.length) {
+        setStatus("Reproduciendo... (" + (chunkIndex + 1) + "/" + chunkQueue.length + ")");
+        playChunk(chunkQueue[chunkIndex]);
+      } else {
+        setStatus("Listo");
+        setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
+        sentenceOffset = 0;
+      }
     });
-    audio.addEventListener("error", () => {
-      setStatus("Error de reproducci\xF3n", true);
+    audio.addEventListener("error", function() {
+      setStatus("Error de reproduccion", true);
       setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
       stopAudio();
     });
-    audio.play().then(() => {
-      setStatus("Reproduciendo...");
+    audio.play().then(function() {
+      setStatus("Reproduciendo... (" + (chunkIndex + 1) + "/" + chunkQueue.length + ")");
       setButtonsEnabled({ read: false, pause: true, stop: true, prev: true, next: true });
-    }).catch((err) => {
+    }).catch(function(err) {
       setStatus("Error: " + err.message, true);
       setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
       stopAudio();
     });
+  }
+  async function startChunkedPlayback(text) {
+    var chunks = splitIntoChunks(text, 2e3);
+    chunkQueue = new Array(chunks.length);
+    chunkIndex = 0;
+    sentenceOffset = 0;
+    sentenceData = [];
+    setStatus("Generando audio... (1/" + chunks.length + ")");
+    chunkQueue[0] = await fetchChunk(chunks[0]);
+    playChunk(chunkQueue[0]);
+    for (var i = 1; i < chunks.length; i++) {
+      setStatus("Reproduciendo... cargando (" + (i + 1) + "/" + chunks.length + ")");
+      chunkQueue[i] = await fetchChunk(chunks[i]);
+    }
+  }
+  function jumpToSentence(idx) {
+    if (idx < 0 || idx >= sentenceData.length) return;
+    if (!audio && chunkIndex < chunkQueue.length) return;
+    var targetTime = sentenceData[idx].start;
+    if (audio && targetTime >= sentenceOffset) {
+      audio.currentTime = targetTime - sentenceOffset;
+      updateHighlight(idx);
+    }
+  }
+  function updateHighlight(idx) {
+    if (idx < 0 || idx >= sentenceData.length) return;
+    var s = sentenceData[idx];
+    for (var i = 0; i < extractedRefs.length; i++) {
+      var ref = extractedRefs[i];
+      var refText = ref.el.textContent.trim();
+      var pos = refText.indexOf(s.text);
+      if (pos !== -1) {
+        highlightOnPage([ref], pos, s.text.length);
+        setCounter(idx + 1, sentenceData.length);
+        return;
+      }
+    }
+    setCounter(idx + 1, sentenceData.length);
   }
   async function sendMessageWithRetry(message, maxRetries = 3) {
     for (let i = 0; i < maxRetries; i++) {
@@ -2685,31 +2767,15 @@
     }
     extractedRefs = result.refs || [];
     const text = result.text;
-    const st = window.__tts_zen_state || {};
-    const voice = st.currentVoice || "es-ES-AlvaroNeural";
-    const rateVal = st.currentRate || 1;
-    const rate = Math.round((rateVal - 1) * 100) + "%";
-    const rateStr = rateVal >= 1 ? "+" + rate : rate;
-    setStatus("Generando audio...");
+    setStatus("Extrayendo texto...");
     setButtonsEnabled({ read: false, pause: false, stop: false, prev: false, next: false });
     try {
       if (!browser || !browser.runtime || !browser.runtime.sendMessage) {
         throw new Error("Extension API not available \u2014 reload the extension in about:debugging");
       }
-      const response = await sendMessageWithRetry({
-        action: "read_page_sync",
-        text,
-        voice,
-        rate: rateStr
-      });
-      if (response.success) {
-        playAudioSync(response.audio, response.sentences);
-      } else {
-        setStatus("Error: " + response.error, true);
-        setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
-      }
+      await startChunkedPlayback(text);
     } catch (err) {
-      setStatus("Error de conexi\xF3n: " + err.message, true);
+      setStatus("Error: " + err.message, true);
       setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
     }
   }
@@ -2728,10 +2794,10 @@
     setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
   }
   function handlePrev() {
-    if (!audio || !sentenceData.length) return;
-    const t = audio.currentTime;
-    let idx = -1;
-    for (let i = sentenceData.length - 1; i >= 0; i--) {
+    if (!sentenceData.length) return;
+    var t = audio ? sentenceOffset + audio.currentTime : sentenceOffset;
+    var idx = -1;
+    for (var i = sentenceData.length - 1; i >= 0; i--) {
       if (sentenceData[i].start < t - 0.5) {
         idx = i;
         break;
@@ -2740,10 +2806,10 @@
     jumpToSentence(Math.max(0, idx));
   }
   function handleNext() {
-    if (!audio || !sentenceData.length) return;
-    const t = audio.currentTime;
-    let idx = sentenceData.length - 1;
-    for (let i = 0; i < sentenceData.length; i++) {
+    if (!sentenceData.length) return;
+    var t = audio ? sentenceOffset + audio.currentTime : sentenceOffset;
+    var idx = sentenceData.length - 1;
+    for (var i = 0; i < sentenceData.length; i++) {
       if (sentenceData[i].start > t + 0.1) {
         idx = i;
         break;
