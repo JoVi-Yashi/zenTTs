@@ -260,8 +260,9 @@ async function dispatchReadPage(extractFn) {
 
   extractedRefs = result.refs || [];
   const text = result.text;
-  const voice = state?.currentVoice || 'es-ES-AlvaroNeural';
-  const rateVal = state?.currentRate || 1.0;
+  const st = window.__tts_zen_state || {};
+  const voice = st.currentVoice || 'es-ES-AlvaroNeural';
+  const rateVal = st.currentRate || 1.0;
   const rate = Math.round((rateVal - 1) * 100) + '%';
   const rateStr = rateVal >= 1 ? '+' + rate : rate;
 
@@ -325,16 +326,7 @@ function handleNext() {
 // ---- Panel state bridge ----
 
 // State shared with panel via global
-window.__tts_zen_state = {
-  get voices() { return state?.voices || []; },
-  set voices(v) { if (state) state.voices = v; },
-  get currentVoice() { return state?.currentVoice || 'es-ES-AlvaroNeural'; },
-  set currentVoice(v) { if (state) state.currentVoice = v; },
-  get currentRate() { return state?.currentRate || 1.0; },
-  set currentRate(v) { if (state) state.currentRate = v; },
-};
-
-let state = { voices: [], currentVoice: 'es-ES-AlvaroNeural', currentRate: 1.0 };
+window.__tts_zen_state = { currentVoice: 'es-ES-AlvaroNeural', currentRate: 1.0 };
 
 // ---- Initialization ----
 

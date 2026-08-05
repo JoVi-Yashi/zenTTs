@@ -327,40 +327,6 @@ export function setButtonsEnabled(btns) {
   }
 }
 
-// ---- Message Dispatch ----
-
-async function dispatchReadPage(extractFn) {
-  const text = extractFn();
-  if (!text) {
-    setStatus('No se encontro texto en esta pagina', true);
-    return;
-  }
-  const voice = state.currentVoice;
-  const rateVal = state.currentRate;
-  const rate = Math.round((rateVal - 1) * 100) + '%';
-  const rateStr = rateVal >= 1 ? '+' + rate : rate;
-
-  setStatus('Generando audio...');
-  setButtonsEnabled({ read: false, pause: false, stop: false, prev: false, next: false });
-
-  try {
-    const response = await browser.runtime.sendMessage({
-      action: 'read_page_sync', text: text, voice: voice, rate: rateStr,
-    });
-    if (response.success) {
-      window.__tts_zen_play(response.audio, response.sentences);
-      setStatus('Reproduciendo...');
-      setButtonsEnabled({ read: false, pause: true, stop: true, prev: true, next: true });
-    } else {
-      setStatus('Error: ' + response.error, true);
-      setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
-    }
-  } catch (err) {
-    setStatus('Error de conexion: ' + err.message, true);
-    setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
-  }
-}
-
 // ---- Initialization ----
 
 export async function createPanel(shadow, handlers) {
@@ -377,11 +343,11 @@ export async function createPanel(shadow, handlers) {
   settingsBtn.addEventListener('click', function() { settingsPanel.classList.toggle('collapsed'); });
 
   const voiceSelect = shadow.getElementById('tts-zen-voice');
-  voiceSelect.addEventListener('change', function() { state.currentVoice = voiceSelect.value; saveSettings(); });
+  voiceSelect.addEventListener('change', function() { state.currentVoice = voiceSelect.value; window.__tts_zen_state.currentVoice = voiceSelect.value; saveSettings(); });
 
   const speedSlider = shadow.getElementById('tts-zen-speed');
   const speedLabel = shadow.getElementById('tts-zen-speed-label');
-  speedSlider.addEventListener('input', function() { state.currentRate = speedSlider.value / 100; speedLabel.textContent = state.currentRate.toFixed(1) + 'x'; saveSettings(); });
+  speedSlider.addEventListener('input', function() { state.currentRate = speedSlider.value / 100; window.__tts_zen_state.currentRate = state.currentRate; speedLabel.textContent = state.currentRate.toFixed(1) + 'x'; saveSettings(); });
 
   var readBtn = shadow.getElementById('tts-zen-read');
   var pauseBtn = shadow.getElementById('tts-zen-pause');
@@ -389,7 +355,7 @@ export async function createPanel(shadow, handlers) {
   var prevBtn = shadow.getElementById('tts-zen-prev');
   var nextBtn = shadow.getElementById('tts-zen-next');
 
-  readBtn.addEventListener('click', function() { dispatchReadPage(handlers.onRead); });
+  readBtn.addEventListener('click', handlers.onRead);
   pauseBtn.addEventListener('click', handlers.onPause);
   stopBtn.addEventListener('click', handlers.onStop);
   prevBtn.addEventListener('click', handlers.onPrev);

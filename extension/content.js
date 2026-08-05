@@ -2417,38 +2417,6 @@
       if (btn) btn.disabled = enabled === false;
     }
   }
-  async function dispatchReadPage(extractFn) {
-    const text = extractFn();
-    if (!text) {
-      setStatus("No se encontro texto en esta pagina", true);
-      return;
-    }
-    const voice = state.currentVoice;
-    const rateVal = state.currentRate;
-    const rate = Math.round((rateVal - 1) * 100) + "%";
-    const rateStr = rateVal >= 1 ? "+" + rate : rate;
-    setStatus("Generando audio...");
-    setButtonsEnabled({ read: false, pause: false, stop: false, prev: false, next: false });
-    try {
-      const response = await browser.runtime.sendMessage({
-        action: "read_page_sync",
-        text,
-        voice,
-        rate: rateStr
-      });
-      if (response.success) {
-        window.__tts_zen_play(response.audio, response.sentences);
-        setStatus("Reproduciendo...");
-        setButtonsEnabled({ read: false, pause: true, stop: true, prev: true, next: true });
-      } else {
-        setStatus("Error: " + response.error, true);
-        setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
-      }
-    } catch (err) {
-      setStatus("Error de conexion: " + err.message, true);
-      setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
-    }
-  }
   async function createPanel(shadow, handlers) {
     const style = document.createElement("style");
     style.textContent = PANEL_CSS;
@@ -2464,12 +2432,14 @@
     const voiceSelect = shadow.getElementById("tts-zen-voice");
     voiceSelect.addEventListener("change", function() {
       state.currentVoice = voiceSelect.value;
+      window.__tts_zen_state.currentVoice = voiceSelect.value;
       saveSettings();
     });
     const speedSlider = shadow.getElementById("tts-zen-speed");
     const speedLabel = shadow.getElementById("tts-zen-speed-label");
     speedSlider.addEventListener("input", function() {
       state.currentRate = speedSlider.value / 100;
+      window.__tts_zen_state.currentRate = state.currentRate;
       speedLabel.textContent = state.currentRate.toFixed(1) + "x";
       saveSettings();
     });
@@ -2478,9 +2448,7 @@
     var stopBtn = shadow.getElementById("tts-zen-stop");
     var prevBtn = shadow.getElementById("tts-zen-prev");
     var nextBtn = shadow.getElementById("tts-zen-next");
-    readBtn.addEventListener("click", function() {
-      dispatchReadPage(handlers.onRead);
-    });
+    readBtn.addEventListener("click", handlers.onRead);
     pauseBtn.addEventListener("click", handlers.onPause);
     stopBtn.addEventListener("click", handlers.onStop);
     prevBtn.addEventListener("click", handlers.onPrev);
@@ -2684,7 +2652,7 @@
       stopAudio();
     });
   }
-  async function dispatchReadPage2(extractFn) {
+  async function dispatchReadPage(extractFn) {
     const result = extractFn();
     if (!result || !result.text) {
       setStatus("No se encontr\xF3 texto en esta p\xE1gina", true);
@@ -2692,8 +2660,9 @@
     }
     extractedRefs = result.refs || [];
     const text = result.text;
-    const voice = state2?.currentVoice || "es-ES-AlvaroNeural";
-    const rateVal = state2?.currentRate || 1;
+    const st = window.__tts_zen_state || {};
+    const voice = st.currentVoice || "es-ES-AlvaroNeural";
+    const rateVal = st.currentRate || 1;
     const rate = Math.round((rateVal - 1) * 100) + "%";
     const rateStr = rateVal >= 1 ? "+" + rate : rate;
     setStatus("Generando audio...");
@@ -2754,27 +2723,7 @@
     }
     jumpToSentence(idx);
   }
-  window.__tts_zen_state = {
-    get voices() {
-      return state2?.voices || [];
-    },
-    set voices(v) {
-      if (state2) state2.voices = v;
-    },
-    get currentVoice() {
-      return state2?.currentVoice || "es-ES-AlvaroNeural";
-    },
-    set currentVoice(v) {
-      if (state2) state2.currentVoice = v;
-    },
-    get currentRate() {
-      return state2?.currentRate || 1;
-    },
-    set currentRate(v) {
-      if (state2) state2.currentRate = v;
-    }
-  };
-  var state2 = { voices: [], currentVoice: "es-ES-AlvaroNeural", currentRate: 1 };
+  window.__tts_zen_state = { currentVoice: "es-ES-AlvaroNeural", currentRate: 1 };
   function injectPanel() {
     const host = document.createElement("div");
     host.id = "tts-zen-host";
@@ -2782,7 +2731,7 @@
     document.body.appendChild(host);
     const shadow = host.attachShadow({ mode: "open" });
     createPanel(shadow, {
-      onRead: () => dispatchReadPage2(extractTextWithRefs),
+      onRead: () => dispatchReadPage(extractTextWithRefs),
       onPause: handlePause,
       onStop: handleStop,
       onPrev: handlePrev,
