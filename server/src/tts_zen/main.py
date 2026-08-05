@@ -34,6 +34,23 @@ class ExtractRequest(BaseModel):
 # ----------------------------------------------------------------- Routes --
 
 
+@app.get("/")
+async def root():
+    """API overview."""
+    return {
+        "name": "TTS-zen",
+        "version": "0.2.0",
+        "endpoints": {
+            "/health": "GET — health check",
+            "/voices?locale=es-": "GET — list available voices",
+            "/tts": "POST {text, voice?, rate?} — generate MP3 audio",
+            "/tts/sync": "POST {text, voice?, rate?} — audio + sentence timing",
+            "/extract": "POST {url, voice?, rate?} — extract text from URL + TTS",
+        },
+        "docs": "http://localhost:8765/docs",
+    }
+
+
 @app.get("/health")
 async def health():
     """Health check endpoint."""
