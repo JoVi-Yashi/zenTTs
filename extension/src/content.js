@@ -76,18 +76,21 @@ const SITE_EXTRACTORS = [
   {
     test: () => window.location.hostname.includes('wattpad.com'),
     extract: () => {
-      // Wattpad stores story text EXCLUSIVELY in <pre> elements.
-      // UI elements (headers, nav, metadata) are never inside <pre>.
-      const pres = document.querySelectorAll('pre');
+      // Wattpad story content is in <pre> elements inside the reading panel.
+      // UI text (nav, metadata, ToC) is outside .panel-reading or in short <pre>s.
+      const panel = document.querySelector('.panel-reading');
+      if (!panel) return null;
+
+      const pres = panel.querySelectorAll('pre');
       if (pres.length === 0) return null;
 
       const parts = [];
       for (const pre of pres) {
-        // Clone and strip ALL spans (comment counts, icons)
         const clone = pre.cloneNode(true);
         clone.querySelectorAll('span').forEach(s => s.remove());
         const txt = clone.textContent.trim();
-        if (txt.length > 20) parts.push(txt);
+        // Story paragraphs are long; UI fragments are short
+        if (txt.length > 80) parts.push(txt);
       }
       return parts.length > 0 ? parts.join('\n\n') : null;
     }

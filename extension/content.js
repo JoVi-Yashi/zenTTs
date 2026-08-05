@@ -2522,14 +2522,16 @@
     {
       test: () => window.location.hostname.includes("wattpad.com"),
       extract: () => {
-        const pres = document.querySelectorAll("pre");
+        const panel = document.querySelector(".panel-reading");
+        if (!panel) return null;
+        const pres = panel.querySelectorAll("pre");
         if (pres.length === 0) return null;
         const parts = [];
         for (const pre of pres) {
           const clone = pre.cloneNode(true);
           clone.querySelectorAll("span").forEach((s) => s.remove());
           const txt = clone.textContent.trim();
-          if (txt.length > 20) parts.push(txt);
+          if (txt.length > 80) parts.push(txt);
         }
         return parts.length > 0 ? parts.join("\n\n") : null;
       }
