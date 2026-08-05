@@ -2666,6 +2666,14 @@
     }
   }
   async function createPanel(shadow, handlers) {
+    await loadSettings();
+    await loadCollapsedState();
+    await loadSiteSettings();
+    if (!isCurrentSiteAllowed()) {
+      var hostEl = document.getElementById("tts-zen-host");
+      if (hostEl) hostEl.remove();
+      return;
+    }
     const style = document.createElement("style");
     style.textContent = PANEL_CSS;
     shadow.appendChild(style);
@@ -2724,9 +2732,6 @@
     stopBtn.addEventListener("click", handlers.onStop);
     prevBtn.addEventListener("click", handlers.onPrev);
     nextBtn.addEventListener("click", handlers.onNext);
-    await loadSettings();
-    await loadCollapsedState();
-    await loadSiteSettings();
     speedSlider.value = Math.round(state.currentRate * 100);
     speedLabel.textContent = state.currentRate.toFixed(1) + "x";
     loadVoices();
@@ -2947,6 +2952,15 @@
   function hideSitesModal() {
     var overlay = getEl("tts-zen-sites-overlay");
     if (overlay) overlay.classList.add("hidden");
+  }
+  function isCurrentSiteAllowed() {
+    var sites = window.__tts_zen_enabled_sites || enabledSites;
+    var host = window.location.hostname;
+    for (var siteId in sites) {
+      if (siteId === "generic") continue;
+      if (host.includes(siteId)) return sites[siteId] !== false;
+    }
+    return sites["generic"] !== false;
   }
 
   // src/content.js
