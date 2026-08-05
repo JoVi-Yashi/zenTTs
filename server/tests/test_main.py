@@ -68,8 +68,17 @@ class TestExtract:
 
 class TestVoices:
     def test_voices_returns_list(self):
-        response = client.get("/voices")
+        """Voices endpoint returns a list of voice objects with metadata."""
+        response = client.get("/voices?locale=es-")
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
-        assert "es-ES-AlvaroNeural" in data
+        assert len(data) > 0
+        # Each voice object has expected structure
+        voice = data[0]
+        assert "name" in voice
+        assert "locale" in voice
+        assert voice["locale"].startswith("es-")
+        # Verify legacy voice is present
+        names = [v["name"] for v in data]
+        assert "es-ES-AlvaroNeural" in names
