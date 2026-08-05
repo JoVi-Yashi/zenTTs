@@ -85,36 +85,46 @@ const SITE_EXTRACTORS = [
         '.dropdown-menu', '[data-toggle="dropdown"]',
         '.ad-container', '[class*="ad-"]', '[id*="ad-"]',
         'nav', '.navbar', '.nav',
+        '.story-header', '.story-actions', '.tag-list',
+        '.recommended-stories', '.btn-group',
       ].join(',');
-      document.querySelectorAll(blacklist).forEach(el => {
-        el.setAttribute('data-tts-zen-excluded', '');
+
+      // Mark UI elements on live DOM, then clone and clean
+      document.querySelectorAll(blacklist + ', .panel-reading .btn, .panel-reading script, .panel-reading noscript').forEach(el => {
+        el.setAttribute('data-tts-zen-excluded', '1');
       });
 
-      // Target the reading panel
       const readingPanel = document.querySelector('.panel-reading');
-      if (!readingPanel) return mapParagraphsToText()?.text || null;
+      if (!readingPanel) {
+        document.querySelectorAll('[data-tts-zen-excluded]').forEach(el => el.removeAttribute('data-tts-zen-excluded'));
+        return mapParagraphsToText()?.text || null;
+      }
 
-      // Clone and clean the reading panel
       const clone = readingPanel.cloneNode(true);
-      clone.querySelectorAll(blacklist + ', [data-tts-zen-excluded]').forEach(el => el.remove());
+      clone.querySelectorAll('[data-tts-zen-excluded]').forEach(el => el.remove());
 
-      // Get all pre elements inside the cleaned clone
+      // Extract only <pre> content (actual story paragraphs)
       const pres = clone.querySelectorAll('pre');
-      if (pres.length === 0) return mapParagraphsToText()?.text || null;
+      if (pres.length === 0) {
+        document.querySelectorAll('[data-tts-zen-excluded]').forEach(el => el.removeAttribute('data-tts-zen-excluded'));
+        return mapParagraphsToText()?.text || null;
+      }
 
       const parts = [];
       for (const pre of pres) {
         const ps = pre.querySelectorAll('p');
         for (const p of ps) {
-          // Remove comment-count spans
+          // Remove ALL spans (num-comment, icons, etc.)
           const pClone = p.cloneNode(true);
-          pClone.querySelectorAll('span.fa-comment-count, span.fa-wp-neutral-2, [class*="fa-comment"]').forEach(s => s.remove());
+          pClone.querySelectorAll('span').forEach(s => s.remove());
           const txt = pClone.textContent.trim();
-          if (txt.length > 1) parts.push(txt);
+          if (txt.length > 2) parts.push(txt);
+        }
+        if (ps.length === 0 && pre.textContent.trim().length > 10) {
+          parts.push(pre.textContent.trim());
         }
       }
 
-      // Cleanup temp attributes
       document.querySelectorAll('[data-tts-zen-excluded]').forEach(el => {
         el.removeAttribute('data-tts-zen-excluded');
       });
