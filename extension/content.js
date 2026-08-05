@@ -2338,8 +2338,20 @@
   }
   async function loadVoices() {
     try {
-      const response = await browser.runtime.sendMessage({ action: "get_voices" });
-      if (response.success) {
+      let response;
+      for (let i = 0; i < 3; i++) {
+        try {
+          response = await browser.runtime.sendMessage({ action: "get_voices" });
+          break;
+        } catch (err) {
+          if (err.message?.includes("receiving end does not exist") && i < 2) {
+            await new Promise((r) => setTimeout(r, 200));
+            continue;
+          }
+          throw err;
+        }
+      }
+      if (response?.success) {
         state.voices = response.voices;
         populateVoiceDropdown();
       }
@@ -2652,6 +2664,19 @@
       stopAudio();
     });
   }
+  async function sendMessageWithRetry(message, maxRetries = 3) {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        return await browser.runtime.sendMessage(message);
+      } catch (err) {
+        if (err.message?.includes("receiving end does not exist") && i < maxRetries - 1) {
+          await new Promise((r) => setTimeout(r, 200));
+          continue;
+        }
+        throw err;
+      }
+    }
+  }
   async function dispatchReadPage(extractFn) {
     const result = extractFn();
     if (!result || !result.text) {
@@ -2671,7 +2696,7 @@
       if (!browser || !browser.runtime || !browser.runtime.sendMessage) {
         throw new Error("Extension API not available \u2014 reload the extension in about:debugging");
       }
-      const response = await browser.runtime.sendMessage({
+      const response = await sendMessageWithRetry({
         action: "read_page_sync",
         text,
         voice,

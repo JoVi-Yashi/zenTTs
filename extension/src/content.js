@@ -251,6 +251,20 @@ function playAudioSync(audioB64, sentences) {
 
 // ---- Message Dispatch ----
 
+async function sendMessageWithRetry(message, maxRetries = 3) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await browser.runtime.sendMessage(message);
+    } catch (err) {
+      if (err.message?.includes('receiving end does not exist') && i < maxRetries - 1) {
+        await new Promise(r => setTimeout(r, 200));
+        continue;
+      }
+      throw err;
+    }
+  }
+}
+
 async function dispatchReadPage(extractFn) {
   const result = extractFn();
   if (!result || !result.text) {
@@ -273,7 +287,7 @@ async function dispatchReadPage(extractFn) {
     if (!browser || !browser.runtime || !browser.runtime.sendMessage) {
       throw new Error('Extension API not available — reload the extension in about:debugging');
     }
-    const response = await browser.runtime.sendMessage({
+    const response = await sendMessageWithRetry({
       action: 'read_page_sync', text, voice, rate: rateStr,
     });
     if (response.success) {
