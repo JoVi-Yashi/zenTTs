@@ -1,0 +1,15 @@
+{
+  "name": "tts-zen-extension",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Firefox MV3 extension — floating TTS panel via Shadow DOM",
+  "scripts": {
+    "build": "node build.js"
+  },
+  "dependencies": {
+    "@mozilla/readability": "0.6.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

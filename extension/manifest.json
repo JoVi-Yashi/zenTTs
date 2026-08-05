@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "TTS-zen",
+  "version": "0.1.0",
+  "description": "Text-to-Speech browser extension with floating Shadow DOM panel",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "tts-zen@gentle-ai.local",
+      "strict_min_version": "109.0"
+    }
+  },
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "http://localhost:8765/*"
+  ],
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ]
+}
