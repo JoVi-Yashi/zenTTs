@@ -1,20 +1,25 @@
 // TTS-zen Background Event Page (Firefox MV3)
 // Proxies content-script messages to local FastAPI server on localhost:8765
-// Top-level runtime.onMessage listener — required for non-persistent Event Pages
 
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   switch (message.action) {
     case 'read_page':
-      handleReadPage(message.text)
+      handleReadPage(message.text, message.voice, message.rate)
         .then(sendResponse)
         .catch(err => sendResponse({ success: false, error: err.message }));
-      return true; // keep channel open for async response
+      return true;
+
+    case 'read_page_sync':
+      handleReadPageSync(message.text, message.voice, message.rate)
+        .then(sendResponse)
+        .catch(err => sendResponse({ success: false, error: err.message }));
+      return true;
 
     case 'extract_url':
-      handleExtractUrl(message.url)
+      handleExtractUrl(message.url, message.voice, message.rate)
         .then(sendResponse)
         .catch(err => sendResponse({ success: false, error: err.message }));
-      return true; // keep channel open for async response
+      return true;
 
     default:
       sendResponse({ success: false, error: `unknown action: ${message.action}` });
@@ -22,32 +27,64 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-async function handleReadPage(text) {
+async function handleReadPage(text, voice, rate) {
+  const body = { text };
+  if (voice) body.voice = voice;
+  if (rate) body.rate = rate;
+
   const resp = await fetch('http://localhost:8765/tts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text })
+    body: JSON.stringify(body)
   });
 
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({}));
-    throw new Error(err.error || `TTS server error: ${resp.status}`);
+    throw new Error(err.detail || err.error || `TTS server error: ${resp.status}`);
   }
 
   const data = await resp.arrayBuffer();
   return { success: true, data };
 }
 
-async function handleExtractUrl(url) {
-  const resp = await fetch('http://localhost:8765/extract', {
+async function handleReadPageSync(text, voice, rate) {
+  const body = { text };
+  if (voice) body.voice = voice;
+  if (rate) body.rate = rate;
+
+  const resp = await fetch('http://localhost:8765/tts/sync', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url })
+    body: JSON.stringify(body)
   });
 
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({}));
-    throw new Error(err.error || `Extraction server error: ${resp.status}`);
+    throw new Error(err.detail || err.error || `TTS server error: ${resp.status}`);
+  }
+
+  const result = await resp.json();
+  return {
+    success: true,
+    audio: result.audio,
+    sentences: result.sentences,
+  };
+}
+
+async function handleExtractUrl(url, voice, rate) {
+  const body = { url };
+  if (voice) body.voice = voice;
+  if (rate) body.rate = rate;
+
+  const resp = await fetch('http://localhost:8765/extract', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.detail || err.error || `Extraction server error: ${resp.status}`);
   }
 
   const data = await resp.arrayBuffer();

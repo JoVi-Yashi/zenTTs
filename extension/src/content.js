@@ -12,17 +12,62 @@ function shouldInject() {
 }
 
 // ---- Text Extraction ----
+
 function stripTags(text) {
   return text.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
              .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
              .replace(/<noscript[^>]*>[\s\S]*?<\/noscript>/gi, '')
-             .replace(/<[^>]+>/g, ' ')  // strip remaining HTML tags
+             .replace(/<[^>]+>/g, ' ')
              .replace(/\s+/g, ' ')
              .trim();
 }
 
+// ---- Site-Specific Extractors ----
+
+const SITE_EXTRACTORS = [
+  {
+    // Wattpad — story content is in pre elements inside the reader
+    test: () => window.location.hostname.includes('wattpad.com'),
+    extract: () => {
+      const parts = document.querySelectorAll('pre');
+      if (parts.length > 0) {
+        return Array.from(parts).map(p => p.textContent).join('\n\n');
+      }
+      return null;
+    }
+  },
+  {
+    // Archive of Our Own (AO3)
+    test: () => window.location.hostname.includes('archiveofourown.org'),
+    extract: () => {
+      const chapter = document.querySelector('#chapters .userstuff');
+      if (chapter) return chapter.textContent;
+      return null;
+    }
+  },
+  {
+    // Fanfiction.net
+    test: () => window.location.hostname.includes('fanfiction.net'),
+    extract: () => {
+      const story = document.querySelector('.storytext, #storytext');
+      if (story) return story.textContent;
+      return null;
+    }
+  },
+];
+
 function extractText() {
-  // Primary: Readability.js on cloned document
+  // Try site-specific extractors first
+  for (const site of SITE_EXTRACTORS) {
+    if (site.test()) {
+      const text = site.extract();
+      if (text && text.trim().length > 50) {
+        return stripTags(text);
+      }
+    }
+  }
+
+  // Fallback: Readability.js on cloned document
   const clone = document.cloneNode(true);
   const reader = new Readability(clone);
   const article = reader.parse();
@@ -31,19 +76,19 @@ function extractText() {
     return stripTags(article.textContent);
   }
 
-  // Fallback 1: <main> element
+  // Fallback 2: <main> element
   const main = document.querySelector('main');
   if (main && main.textContent && main.textContent.trim().length > 50) {
     return stripTags(main.textContent);
   }
 
-  // Fallback 2: <article> element
+  // Fallback 3: <article> element
   const articleEl = document.querySelector('article');
   if (articleEl && articleEl.textContent && articleEl.textContent.trim().length > 50) {
     return stripTags(articleEl.textContent);
   }
 
-  // Last resort: body.innerText (already text-only, no tags)
+  // Last resort: body.innerText
   if (document.body && document.body.innerText) {
     return stripTags(document.body.innerText);
   }
@@ -51,126 +96,8 @@ function extractText() {
   return null;
 }
 
-// ---- Audio Playback ----
-let audio = null;
-
-function stopAudio() {
-  if (audio) {
-    audio.pause();
-    if (audio.src && audio.src.startsWith('blob:')) {
-      URL.revokeObjectURL(audio.src);
-    }
-    audio = null;
-  }
-}
-
-function playAudio(arrayBuffer) {
-  stopAudio();
-
-  const blob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
-  const url = URL.createObjectURL(blob);
-  audio = new Audio(url);
-
-  audio.addEventListener('ended', () => {
-    setStatus('Ready');
-    setButtonsEnabled({ read: true, pause: false, stop: false });
-    URL.revokeObjectURL(audio.src);
-    audio = null;
-  });
-
-  audio.addEventListener('error', () => {
-    setStatus('Playback error');
-    setButtonsEnabled({ read: true, pause: false, stop: false });
-    stopAudio();
-  });
-
-  audio.play().then(() => {
-    setStatus('Playing...');
-    setButtonsEnabled({ read: false, pause: true, stop: true });
-  }).catch(err => {
-    setStatus(`Playback failed: ${err.message}`);
-    setButtonsEnabled({ read: true, pause: false, stop: false });
-    stopAudio();
-  });
-}
-
-// ---- Message Dispatch ----
-async function dispatchReadPage() {
-  const text = extractText();
-  if (!text) {
-    setStatus('No readable text found on this page');
-    return;
-  }
-
-  setStatus('Generating audio...');
-  setButtonsEnabled({ read: false, pause: false, stop: false });
-
-  try {
-    const response = await browser.runtime.sendMessage({
-      action: 'read_page',
-      text
-    });
-
-    if (response.success) {
-      // Convert ArrayBuffer-like object back to actual ArrayBuffer
-      const buffer = new Uint8Array(response.data).buffer;
-      playAudio(buffer);
-    } else {
-      setStatus(`Error: ${response.error}`);
-      setButtonsEnabled({ read: true, pause: false, stop: false });
-    }
-  } catch (err) {
-    setStatus(`Connection error: ${err.message}`);
-    setButtonsEnabled({ read: true, pause: false, stop: false });
-  }
-}
-
-async function dispatchExtractUrl(url) {
-  setStatus('Extracting and generating audio...');
-  setButtonsEnabled({ read: false, pause: false, stop: false });
-
-  try {
-    const response = await browser.runtime.sendMessage({
-      action: 'extract_url',
-      url
-    });
-
-    if (response.success) {
-      const buffer = new Uint8Array(response.data).buffer;
-      playAudio(buffer);
-    } else {
-      setStatus(`Error: ${response.error}`);
-      setButtonsEnabled({ read: true, pause: false, stop: false });
-    }
-  } catch (err) {
-    setStatus(`Connection error: ${err.message}`);
-    setButtonsEnabled({ read: true, pause: false, stop: false });
-  }
-}
-
-// ---- Audio Controls ----
-function handlePause() {
-  if (audio) {
-    if (audio.paused) {
-      audio.play().then(() => {
-        setStatus('Playing...');
-        setButtonsEnabled({ read: false, pause: true, stop: true });
-      });
-    } else {
-      audio.pause();
-      setStatus('Paused');
-      setButtonsEnabled({ read: false, pause: true, stop: true });
-    }
-  }
-}
-
-function handleStop() {
-  stopAudio();
-  setStatus('Ready');
-  setButtonsEnabled({ read: true, pause: false, stop: false });
-}
-
 // ---- Initialization ----
+
 function injectPanel() {
   const host = document.createElement('div');
   host.id = 'tts-zen-host';
@@ -179,13 +106,10 @@ function injectPanel() {
 
   const shadow = host.attachShadow({ mode: 'open' });
   createPanel(shadow, {
-    onRead: dispatchReadPage,
-    onPause: handlePause,
-    onStop: handleStop
+    onRead: extractText,
   });
 }
 
-// ---- Entry Point ----
 function tryInject() {
   if (document.body) {
     injectPanel();
