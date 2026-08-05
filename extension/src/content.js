@@ -10,21 +10,19 @@ function shouldInject() {
   var proto = window.location.protocol;
   if (RESTRICTED_PROTOCOLS.includes(proto)) return false;
 
-  // Check site filter
-  var sites = window.__tts_zen_enabled_sites;
-  if (sites) {
-    var host = window.location.hostname;
-    for (var siteId in sites) {
-      if (sites[siteId] === false) continue; // disabled
-      if (siteId === 'generic') continue; // check specific sites first
-      if (host.includes(siteId)) return true; // enabled and matching
+  var sites = window.__tts_zen_enabled_sites || {};
+  var host = window.location.hostname;
+
+  // Check specific sites first
+  for (var siteId in sites) {
+    if (siteId === 'generic') continue;
+    if (host.includes(siteId)) {
+      return sites[siteId] !== false;
     }
-    // Check generic
-    if (sites['generic'] !== false) return true;
-    return false; // no matching enabled site
   }
 
-  return true; // no site data loaded yet
+  // No specific match — use generic setting
+  return sites['generic'] !== false;
 }
 
 // ---- Text Extraction with DOM references ----
@@ -484,6 +482,8 @@ function handleNext() {
 
 // State shared with panel via global
 window.__tts_zen_state = { currentVoice: 'es-ES-AlvaroNeural', currentRate: 1.0 };
+// Default enabled sites (panel.js overrides from storage after async load)
+window.__tts_zen_enabled_sites = { 'wattpad.com': true, 'archiveofourown.org': true, 'fanfiction.net': true, 'generic': true };
 
 // ---- Initialization ----
 

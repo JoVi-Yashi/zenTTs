@@ -2549,6 +2549,9 @@
   transition: transform .2s ease;
 }
 .site-toggle.on::after { transform: translateX(18px); }
+
+#tts-zen-add-site-input:focus { border-color: #a78bfa !important; }
+#tts-zen-add-site-btn:hover { background: rgba(167,139,250,0.2) !important; }
 `;
   var state = {
     voices: [],
@@ -2843,20 +2846,34 @@
     btn.innerHTML = isPlaying ? PAUSE_ICON : PLAY_ICON;
   }
   var ALL_SITES = [
-    { id: "wattpad.com", name: "Wattpad", icon: "W", domain: "wattpad.com" },
-    { id: "archiveofourown.org", name: "AO3", icon: "A", domain: "archiveofourown.org" },
-    { id: "fanfiction.net", name: "FanFiction", icon: "F", domain: "fanfiction.net" },
-    { id: "generic", name: "Gen\xE9rico", icon: "+", domain: "otros sitios" }
+    { id: "wattpad.com", name: "Wattpad", domain: "wattpad.com" },
+    { id: "archiveofourown.org", name: "AO3", domain: "archiveofourown.org" },
+    { id: "fanfiction.net", name: "FanFiction", domain: "fanfiction.net" },
+    { id: "generic", name: "Gen\xE9rico", domain: "otros sitios" }
   ];
+  function faviconUrl(domain) {
+    if (domain === "otros sitios") return "";
+    return "https://www.google.com/s2/favicons?domain=" + domain + "&sz=32";
+  }
   var enabledSites = {};
   async function loadSiteSettings() {
     try {
-      var stored = await browser.storage.local.get("enabledSites");
+      var stored = await browser.storage.local.get(["enabledSites", "customSites"]);
       if (stored.enabledSites) {
         enabledSites = stored.enabledSites;
       } else {
         ALL_SITES.forEach(function(s) {
           enabledSites[s.id] = true;
+        });
+      }
+      if (stored.customSites) {
+        stored.customSites.forEach(function(s) {
+          if (!ALL_SITES.some(function(x) {
+            return x.id === s.id;
+          })) {
+            ALL_SITES.push(s);
+            if (enabledSites[s.id] === void 0) enabledSites[s.id] = true;
+          }
         });
       }
       window.__tts_zen_enabled_sites = enabledSites;
@@ -2868,8 +2885,11 @@
     }
   }
   async function saveSiteSettings() {
+    var custom = ALL_SITES.filter(function(s) {
+      return !["wattpad.com", "archiveofourown.org", "fanfiction.net", "generic"].includes(s.id);
+    });
     try {
-      await browser.storage.local.set({ enabledSites });
+      await browser.storage.local.set({ enabledSites, customSites: custom });
     } catch (_) {
     }
     window.__tts_zen_enabled_sites = enabledSites;
@@ -2882,7 +2902,8 @@
       var enabled = enabledSites[site.id] !== false;
       var row = document.createElement("div");
       row.className = "site-row";
-      row.innerHTML = '<div class="site-row-left"><div class="site-row-icon">' + site.icon + '</div><div class="site-row-info"><div class="site-row-name">' + site.name + '</div><div class="site-row-domain">' + site.domain + '</div></div></div><button class="site-toggle' + (enabled ? " on" : "") + '" data-site="' + site.id + '"></button>';
+      var iconHtml = site.id === "generic" ? '<div class="site-row-icon" style="font-size:16px">+</div>' : '<img class="site-row-icon" src="' + faviconUrl(site.domain) + `" width="24" height="24" style="border-radius:4px" onerror="this.style.display='none'">`;
+      row.innerHTML = '<div class="site-row-left">' + iconHtml + '<div class="site-row-info"><div class="site-row-name">' + site.name + '</div><div class="site-row-domain">' + site.domain + '</div></div></div><button class="site-toggle' + (enabled ? " on" : "") + '" data-site="' + site.id + '"></button>';
       var toggle = row.querySelector(".site-toggle");
       toggle.addEventListener("click", function() {
         var siteId = this.dataset.site;
@@ -2891,6 +2912,30 @@
         saveSiteSettings();
       });
       list.appendChild(row);
+    });
+    var addRow = document.createElement("div");
+    addRow.className = "site-row";
+    addRow.style.cssText = "padding:6px 10px;gap:8px;";
+    addRow.innerHTML = '<input id="tts-zen-add-site-input" type="text" placeholder="ejemplo.com" style="flex:1;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#d1d5db;font-size:11px;outline:none"><button id="tts-zen-add-site-btn" style="padding:6px 12px;border-radius:6px;border:1px solid rgba(167,139,250,0.3);background:rgba(167,139,250,0.1);color:#a78bfa;font-size:11px;cursor:pointer;white-space:nowrap">A\xF1adir</button>';
+    list.appendChild(addRow);
+    var addInput = list.querySelector("#tts-zen-add-site-input");
+    var addBtn = list.querySelector("#tts-zen-add-site-btn");
+    addBtn.addEventListener("click", function() {
+      var domain = addInput.value.trim().toLowerCase();
+      if (!domain || domain === "otros sitios") return;
+      domain = domain.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+      if (!domain.includes(".")) return;
+      if (ALL_SITES.some(function(s) {
+        return s.id === domain;
+      })) return;
+      ALL_SITES.push({ id: domain, name: domain.split(".")[0], domain });
+      enabledSites[domain] = true;
+      saveSiteSettings();
+      addInput.value = "";
+      renderSitesList();
+    });
+    addInput.addEventListener("keydown", function(e) {
+      if (e.key === "Enter") addBtn.click();
     });
   }
   function showSitesModal() {
@@ -2908,18 +2953,15 @@
   function shouldInject() {
     var proto = window.location.protocol;
     if (RESTRICTED_PROTOCOLS.includes(proto)) return false;
-    var sites = window.__tts_zen_enabled_sites;
-    if (sites) {
-      var host = window.location.hostname;
-      for (var siteId in sites) {
-        if (sites[siteId] === false) continue;
-        if (siteId === "generic") continue;
-        if (host.includes(siteId)) return true;
+    var sites = window.__tts_zen_enabled_sites || {};
+    var host = window.location.hostname;
+    for (var siteId in sites) {
+      if (siteId === "generic") continue;
+      if (host.includes(siteId)) {
+        return sites[siteId] !== false;
       }
-      if (sites["generic"] !== false) return true;
-      return false;
     }
-    return true;
+    return sites["generic"] !== false;
   }
   function extractTextWithRefs() {
     const result = { text: "", refs: [] };
@@ -3301,6 +3343,7 @@
     jumpToSentence(idx);
   }
   window.__tts_zen_state = { currentVoice: "es-ES-AlvaroNeural", currentRate: 1 };
+  window.__tts_zen_enabled_sites = { "wattpad.com": true, "archiveofourown.org": true, "fanfiction.net": true, "generic": true };
   function injectPanel() {
     const host = document.createElement("div");
     host.id = "tts-zen-host";
