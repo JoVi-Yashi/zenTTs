@@ -5,7 +5,6 @@
 require 'gtk3'
 require 'fileutils'
 require 'net/http'
-require 'os' rescue nil
 
 PORT = 8765
 PROJECT_DIR = File.dirname(File.expand_path(__FILE__))
@@ -41,6 +40,8 @@ def port_pid
     pid = `fuser #{PORT}/tcp 2>/dev/null`.strip
     pid.empty? ? nil : pid
   end
+rescue
+  nil
 end
 
 def server_running?
@@ -55,7 +56,10 @@ end
 
 def server_healthy?
   uri = URI("http://127.0.0.1:#{PORT}/health")
-  res = Net::HTTP.get_response(uri)
+  http = Net::HTTP.new(uri.host, uri.port)
+  http.open_timeout = 2
+  http.read_timeout = 2
+  res = http.get(uri.path)
   res.body.include?('"status":"ok"')
 rescue
   false
@@ -192,19 +196,23 @@ CSS
 # ══════════════════════════════════════════════
 
 class TTSZenApp
-  def initialize(app)
-    @app = app
+  def initialize
     build_ui
-    refresh_status
+    # Defer first refresh so window appears immediately
+    GLib::Idle.add { refresh_status; false }
     GLib::Timeout.add(3000) { refresh_status; true }
   end
 
   def build_ui
-    @window = Gtk::ApplicationWindow.new(@app)
+    @window = Gtk::Window.new
     @window.title = 'TTS-zen'
     @window.set_size_request(360, 340)
     @window.resizable = false
     @window.window_position = :center
+
+    # Proper WM_CLASS so taskbars/docks show "TTS-zen"
+    @window.set_wmclass('tts-zen', 'TTS-zen')
+    @window.signal_connect('destroy') { Gtk.main_quit }
 
     provider = Gtk::CssProvider.new
     provider.load(data: CSS)
@@ -337,6 +345,5 @@ end
 #  Entry
 # ══════════════════════════════════════════════
 
-app = Gtk::Application.new('io.github.jovi-yashi.zentts', :default_flags)
-app.signal_connect('activate') { TTSZenApp.new(app) }
-app.run
+TTSZenApp.new
+Gtk.main
