@@ -3629,10 +3629,15 @@
     setPauseIcon(true);
     try {
       for (var ci = 0; ci < totalChunks; ci++) {
-        if (!isSpeaking) break;
+        if (!isSpeaking) {
+          console.log("[TTS-zen] Chunk loop stopped: isSpeaking=false");
+          break;
+        }
         var progress = totalChunks > 1 ? " [" + (ci + 1) + "/" + totalChunks + "]" : "";
         setStatus(ts("serverMode") + progress);
+        console.log("[TTS-zen] Chunk " + (ci + 1) + "/" + totalChunks + ": sending " + chunks[ci].length + " chars");
         var resp = await browser.runtime.sendMessage({ action: "read_page_sync", text: chunks[ci], voice, rate: rateStr });
+        console.log("[TTS-zen] Chunk " + (ci + 1) + ": resp success=" + resp.success);
         if (!resp.success) throw new Error(ts("serverError"));
         var offset = allSentences.length > 0 ? allSentences[allSentences.length - 1].end : 0;
         (resp.sentences || []).forEach(function(s) {
@@ -3668,12 +3673,20 @@
               }
             }
           };
-          serverAudio.onended = resolve;
-          serverAudio.onerror = function() {
+          serverAudio.onended = function() {
+            console.log("[TTS-zen] Chunk " + (ci + 1) + ": audio ended");
+            resolve();
+          };
+          serverAudio.onerror = function(e) {
+            console.error("[TTS-zen] Chunk " + (ci + 1) + ": audio error");
             reject(new Error("audio"));
           };
-          serverAudio.play().catch(reject);
+          serverAudio.play().catch(function(e) {
+            console.error("[TTS-zen] Chunk " + (ci + 1) + ": play() failed", e.message);
+            reject(e);
+          });
         });
+        console.log("[TTS-zen] Chunk " + (ci + 1) + ": done");
       }
       isSpeaking = false;
       setStatus(ts("ready"));
