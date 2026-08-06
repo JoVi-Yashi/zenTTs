@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>zenTTS — Text-to-Speech para Zen Browser</title>
+<meta property="og:title" content="zenTTS — Text-to-Speech para Zen Browser">
+<meta property="og:description" content="Panel TTS flotante para Zen Browser. Leé cualquier página web con un solo click — sin servidores.">
+<meta property="og:image" content="https://jovi-yashi.github.io/zenTTs/logo.svg">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
 <style>
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   body{
@@ -315,10 +320,13 @@ make build-extension</pre>
       </div>
     </div>
     <div class="step">
-      <div class="step-num">◆</div>
+      <div class="step-num">4</div>
       <div class="step-content">
         <strong>Flatpak? Concedé acceso al filesystem</strong>
-        <pre>flatpak override --user --filesystem=$HOME/Proyectos/zenTTs app.zen_browser.zen</pre>
+        <p style="margin-top:6px">Si Zen está instalado vía Flatpak, necesita leer los archivos de la extensión:</p>
+        <pre>flatpak override --user \
+  --filesystem=$HOME/Proyectos/zenTTs \
+  app.zen_browser.zen</pre>
       </div>
     </div>
   </div>
