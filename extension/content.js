@@ -3292,10 +3292,9 @@
     var utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = rate;
     utterance.lang = "es-ES";
-    var voices = speechSynthesis.getVoices();
     var selectedVoice = st.currentVoice || "";
-    if (selectedVoice && voices.length > 0) {
-      var match = voices.find(function(v) {
+    if (selectedVoice && _nativeVoices.length > 0) {
+      var match = _nativeVoices.find(function(v) {
         return v.name === selectedVoice || v.voiceURI === selectedVoice;
       });
       if (match) utterance.voice = match;
@@ -3307,6 +3306,10 @@
     };
     utterance.onend = function() {
       if (!isSpeaking) return;
+      if (isPaused) {
+        isSpeaking = false;
+        return;
+      }
       speakSentence(idx + 1);
     };
     utterance.onerror = function(e) {
@@ -3465,6 +3468,19 @@
     jumpToSentence(idx);
   }
   window.__tts_zen_state = { currentVoice: "es-ES-AlvaroNeural", currentRate: 1, currentEngine: "native", serverAvailable: false };
+  var _nativeVoices = [];
+  function ensureVoices() {
+    _nativeVoices = speechSynthesis.getVoices();
+    if (_nativeVoices.length === 0) {
+      speechSynthesis.onvoiceschanged = function() {
+        _nativeVoices = speechSynthesis.getVoices();
+      };
+      var dummy = new SpeechSynthesisUtterance("");
+      dummy.volume = 0;
+      speechSynthesis.speak(dummy);
+    }
+  }
+  ensureVoices();
   window.__tts_zen_enabled_sites = { "wattpad.com": true, "archiveofourown.org": true, "fanfiction.net": true, "webnovel.com": true, "generic": true };
   function injectPanel() {
     const host = document.createElement("div");
