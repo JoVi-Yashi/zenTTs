@@ -3447,40 +3447,55 @@
       currentHighlight = null;
     }
   }
+  function cleanText(text) {
+    return text.replace(/[\t ]+/g, " ").replace(/\n{3,}/g, "\n\n").replace(/([^.!?…\n])\n([a-záéíóúñ])/gi, "$1 $2").replace(/\.{3,}/g, "\u2026").replace(/\s+\./g, ".").replace(/\s+,/g, ",").replace(/\s+!/g, "!").replace(/\s+\?/g, "?").replace(/\.([A-ZÁÉÍÓÚÑ])/g, ". $1").split("\n").map(function(l) {
+      return l.trim();
+    }).join("\n").replace(/^\n+/, "").replace(/\n+$/, "").replace(/ {2,}/g, " ").trim();
+  }
   var serverAudio = null;
   var serverSentences = [];
-  async function startServerPlayback(text) {
-    stopSpeech();
-    var st = window.__tts_zen_state || {};
-    var voice = st.currentVoice || "es-ES-AlvaroNeural";
-    var rate = st.currentRate || 1;
-    var rateStr = rate >= 1 ? "+" + Math.round((rate - 1) * 100) + "%" : "-" + Math.round((1 - rate) * 100) + "%";
-    setStatus(ts("connecting"));
-    try {
-      var resp = await browser.runtime.sendMessage({ action: "read_page_sync", text, voice, rate: rateStr });
-      if (!resp.success) throw new Error(ts("serverError"));
-      if (!resp.sentences || resp.sentences.length === 0) throw new Error(ts("noTiming"));
-      serverSentences = resp.sentences;
-      window.__tts_zen_sentences = serverSentences;
-      window.__tts_zen_state.serverAvailable = true;
-      sentenceData = serverSentences.map(function(s) {
-        return { text: s.text, start: s.start, end: s.end };
-      });
-      var audioBytes = Uint8Array.from(atob(resp.audio), function(c) {
-        return c.charCodeAt(0);
-      });
-      var blob = new Blob([audioBytes], { type: "audio/mpeg" });
-      var url = URL.createObjectURL(blob);
-      if (serverAudio) {
-        serverAudio.pause();
-        URL.revokeObjectURL(serverAudio.src);
+  var chunkIdx = 0;
+  var globalSentenceOffset = 0;
+  function splitIntoChunks(text, maxLen) {
+    maxLen = maxLen || 2e3;
+    if (text.length <= maxLen) return [text];
+    var chunks = [];
+    var sentences = text.match(/[^.!?…\n]+[.!?…]*(\n|$)?/g) || [text];
+    var current = "";
+    for (var i = 0; i < sentences.length; i++) {
+      if (current.length + sentences[i].length > maxLen && current.length > 0) {
+        chunks.push(current.trim());
+        current = "";
       }
-      serverAudio = new Audio(url);
-      serverAudio.playbackRate = rate;
-      currentSentenceIdx = 0;
-      isSpeaking = true;
-      setButtonsEnabled({ read: false, pause: true, stop: true, prev: true, next: true });
-      setPauseIcon(true);
+      current += sentences[i];
+    }
+    if (current.trim()) chunks.push(current.trim());
+    return chunks;
+  }
+  async function preloadChunk(text, voice, rate) {
+    return await browser.runtime.sendMessage({ action: "read_page_sync", text, voice, rate });
+  }
+  async function playChunk(chunkData, rate, totalChunks) {
+    serverSentences = chunkData.sentences;
+    window.__tts_zen_sentences = serverSentences;
+    sentenceData = serverSentences.map(function(s) {
+      return { text: s.text, start: s.start, end: s.end };
+    });
+    var audioBytes = Uint8Array.from(atob(chunkData.audio), function(c) {
+      return c.charCodeAt(0);
+    });
+    var blob = new Blob([audioBytes], { type: "audio/mpeg" });
+    var url = URL.createObjectURL(blob);
+    if (serverAudio) {
+      serverAudio.pause();
+      URL.revokeObjectURL(serverAudio.src);
+    }
+    serverAudio = new Audio(url);
+    serverAudio.playbackRate = rate;
+    currentSentenceIdx = 0;
+    isSpeaking = true;
+    setPauseIcon(true);
+    return new Promise(function(resolve, reject) {
       serverAudio.ontimeupdate = function() {
         if (!isSpeaking || serverSentences.length === 0) return;
         var t2 = serverAudio.currentTime;
@@ -3488,25 +3503,60 @@
           if (t2 >= serverSentences[i].start && t2 < serverSentences[i].end) {
             if (i !== currentSentenceIdx) {
               currentSentenceIdx = i;
-              updateHighlightServer(i);
+              updateHighlightServer(globalSentenceOffset + i);
             }
             break;
           }
         }
       };
       serverAudio.onended = function() {
-        isSpeaking = false;
-        setStatus(ts("ready"));
-        setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
-        setPauseIcon(false);
+        resolve();
       };
       serverAudio.onerror = function() {
-        setStatus(ts("audioError"), true);
-        setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
-        isSpeaking = false;
+        reject(new Error("audio"));
       };
-      await serverAudio.play();
-      setStatus(ts("serverMode"));
+      serverAudio.play().catch(reject);
+    });
+  }
+  async function startServerPlayback(text) {
+    stopSpeech();
+    window.__tts_zen_state.serverAvailable = true;
+    var st = window.__tts_zen_state || {};
+    var voice = st.currentVoice || "es-ES-AlvaroNeural";
+    var rate = st.currentRate || 1;
+    var rateStr = rate >= 1 ? "+" + Math.round((rate - 1) * 100) + "%" : "-" + Math.round((1 - rate) * 100) + "%";
+    var allChunks = splitIntoChunks(text, 2e3);
+    var totalChunks = allChunks.length;
+    setStatus(ts("connecting"));
+    try {
+      var nextChunk = null;
+      for (var ci = 0; ci < totalChunks; ci++) {
+        chunkIdx = ci;
+        globalSentenceOffset = ci > 0 ? sentenceData.length : 0;
+        var chunkProgress = " [" + (ci + 1) + "/" + totalChunks + "]";
+        setStatus(ts("serverMode") + chunkProgress);
+        var chunkData;
+        if (nextChunk && ci > 0) {
+          chunkData = nextChunk;
+          nextChunk = null;
+        } else {
+          setStatus(ts("connecting") + chunkProgress);
+          var resp = await browser.runtime.sendMessage({ action: "read_page_sync", text: allChunks[ci], voice, rate: rateStr });
+          if (!resp.success) throw new Error(ts("serverError"));
+          chunkData = resp;
+        }
+        if (ci + 1 < totalChunks) {
+          preloadChunk(allChunks[ci + 1], voice, rateStr).then(function(data) {
+            nextChunk = data;
+          }).catch(function() {
+          });
+        }
+        await playChunk(chunkData, rate, totalChunks);
+      }
+      isSpeaking = false;
+      setStatus(ts("ready"));
+      setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
+      setPauseIcon(false);
     } catch (e) {
       window.__tts_zen_state.serverAvailable = false;
       setStatus(ts("noServer") + " \u2014 usando modo Nativo", true);
@@ -3689,7 +3739,7 @@
       return;
     }
     extractedRefs = result.refs || [];
-    var text = result.text;
+    var text = cleanText(result.text);
     window.__tts_zen_last_text = text;
     setStatus(ts("starting"));
     var st = window.__tts_zen_state || {};
