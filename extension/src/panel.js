@@ -564,7 +564,8 @@ var T = {
     loadingEdgeVoices: 'Cargando voces edge-tts...', serverUnavailable: 'Servidor no disponible',
     unknown: 'desconocido', line: 'Línea', noText: 'Sin texto — haz clic en Leer primero.',
     generic: 'Genérico', otherSites: 'otros sitios', addSite: 'Añadir',
-    addSitePlaceholder: 'ejemplo.com', serif: 'Serif', sans: 'Sans', mono: 'Mono'
+    addSitePlaceholder: 'ejemplo.com', serif: 'Serif', sans: 'Sans', mono: 'Mono',
+    translateTitle: 'Traducción'
   },
   en: {
     minimize: 'Minimize', preview: 'View extracted text', sites: 'Manage sites',
@@ -577,7 +578,8 @@ var T = {
     loadingEdgeVoices: 'Loading edge-tts voices...', serverUnavailable: 'Server unavailable',
     unknown: 'unknown', line: 'Line', noText: 'No text — click Read first.',
     generic: 'Generic', otherSites: 'other sites', addSite: 'Add',
-    addSitePlaceholder: 'example.com', serif: 'Serif', sans: 'Sans', mono: 'Mono'
+    addSitePlaceholder: 'example.com', serif: 'Serif', sans: 'Sans', mono: 'Mono',
+    translateTitle: 'Translation'
   }
 };
 
@@ -747,6 +749,12 @@ function applyLanguage(shadow) {
   if (engineRow) engineRow.textContent = T[lang].engine;
   var langRow = shadow.querySelector('.setting-row:nth-child(3) label');
   if (langRow) langRow.textContent = T[lang].langLabel;
+  // Translation section header
+  var translateHeader = shadow.querySelector('.section-header span:last-child');
+  if (translateHeader) translateHeader.textContent = T[lang].translateTitle;
+  // Speed label
+  var speedRow = shadow.querySelector('.setting-row:nth-child(4) label');
+  if (speedRow) speedRow.textContent = T[lang].speed;
 
   // Update button texts
   var readBtn = shadow.getElementById('tts-zen-read');

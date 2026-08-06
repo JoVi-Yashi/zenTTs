@@ -2672,7 +2672,8 @@
       addSitePlaceholder: "ejemplo.com",
       serif: "Serif",
       sans: "Sans",
-      mono: "Mono"
+      mono: "Mono",
+      translateTitle: "Traducci\xF3n"
     },
     en: {
       minimize: "Minimize",
@@ -2709,7 +2710,8 @@
       addSitePlaceholder: "example.com",
       serif: "Serif",
       sans: "Sans",
-      mono: "Mono"
+      mono: "Mono",
+      translateTitle: "Translation"
     }
   };
   function t(key) {
@@ -2863,6 +2865,10 @@
     if (engineRow) engineRow.textContent = T[lang].engine;
     var langRow = shadow.querySelector(".setting-row:nth-child(3) label");
     if (langRow) langRow.textContent = T[lang].langLabel;
+    var translateHeader = shadow.querySelector(".section-header span:last-child");
+    if (translateHeader) translateHeader.textContent = T[lang].translateTitle;
+    var speedRow = shadow.querySelector(".setting-row:nth-child(4) label");
+    if (speedRow) speedRow.textContent = T[lang].speed;
     var readBtn = shadow.getElementById("tts-zen-read");
     if (readBtn) readBtn.childNodes[readBtn.childNodes.length - 1].textContent = " " + T[lang].read;
     var previewBtn = shadow.getElementById("tts-zen-preview-btn");
