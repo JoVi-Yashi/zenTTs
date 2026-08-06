@@ -60,6 +60,15 @@ const PANEL_HTML = `
         </div>
       </div>
       <div class="setting-row">
+        <label id="tts-zen-lang-label">Idioma</label>
+        <div class="select-wrap">
+          <select id="tts-zen-lang">
+            <option value="es">Español</option>
+            <option value="en">English</option>
+          </select>
+        </div>
+      </div>
+      <div class="setting-row">
         <label>Velocidad</label>
         <div class="speed-group">
           <input type="range" id="tts-zen-speed" min="50" max="300" value="100" step="10">
@@ -476,6 +485,39 @@ const PANEL_CSS = `
 #tts-zen-add-site-input:focus { border-color: #a78bfa !important; }
 #tts-zen-add-site-btn:hover { background: rgba(167,139,250,0.2) !important; }
 `;
+// ---- Translations ----
+
+var T = {
+  es: {
+    minimize: 'Minimizar', preview: 'Ver texto extraído', sites: 'Gestionar sitios',
+    settings: 'Ajustes', voice: 'Voz', engine: 'Motor', engineNative: 'Nativo (Browser)',
+    engineNeural: 'Neural (edge-tts)', speed: 'Velocidad', langLabel: 'Idioma',
+    langES: 'Español', langEN: 'English', prev: 'Anterior', next: 'Siguiente',
+    read: 'Leer', ready: 'Listo', extractedText: 'Texto extraído', reduce: 'Reducir',
+    increase: 'Aumentar', lessSpacing: 'Menos espacio', moreSpacing: 'Más espacio',
+    sitesModal: 'Sitios', loadingVoices: 'Cargando voces...',
+    loadingEdgeVoices: 'Cargando voces edge-tts...', serverUnavailable: 'Servidor no disponible',
+    unknown: 'desconocido', line: 'Línea', noText: 'Sin texto — haz clic en Leer primero.',
+    generic: 'Genérico', otherSites: 'otros sitios', addSite: 'Añadir',
+    addSitePlaceholder: 'ejemplo.com', serif: 'Serif', sans: 'Sans', mono: 'Mono'
+  },
+  en: {
+    minimize: 'Minimize', preview: 'View extracted text', sites: 'Manage sites',
+    settings: 'Settings', voice: 'Voice', engine: 'Engine', engineNative: 'Native (Browser)',
+    engineNeural: 'Neural (edge-tts)', speed: 'Speed', langLabel: 'Language',
+    langES: 'Español', langEN: 'English', prev: 'Previous', next: 'Next',
+    read: 'Read', ready: 'Ready', extractedText: 'Extracted text', reduce: 'Decrease',
+    increase: 'Increase', lessSpacing: 'Less spacing', moreSpacing: 'More spacing',
+    sitesModal: 'Sites', loadingVoices: 'Loading voices...',
+    loadingEdgeVoices: 'Loading edge-tts voices...', serverUnavailable: 'Server unavailable',
+    unknown: 'unknown', line: 'Line', noText: 'No text — click Read first.',
+    generic: 'Generic', otherSites: 'other sites', addSite: 'Add',
+    addSitePlaceholder: 'example.com', serif: 'Serif', sans: 'Sans', mono: 'Mono'
+  }
+};
+
+function t(key) { return (T[state.lang] || T['es'])[key] || key; }
+
 // ---- State ----
 
 let state = {
@@ -483,22 +525,24 @@ let state = {
   currentVoice: 'es-ES-AlvaroNeural',
   currentRate: 1.0,
   currentEngine: 'native',
+  lang: 'es',
 };
 
 // ---- Storage ----
 
 async function loadSettings() {
   try {
-    const stored = await browser.storage.local.get(['voice', 'rate', 'engine']);
+    const stored = await browser.storage.local.get(['voice', 'rate', 'engine', 'lang']);
     if (stored.voice) state.currentVoice = stored.voice;
     if (stored.rate) state.currentRate = stored.rate;
     if (stored.engine) state.currentEngine = stored.engine;
+    if (stored.lang) state.lang = stored.lang;
   } catch (_) {}
 }
 
 async function saveSettings() {
   try {
-    await browser.storage.local.set({ voice: state.currentVoice, rate: state.currentRate, engine: state.currentEngine });
+    await browser.storage.local.set({ voice: state.currentVoice, rate: state.currentRate, engine: state.currentEngine, lang: state.lang });
   } catch (_) {}
 }
 
@@ -613,6 +657,90 @@ function populateVoiceDropdown() {
   });
 }
 
+function applyLanguage(shadow) {
+  var lang = state.lang;
+  // Update labels
+  var labels = {
+    'tts-zen-voice-label': 'voice', 'tts-zen-engine-label': 'engine',
+    'tts-zen-speed-label-text': 'speed', 'tts-zen-lang-label': 'langLabel',
+    'tts-zen-status': null
+  };
+  // Update settings label texts
+  var voiceRow = shadow.querySelector('.setting-row:nth-child(1) label');
+  if (voiceRow) voiceRow.textContent = T[lang].voice;
+  var engineRow = shadow.querySelector('.setting-row:nth-child(2) label');
+  if (engineRow) engineRow.textContent = T[lang].engine;
+  var langRow = shadow.querySelector('.setting-row:nth-child(3) label');
+  if (langRow) langRow.textContent = T[lang].langLabel;
+  var speedRow = shadow.querySelector('.setting-row:nth-child(4) label');
+  if (speedRow) speedRow.textContent = T[lang].speed;
+
+  // Update button texts
+  var readBtn = shadow.getElementById('tts-zen-read');
+  if (readBtn) readBtn.childNodes[readBtn.childNodes.length-1].textContent = ' ' + T[lang].read;
+  var previewBtn = shadow.getElementById('tts-zen-preview-btn');
+  if (previewBtn) previewBtn.title = T[lang].preview;
+  var sitesBtn = shadow.getElementById('tts-zen-sites-btn');
+  if (sitesBtn) sitesBtn.title = T[lang].sites;
+  var settingsBtn = shadow.getElementById('tts-zen-settings-btn');
+  if (settingsBtn) settingsBtn.title = T[lang].settings;
+  var minimizeBtn = shadow.getElementById('tts-zen-minimize');
+  if (minimizeBtn) minimizeBtn.title = T[lang].minimize;
+  var prevBtn = shadow.getElementById('tts-zen-prev');
+  if (prevBtn) prevBtn.title = T[lang].prev;
+  var nextBtn = shadow.getElementById('tts-zen-next');
+  if (nextBtn) nextBtn.title = T[lang].next;
+
+  // Update engine options
+  var engineSelect = shadow.getElementById('tts-zen-engine');
+  if (engineSelect && engineSelect.options.length >= 2) {
+    engineSelect.options[0].textContent = T[lang].engineNative;
+    engineSelect.options[1].textContent = T[lang].engineNeural;
+  }
+
+  // Update status
+  var statusEl = shadow.getElementById('tts-zen-status');
+  if (statusEl && (statusEl.textContent === T['es'].ready || statusEl.textContent === T['en'].ready)) {
+    statusEl.textContent = T[lang].ready;
+  }
+
+  // Update sites modal header
+  var sitesHeader = shadow.querySelector('#tts-zen-sites-header span');
+  if (sitesHeader) sitesHeader.textContent = T[lang].sitesModal;
+  // Update preview header
+  var previewHeader = shadow.querySelector('#tts-zen-preview-header span');
+  if (previewHeader) previewHeader.textContent = T[lang].extractedText;
+  // Update preview tools
+  var tools = shadow.querySelectorAll('.preview-tool');
+  tools.forEach(function(tool) {
+    if (tool.dataset.font === 'serif') tool.textContent = T[lang].serif;
+    if (tool.dataset.font === 'sans') tool.textContent = T[lang].sans;
+    if (tool.dataset.font === 'mono') tool.textContent = T[lang].mono;
+    if (tool.dataset.size === 'down') tool.title = T[lang].reduce;
+    if (tool.dataset.size === 'up') tool.title = T[lang].increase;
+    if (tool.dataset.spacing === 'down') tool.title = T[lang].lessSpacing;
+    if (tool.dataset.spacing === 'up') tool.title = T[lang].moreSpacing;
+  });
+  // Update generic site name in ALL_SITES
+  for (var i = 0; i < ALL_SITES.length; i++) {
+    if (ALL_SITES[i].id === 'generic') {
+      ALL_SITES[i].name = T[lang].generic;
+      ALL_SITES[i].domain = T[lang].otherSites;
+    }
+  }
+  // Update add site input placeholder
+  var addInput = shadow.getElementById('tts-zen-add-site-input');
+  if (addInput) addInput.placeholder = T[lang].addSitePlaceholder;
+  var addBtn = shadow.getElementById('tts-zen-add-site-btn');
+  if (addBtn) addBtn.textContent = T[lang].addSite;
+
+  // Re-render sites list if open
+  if (shadow.getElementById('tts-zen-sites-overlay') && 
+      !shadow.getElementById('tts-zen-sites-overlay').classList.contains('hidden')) {
+    renderSitesList();
+  }
+}
+
 // ---- UI Helpers ----
 
 function getEl(id) {
@@ -631,7 +759,7 @@ export function setStatus(text, isError) {
 export function setCounter(current, total) {
   const el = getEl('tts-zen-counter');
   if (!el) return;
-  el.textContent = 'Línea ' + current + ' de ' + total;
+  el.textContent = t('line') + ' ' + current + ' de ' + total;
 }
 
 export function setButtonsEnabled(btns) {
@@ -711,6 +839,15 @@ export async function createPanel(shadow, handlers) {
     await loadVoices();
   });
 
+  const langSelect = shadow.getElementById('tts-zen-lang');
+  langSelect.value = state.lang;
+  langSelect.addEventListener('change', function() {
+    state.lang = langSelect.value;
+    window.__tts_zen_state.lang = langSelect.value;
+    saveSettings();
+    applyLanguage(shadow);
+  });
+
   const speedSlider = shadow.getElementById('tts-zen-speed');
   const speedLabel = shadow.getElementById('tts-zen-speed-label');
   speedSlider.addEventListener('input', function() { state.currentRate = speedSlider.value / 100; window.__tts_zen_state.currentRate = state.currentRate; speedLabel.textContent = state.currentRate.toFixed(1) + 'x'; saveSettings(); });
@@ -730,6 +867,7 @@ export async function createPanel(shadow, handlers) {
   speedSlider.value = Math.round(state.currentRate * 100);
   speedLabel.textContent = state.currentRate.toFixed(1) + 'x';
   loadVoices();
+  applyLanguage(shadow);
 }
 
 // ---- Minimize / Collapse ----

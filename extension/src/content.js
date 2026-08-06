@@ -201,11 +201,11 @@ async function startServerPlayback(text) {
   var rate = st.currentRate || 1.0;
   var rateStr = rate >= 1.0 ? '+' + Math.round((rate - 1) * 100) + '%' : '-' + Math.round((1 - rate) * 100) + '%';
 
-  setStatus('Conectando al servidor...');
+  setStatus(ts('connecting'));
   try {
     var resp = await browser.runtime.sendMessage({ action: 'read_page_sync', text: text, voice: voice, rate: rateStr });
-    if (!resp.success) throw new Error(resp.error || 'Error del servidor');
-    if (!resp.sentences || resp.sentences.length === 0) throw new Error('Sin datos de timing');
+    if (!resp.success) throw new Error(ts('serverError'));
+    if (!resp.sentences || resp.sentences.length === 0) throw new Error(ts('noTiming'));
 
     serverSentences = resp.sentences;
     window.__tts_zen_sentences = serverSentences;
@@ -249,22 +249,22 @@ async function startServerPlayback(text) {
 
     serverAudio.onended = function() {
       isSpeaking = false;
-      setStatus('Listo');
+      setStatus(ts('ready'));
       setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
       setPauseIcon(false);
     };
 
     serverAudio.onerror = function() {
-      setStatus('Error de audio', true);
+      setStatus(ts('audioError'), true);
       setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
       isSpeaking = false;
     };
 
     await serverAudio.play();
-    setStatus('Reproduciendo (edge-tts)...');
+    setStatus(ts('serverMode'));
   } catch (e) {
     window.__tts_zen_state.serverAvailable = false;
-    setStatus('Servidor no disponible — usa modo Nativo', true);
+    setStatus(ts('noServer'), true);
     setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
   }
 }
@@ -333,7 +333,7 @@ function stopSpeech() {
 function speakSentence(idx) {
   if (idx >= sentenceData.length) {
     // Finished all sentences
-    setStatus('Listo');
+    setStatus(ts('ready'));
     setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
     setPauseIcon(false);
     isSpeaking = false;
@@ -359,7 +359,7 @@ function speakSentence(idx) {
   utterance.onstart = function() {
     updateHighlight(idx);
     setCounter(idx + 1, sentenceData.length);
-    setStatus('Reproduciendo...');
+    setStatus(ts('playing'));
   };
 
   utterance.onend = function() {
@@ -374,7 +374,7 @@ function speakSentence(idx) {
 
   utterance.onerror = function(e) {
     if (e.error === 'canceled' || e.error === 'interrupted') return;
-    setStatus('Error de voz: ' + e.error, true);
+    setStatus(ts('voiceError') + ': ' + e.error, true);
     setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
     isSpeaking = false;
   };
@@ -463,7 +463,7 @@ function refreshPreviewContent(shadow) {
 async function dispatchReadPage(extractFn) {
   var result = extractFn();
   if (!result || !result.text) {
-    setStatus('No se encontró texto en esta página', true);
+    setStatus(ts('noTextFound'), true);
     return;
   }
 
@@ -471,7 +471,7 @@ async function dispatchReadPage(extractFn) {
   var text = result.text;
   window.__tts_zen_last_text = text;
 
-  setStatus('Iniciando lectura...');
+  setStatus(ts('starting'));
 
   var st = window.__tts_zen_state || {};
   if (st.currentEngine === 'server') {
@@ -490,12 +490,12 @@ function handlePause() {
     if (isPaused) {
       serverAudio.play();
       isPaused = false;
-      setStatus('Reproduciendo (edge-tts)...');
+      setStatus(ts('serverMode'));
       setPauseIcon(true);
     } else {
       serverAudio.pause();
       isPaused = true;
-      setStatus('Pausado');
+      setStatus(ts('paused'));
       setPauseIcon(false);
     }
     return;
@@ -503,19 +503,19 @@ function handlePause() {
   if (isPaused) {
     speechSynthesis.resume();
     isPaused = false;
-    setStatus('Reproduciendo...');
+    setStatus(ts('playing'));
     setPauseIcon(true);
   } else {
     speechSynthesis.pause();
     isPaused = true;
-    setStatus('Pausado');
+    setStatus(ts('paused'));
     setPauseIcon(false);
   }
 }
 
 function handleStop() {
   stopSpeech();
-  setStatus('Detenido');
+  setStatus(ts('stopped'));
   setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
   setPauseIcon(false);
 }
@@ -551,7 +551,29 @@ function handleNext() {
 // ---- Panel state bridge ----
 
 // State shared with panel via global
-window.__tts_zen_state = { currentVoice: 'es-ES-AlvaroNeural', currentRate: 1.0, currentEngine: 'native', serverAvailable: false };
+window.__tts_zen_state = { currentVoice: 'es-ES-AlvaroNeural', currentRate: 1.0, currentEngine: 'native', serverAvailable: false, lang: 'es' };
+
+// Translation helper for status messages
+function ts(key) {
+  var lang = (window.__tts_zen_state && window.__tts_zen_state.lang) || 'es';
+  var T = {
+    es: {
+      ready: 'Listo', playing: 'Reproduciendo...', connecting: 'Conectando al servidor...',
+      serverError: 'Error del servidor', noTiming: 'Sin datos de timing', audioError: 'Error de audio',
+      serverMode: 'Reproduciendo (edge-tts)...', noServer: 'Servidor no disponible — usa modo Nativo',
+      noTextFound: 'No se encontró texto en esta página', starting: 'Iniciando lectura...',
+      paused: 'Pausado', stopped: 'Detenido', voiceError: 'Error de voz'
+    },
+    en: {
+      ready: 'Ready', playing: 'Playing...', connecting: 'Connecting to server...',
+      serverError: 'Server error', noTiming: 'No timing data', audioError: 'Audio error',
+      serverMode: 'Playing (edge-tts)...', noServer: 'Server unavailable — switch to Native mode',
+      noTextFound: 'No text found on this page', starting: 'Starting playback...',
+      paused: 'Paused', stopped: 'Stopped', voiceError: 'Voice error'
+    }
+  };
+  return (T[lang] || T['es'])[key] || key;
+}
 
 // Warm up speechSynthesis voices (async, needed before first speak)
 var _nativeVoices = [];

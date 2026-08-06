@@ -111,6 +111,55 @@ def open_browser
   end
 end
 
+# ── Translations ──
+
+LANG_FILE = File.join(DATA_DIR, 'lang')
+
+def load_lang
+  File.read(LANG_FILE).strip == 'en' ? 'en' : 'es'
+rescue
+  'es'
+end
+
+def save_lang(lang)
+  File.write(LANG_FILE, lang)
+end
+
+L = {
+  es: {
+    status_header: 'ESTADO DEL SERVIDOR',
+    stopped: 'Detenido',
+    not_started: 'sin iniciar',
+    running: 'En ejecución',
+    healthy: 'saludable',
+    no_response: 'Sin respuesta',
+    not_responding: 'sin responder',
+    actions: 'ACCIONES',
+    start: 'Iniciar servidor',
+    stop: 'Detener',
+    open_zen: 'Abrir Zen Browser',
+    version: 'TTS-zen v0.4'
+  },
+  en: {
+    status_header: 'SERVER STATUS',
+    stopped: 'Stopped',
+    not_started: 'not started',
+    running: 'Running',
+    healthy: 'healthy',
+    no_response: 'No response',
+    not_responding: 'not responding',
+    actions: 'ACTIONS',
+    start: 'Start server',
+    stop: 'Stop',
+    open_zen: 'Open Zen Browser',
+    version: 'TTS-zen v0.4'
+  }
+}
+
+def l(key, lang = @lang)
+  (L[lang.to_sym] || L[:es])[key.to_sym] || key.to_s
+end
+
 # ══════════════════════════════════════════════
 #  CSS
 # ══════════════════════════════════════════════
@@ -217,6 +266,16 @@ CSS = <<~CSS
     border-color: rgba(167,139,250,0.18); color: #a78bfa;
   }
 
+  .lang-toggle {
+    font-size: 9px; font-weight: 700; padding: 2px 6px;
+    border-radius: 4px; border: 1px solid rgba(167,139,250,0.15);
+    background: rgba(167,139,250,0.08); color: #a78bfa;
+    min-width: 28px;
+  }
+  .lang-toggle:hover {
+    background: rgba(167,139,250,0.18);
+  }
+
   .footer {
     font-size: 10px; color: #3a3f50;
     padding-top: 16px; margin-top: 8px;
@@ -230,8 +289,8 @@ CSS
 
 class TTSZenApp
   def initialize
+    @lang = load_lang
     build_ui
-    # Defer first refresh so window appears immediately
     GLib::Idle.add { refresh_status; false }
     GLib::Timeout.add(3000) { refresh_status; true }
   end
@@ -287,7 +346,7 @@ class TTSZenApp
     card = Gtk::Box.new(:vertical, 0)
     card.style_context.add_class('status-card')
 
-    sh = Gtk::Label.new('ESTADO DEL SERVIDOR')
+    sh = Gtk::Label.new(l(:status_header))
     sh.style_context.add_class('status-header'); sh.halign = :start
     card.pack_start(sh, expand: false, fill: false, padding: 0)
 
@@ -298,32 +357,32 @@ class TTSZenApp
     @dot.style_context.add_class('indicator')
     row.pack_start(@dot, expand: false, fill: false, padding: 0)
 
-    @status_label = Gtk::Label.new('Detenido')
+    @status_label = Gtk::Label.new(l(:stopped))
     row.pack_start(@status_label, expand: false, fill: false, padding: 0)
     card.pack_start(row, expand: false, fill: false, padding: 0)
 
-    @detail = Gtk::Label.new("localhost:#{PORT}  ·  sin iniciar")
+    @detail = Gtk::Label.new("localhost:#{PORT}  ·  #{l(:not_started)}")
     @detail.style_context.add_class('detail'); @detail.halign = :start
     card.pack_start(@detail, expand: false, fill: false, padding: 0)
     body.pack_start(card, expand: false, fill: true, padding: 0)
 
-    al = Gtk::Label.new('ACCIONES')
+    al = Gtk::Label.new(l(:actions))
     al.style_context.add_class('section-label'); al.halign = :start
     body.pack_start(al, expand: false, fill: false, padding: 0)
 
     btn_row = Gtk::Box.new(:horizontal, 8)
-    @start_btn = Gtk::Button.new(label: 'Iniciar servidor')
+    @start_btn = Gtk::Button.new(label: l(:start))
     @start_btn.style_context.add_class('btn-primary')
     @start_btn.signal_connect('clicked') { start_server!; refresh_status }
 
-    @stop_btn = Gtk::Button.new(label: 'Detener')
+    @stop_btn = Gtk::Button.new(label: l(:stop))
     @stop_btn.style_context.add_class('btn-danger')
     @stop_btn.signal_connect('clicked') { stop_server!; refresh_status }
     btn_row.pack_start(@start_btn, expand: true, fill: true, padding: 0)
     btn_row.pack_start(@stop_btn, expand: false, fill: false, padding: 0)
     body.pack_start(btn_row, expand: false, fill: true, padding: 0)
 
-    @zen_btn = Gtk::Button.new(label: 'Abrir Zen Browser')
+    @zen_btn = Gtk::Button.new(label: l(:open_zen))
     @zen_btn.style_context.add_class('btn-zen')
     @zen_btn.margin_top = 10
     @zen_btn.signal_connect('clicked') { open_browser }
@@ -353,6 +412,16 @@ class TTSZenApp
       false
     end
     box.pack_start(da, expand: false, fill: false, padding: 0)
+
+    @lang_btn = Gtk::Button.new(label: @lang == 'en' ? 'EN' : 'ES')
+    @lang_btn.style_context.add_class('lang-toggle')
+    @lang_btn.signal_connect('clicked') do
+      @lang = @lang == 'es' ? 'en' : 'es'
+      @lang_btn.label = @lang == 'en' ? 'EN' : 'ES'
+      save_lang(@lang)
+      refresh_status
+    end
+    box.pack_end(@lang_btn, expand: false, fill: false, padding: 0)
     box.show_all
     box
   end
@@ -364,20 +433,20 @@ class TTSZenApp
     if pid && healthy
       set_dot('dot-on')
       swap_class(@status_label, %w[text-off text-warn], 'text-on')
-      @status_label.text = 'En ejecución'
-      @detail.text = "localhost:#{PORT}  ·  PID #{pid}  ·  saludable"
+      @status_label.text = l(:running)
+      @detail.text = "localhost:#{PORT}  ·  PID #{pid}  ·  #{l(:healthy)}"
       @start_btn.sensitive = false; @stop_btn.sensitive = true
     elsif pid
       set_dot('dot-warn')
       swap_class(@status_label, %w[text-on text-off], 'text-warn')
-      @status_label.text = 'Sin respuesta'
-      @detail.text = "localhost:#{PORT}  ·  PID #{pid}  ·  sin responder"
+      @status_label.text = l(:no_response)
+      @detail.text = "localhost:#{PORT}  ·  PID #{pid}  ·  #{l(:not_responding)}"
       @start_btn.sensitive = true; @stop_btn.sensitive = true
     else
       set_dot('dot-off')
       swap_class(@status_label, %w[text-on text-warn], 'text-off')
-      @status_label.text = 'Detenido'
-      @detail.text = "localhost:#{PORT}  ·  sin iniciar"
+      @status_label.text = l(:stopped)
+      @detail.text = "localhost:#{PORT}  ·  #{l(:not_started)}"
       @start_btn.sensitive = true; @stop_btn.sensitive = false
     end
     true
