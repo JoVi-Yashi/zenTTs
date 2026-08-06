@@ -148,26 +148,72 @@
   .panel-btn.p:hover{background:#8b5cf6;box-shadow:0 4px 20px rgba(124,58,237,.45)}
   .panel-st{font-size:11px;color:#6b7280;text-align:center;padding:2px 12px 8px;font-weight:500}
 
-  /* Features */
-  .features{padding:80px 20px;max-width:1000px;margin:0 auto}
+  /* Features — Zig-zag Carousel */
+  .features{padding:80px 20px 100px;max-width:1100px;margin:0 auto;position:relative}
   .features h2{font-size:36px;font-weight:700;color:#f3f4f6;text-align:center;margin-bottom:52px;letter-spacing:-1px}
-  .features-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
-  .f-card{
-    position:relative;overflow:hidden;
-    background:linear-gradient(145deg,rgba(20,20,43,.8),rgba(26,26,53,.8));
-    border:1px solid rgba(167,139,250,.08);border-radius:16px;padding:28px 24px;
-    transition:all .4s cubic-bezier(0.4,0,0.2,1);
+  .carousel-wrap{position:relative;overflow:hidden;padding:20px 0}
+  .carousel-track{
+    display:flex;gap:24px;
+    transition:transform .7s cubic-bezier(.25,.46,.45,.94);
+  }
+  .carousel-card{
+    min-width:320px;max-width:340px;flex-shrink:0;
+    background:linear-gradient(145deg,rgba(20,20,43,.85),rgba(26,26,53,.85));
+    border:1px solid rgba(167,139,250,.1);border-radius:18px;padding:32px 26px;
     backdrop-filter:blur(20px);
+    transform:translateY(var(--y,0)) rotate(var(--r,0deg));
+    transition:all .6s cubic-bezier(.25,.46,.45,.94),border-color .3s,box-shadow .3s;
+    position:relative;overflow:hidden;
   }
-  .f-card::before{
-    content:'';position:absolute;inset:0;opacity:0;transition:opacity .4s;
-    background:radial-gradient(600px circle at var(--mx,50%) var(--my,50%),rgba(167,139,250,.06),transparent 40%);
+  .carousel-card:nth-child(odd){--y:-12px;--r:-1.2deg}
+  .carousel-card:nth-child(even){--y:12px;--r:1.2deg}
+  .carousel-card.active{
+    --y:0px;--r:0deg;
+    border-color:rgba(167,139,250,.25);
+    box-shadow:0 0 0 1px rgba(167,139,250,.08),0 12px 48px rgba(124,58,237,.15);
   }
-  .f-card:hover{transform:translateY(-4px) scale(1.01);border-color:rgba(167,139,250,.2);box-shadow:0 12px 40px rgba(0,0,0,.4),0 0 0 1px rgba(167,139,250,.1)}
-  .f-card:hover::before{opacity:1}
-  .f-icon{font-size:32px;margin-bottom:14px;display:block;color:#a78bfa;position:relative;z-index:1}
-  .f-card h3{font-size:15px;color:#f3f4f6;margin-bottom:8px;position:relative;z-index:1}
-  .f-card p{font-size:13px;color:#7e8aa0;line-height:1.7;position:relative;z-index:1}
+  .carousel-card::before{
+    content:'';position:absolute;inset:0;opacity:0;transition:opacity .5s;
+    background:radial-gradient(500px circle at 50% 0%,rgba(167,139,250,.08),transparent 60%);
+    pointer-events:none;
+  }
+  .carousel-card.active::before{opacity:1}
+  .carousel-card:hover{
+    border-color:rgba(167,139,250,.2);
+    box-shadow:0 8px 36px rgba(0,0,0,.35);
+    transform:translateY(var(--y,-4px)) rotate(var(--r,0deg)) scale(1.02);
+  }
+  .card-icon{font-size:36px;margin-bottom:16px;display:block;color:#a78bfa;position:relative;z-index:1}
+  .carousel-card h3{font-size:16px;color:#f3f4f6;margin-bottom:10px;position:relative;z-index:1}
+  .carousel-card p{font-size:13px;color:#8b94a5;line-height:1.7;position:relative;z-index:1}
+
+  /* Carousel controls */
+  .carousel-ctrls{
+    display:flex;align-items:center;justify-content:center;gap:20px;margin-top:36px;
+  }
+  .carousel-arrow{
+    width:44px;height:44px;border-radius:50%;
+    background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2);
+    color:#a78bfa;display:flex;align-items:center;justify-content:center;
+    cursor:pointer;transition:all .25s;font-size:18px;user-select:none;
+  }
+  .carousel-arrow:hover{background:rgba(167,139,250,.2);border-color:#a78bfa;transform:scale(1.08)}
+  .carousel-arrow:active{transform:scale(.94)}
+  .carousel-dots{display:flex;gap:10px}
+  .carousel-dot{
+    width:10px;height:10px;border-radius:50%;
+    background:rgba(167,139,250,.15);border:none;
+    cursor:pointer;transition:all .35s ease;
+  }
+  .carousel-dot.active{background:#a78bfa;box-shadow:0 0 12px rgba(167,139,250,.5);width:28px;border-radius:6px}
+
+  /* Features — mobile */
+  @media(max-width:768px){
+    .carousel-card{min-width:260px;max-width:280px;padding:24px 20px}
+    .carousel-card:nth-child(odd){--y:-8px;--r:-1deg}
+    .carousel-card:nth-child(even){--y:8px;--r:1deg}
+    .carousel-ctrls{margin-top:28px;gap:14px}
+  }
 
   /* Install */
   .install{padding:80px 20px;max-width:700px;margin:0 auto}
@@ -228,10 +274,11 @@ footer p{margin:0}
     .panel-preview{width:100%;max-width:290px}
     .panel-wrapper{transform:rotateX(5deg) rotateY(-4deg)}
     .panel-wrapper:hover{transform:rotateX(0deg) rotateY(0deg) translateZ(15px)}
-    .features{padding:40px 16px}
+    .features{padding:40px 16px 60px}
     .features h2{font-size:24px;margin-bottom:32px}
-    .features-grid{grid-template-columns:1fr;gap:10px}
-    .f-card{padding:20px 18px}
+    .carousel-card{min-width:260px;max-width:280px;padding:24px 20px}
+    .carousel-card:nth-child(odd){--y:-8px;--r:-1deg}
+    .carousel-card:nth-child(even){--y:8px;--r:1deg}
     .install{padding:40px 16px}
     .install h2{font-size:24px}
     .steps{gap:8px}
@@ -402,42 +449,49 @@ footer p{margin:0}
 
 <section class="features" id="features">
   <h2>◈ Características</h2>
-  <div class="features-grid">
-    <div class="f-card">
-      <span class="f-icon">◈</span>
-      <h3>Shadow DOM nativo</h3>
-      <p>El panel flotante usa Shadow DOM encapsulado. El CSS del sitio jamás interfiere con la herramienta — aislamiento total.</p>
+  <div class="carousel-wrap" id="carousel">
+    <div class="carousel-track" id="carouselTrack">
+      <div class="carousel-card">
+        <span class="card-icon">◈</span>
+        <h3>Shadow DOM nativo</h3>
+        <p>El panel flotante usa Shadow DOM encapsulado. El CSS del sitio jamás interfiere con la herramienta — aislamiento total.</p>
+      </div>
+      <div class="carousel-card">
+        <span class="card-icon">≋</span>
+        <h3>Dos motores TTS</h3>
+        <p>Elegí entre SpeechSynthesis nativo (sin dependencias) o edge-tts con 45 voces neurales de Microsoft. Cambiás desde el panel de ajustes con un click.</p>
+      </div>
+      <div class="carousel-card">
+        <span class="card-icon">◎</span>
+        <h3>Highlighting en la página</h3>
+        <p>Resalta el párrafo actual directamente en el DOM del sitio mientras se reproduce. Como Edge Read Aloud, en Zen.</p>
+      </div>
+      <div class="carousel-card">
+        <span class="card-icon">▣</span>
+        <h3>Extractores por sitio</h3>
+        <p>Wattpad, AO3, FanFiction, Webnovel — cada plataforma tiene su extractor optimizado con selectores específicos.</p>
+      </div>
+      <div class="carousel-card">
+        <span class="card-icon">◉</span>
+        <h3>Site Manager</h3>
+        <p>Activá o desactivá la herramienta por dominio con toggle switches. Favicons reales. Persiste entre sesiones.</p>
+      </div>
+      <div class="carousel-card">
+        <span class="card-icon">⬡</span>
+        <h3>Flatpak · cualquier distro</h3>
+        <p>Instalá TTS-zen con un solo comando en Ubuntu, Fedora, Arch y cualquier Linux. Ruby, edge-tts, trafilatura — todo incluido en el sandbox.</p>
+      </div>
+      <div class="carousel-card">
+        <span class="card-icon">◎</span>
+        <h3>Preview sincronizado</h3>
+        <p>Pop-up con el texto extraído y subrayado en tiempo real al ritmo del audio. Tipografía y espaciado ajustables.</p>
+      </div>
     </div>
-    <div class="f-card">
-      <span class="f-icon">≋</span>
-      <h3>Dos motores TTS</h3>
-      <p>Elegí entre SpeechSynthesis nativo (sin dependencias) o edge-tts con 45 voces neurales de Microsoft. Cambiás desde el panel de ajustes con un click.</p>
-    </div>
-    <div class="f-card">
-      <span class="f-icon">◎</span>
-      <h3>Highlighting en la página</h3>
-      <p>Resalta el párrafo actual directamente en el DOM del sitio mientras se reproduce. Como Edge Read Aloud, en Zen.</p>
-    </div>
-    <div class="f-card">
-      <span class="f-icon">▣</span>
-      <h3>Extractores por sitio</h3>
-      <p>Wattpad, AO3, FanFiction, Webnovel — cada plataforma tiene su extractor optimizado con selectores específicos.</p>
-    </div>
-    <div class="f-card">
-      <span class="f-icon">◉</span>
-      <h3>Site Manager</h3>
-      <p>Activá o desactivá la herramienta por dominio con toggle switches. Favicons reales. Persiste entre sesiones.</p>
-    </div>
-    <div class="f-card">
-      <span class="f-icon">⬡</span>
-      <h3>Flatpak · cualquier distro</h3>
-      <p>Instalá TTS-zen con un solo comando en Ubuntu, Fedora, Arch y cualquier Linux. Ruby, edge-tts, trafilatura — todo incluido en el sandbox.</p>
-    </div>
-    <div class="f-card">
-      <span class="f-icon">◎</span>
-      <h3>Preview sincronizado</h3>
-      <p>Pop-up con el texto extraído y subrayado en tiempo real al ritmo del audio. Tipografía y espaciado ajustables.</p>
-    </div>
+  </div>
+  <div class="carousel-ctrls">
+    <button class="carousel-arrow" id="carouselPrev" aria-label="Anterior">←</button>
+    <div class="carousel-dots" id="carouselDots"></div>
+    <button class="carousel-arrow" id="carouselNext" aria-label="Siguiente">→</button>
   </div>
 </section>
 
@@ -508,20 +562,118 @@ make build-extension</pre>
 </footer>
 
 <script>
-// Mouse-follow glow on feature cards
-document.querySelectorAll('.f-card').forEach(function(card){
-  card.addEventListener('mousemove',function(e){
-    var r=card.getBoundingClientRect();
-    card.style.setProperty('--mx',(e.clientX-r.left)+'px');
-    card.style.setProperty('--my',(e.clientY-r.top)+'px');
+// ── Zig-zag Carousel ──
+(function(){
+  var track = document.getElementById('carouselTrack');
+  var cards = track.querySelectorAll('.carousel-card');
+  var dotsContainer = document.getElementById('carouselDots');
+  var prevBtn = document.getElementById('carouselPrev');
+  var nextBtn = document.getElementById('carouselNext');
+  var wrap = document.getElementById('carousel');
+
+  var perView = window.innerWidth < 600 ? 1 : window.innerWidth < 900 ? 2 : 3;
+  var totalSlides = Math.ceil(cards.length / perView);
+  var current = 0;
+  var autoTimer = null;
+  var paused = false;
+
+  // Build dots
+  for (var i = 0; i < totalSlides; i++) {
+    var dot = document.createElement('button');
+    dot.className = 'carousel-dot' + (i === 0 ? ' active' : '');
+    dot.setAttribute('aria-label', 'Slide ' + (i + 1));
+    dot.addEventListener('click', (function(idx){ return function(){ goTo(idx); }; })(i));
+    dotsContainer.appendChild(dot);
+  }
+  var dots = dotsContainer.querySelectorAll('.carousel-dot');
+
+  function goTo(idx) {
+    current = idx;
+    var cardWidth = cards[0].offsetWidth + 24; // gap
+    track.style.transform = 'translateX(-' + (current * perView * cardWidth) + 'px)';
+
+    // Update active state on visible cards
+    cards.forEach(function(c){ c.classList.remove('active'); });
+    var start = current * perView;
+    var end = Math.min(start + perView, cards.length);
+    for (var j = start; j < end; j++) {
+      cards[j].classList.add('active');
+    }
+
+    // Update dots
+    dots.forEach(function(d, i){ d.classList.toggle('active', i === current); });
+  }
+
+  function next() {
+    goTo((current + 1) % totalSlides);
+  }
+
+  function prev() {
+    goTo((current - 1 + totalSlides) % totalSlides);
+  }
+
+  function startAuto() {
+    stopAuto();
+    autoTimer = setInterval(function(){
+      if (!paused) next();
+    }, 5000);
+  }
+
+  function stopAuto() {
+    if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+  }
+
+  prevBtn.addEventListener('click', function(){ prev(); resetAuto(); });
+  nextBtn.addEventListener('click', function(){ next(); resetAuto(); });
+
+  wrap.addEventListener('mouseenter', function(){ paused = true; });
+  wrap.addEventListener('mouseleave', function(){ paused = false; });
+
+  // Touch / swipe
+  var touchStartX = 0;
+  wrap.addEventListener('touchstart', function(e){ touchStartX = e.touches[0].clientX; paused = true; }, {passive:true});
+  wrap.addEventListener('touchend', function(e){
+    paused = false;
+    var diff = touchStartX - e.changedTouches[0].clientX;
+    if (Math.abs(diff) > 50) { diff > 0 ? next() : prev(); resetAuto(); }
   });
-});
+
+  function resetAuto() { stopAuto(); startAuto(); }
+
+  // Init
+  goTo(0);
+  startAuto();
+
+  // Resize handler
+  var resizeDebounce;
+  window.addEventListener('resize', function(){
+    clearTimeout(resizeDebounce);
+    resizeDebounce = setTimeout(function(){
+      var newPerView = window.innerWidth < 600 ? 1 : window.innerWidth < 900 ? 2 : 3;
+      if (newPerView !== perView) {
+        perView = newPerView;
+        totalSlides = Math.ceil(cards.length / perView);
+        // Rebuild dots
+        dotsContainer.innerHTML = '';
+        for (var k = 0; k < totalSlides; k++) {
+          var d = document.createElement('button');
+          d.className = 'carousel-dot';
+          d.addEventListener('click', (function(idx){ return function(){ goTo(idx); }; })(k));
+          dotsContainer.appendChild(d);
+        }
+        dots = dotsContainer.querySelectorAll('.carousel-dot');
+        current = Math.min(current, totalSlides - 1);
+        goTo(current);
+      }
+    }, 200);
+  });
+})();
 
 // Petal loop — restart animation when it ends
 document.querySelectorAll('.petal').forEach(function(p){
   p.addEventListener('animationend',function(){
     this.style.animation='none';
-    this.offsetHeight; // trigger reflow
+    this.offsetHeight;
     this.style.animation='';
   });
 });
