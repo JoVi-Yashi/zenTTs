@@ -14,14 +14,14 @@ Construido sobre la [Web Speech API](https://developer.mozilla.org/en-US/docs/We
 > [!WARNING]
 > Esta extensión se carga como complemento temporal en `about:debugging`. No está publicada en addons.mozilla.org.
 
-## Ramas
+## Modos de funcionamiento
 
-| Rama | Motor | Dependencias |
+| Modo | Motor | Dependencias |
 |---|---|---|
-| [`main`](https://github.com/JoVi-Yashi/zenTTs) | SpeechSynthesis | **Ninguna** |
-| [`feat/edge-tts-server`](https://github.com/JoVi-Yashi/zenTTs/tree/feat/edge-tts-server) | edge-tts + FastAPI | Python, uv, server local |
+| Nativo | SpeechSynthesis | **Ninguna** |
+| Neural | edge-tts (45 voces Microsoft) | Ruby, Sinatra, edge-tts CLI |
 
-`main` es la versión recomendada: cero configuración, funciona apenas cargás la extensión. `feat/edge-tts-server` ofrece 45 voces neurales de Microsoft a costa de mantener un server Python local.
+La extensión funciona **sin servidor**: SpeechSynthesis nativo del navegador, cero configuración. Si querés voces neurales de Microsoft, levantás el server Ruby con `make backend` o `ruby launcher.rb`.
 
 ## Características
 
@@ -101,12 +101,12 @@ make build-extension
 > flatpak override --user --filesystem=$HOME/Proyectos/zenTTs app.zen_browser.zen
 > ```
 
-### Server opcional (`feat/edge-tts-server`)
+### Server opcional (edge-tts)
 
 ```bash
-git checkout feat/edge-tts-server
-make install-backend
-./launcher.sh start
+gem install sinatra puma rackup --user-install
+make backend        # o ruby server.rb
+./launcher.rb       # TUI interactiva (ruby launcher.rb)
 ```
 
 ## Estructura
@@ -121,19 +121,20 @@ zenTTs/
 │   │   ├── content.js      # Fuente: inyección, extractores, TTS
 │   │   └── panel.js        # Fuente: UI del panel, modales
 │   └── icons/              # PNG 16→128 + SVG
-├── server/                 # FastAPI backend (solo edge-tts)
-├── launcher.sh             # TUI interactiva (solo edge-tts)
+├── server.rb               # API REST Ruby/Sinatra (edge-tts)
+├── launcher.rb              # TUI interactiva Ruby
+├── launcher.sh              # TUI interactiva Bash (alternativa)
 ├── docs/                   # GitHub Pages landing
 ├── Makefile
-└── read.py                 # Script CLI original (preservado)
+└── Gemfile                 # Dependencias Ruby
 ```
 
 ## Tech Stack
 
 - **Extensión**: vanilla JS, esbuild IIFE, Firefox MV3, Shadow DOM
-- **TTS**: SpeechSynthesis API (`main`) / edge-tts 7.2.8 + FastAPI (`feat/edge-tts-server`)
+- **TTS**: SpeechSynthesis API (nativo) / edge-tts 7.2.8 + Sinatra (Ruby)
 - **Extracción**: @mozilla/readability v0.6.0 + selectores específicos por sitio
-- **Server**: Python 3.14, FastAPI, trafilatura, uv
+- **Server**: Ruby 3.4, Sinatra, trafilatura CLI, edge-tts CLI
 
 ## Licencia
 
