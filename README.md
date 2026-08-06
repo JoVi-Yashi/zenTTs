@@ -1,4 +1,4 @@
-<h1 align="center"><img alt="zenTTS" src="docs/logo.svg" width="140"></h1>
+<h1 align="center"><img alt="zenTTS" src="tts.png" width="140"></h1>
 <p align="center">Text-to-speech flotante para Zen Browser. Elegí el motor que quieras.</p>
 <p align="center">
     <a href="https://github.com/JoVi-Yashi/zenTTs/blob/main/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>

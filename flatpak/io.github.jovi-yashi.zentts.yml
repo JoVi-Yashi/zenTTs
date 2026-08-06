@@ -67,7 +67,7 @@ modules:
       - install -Dm755 gui.rb /app/share/zentts/gui.rb
       - install -Dm755 launcher.sh /app/share/zentts/launcher.sh
       - install -Dm644 Gemfile /app/share/zentts/Gemfile
-      - install -Dm644 tts-zen.svg /app/share/icons/hicolor/scalable/apps/io.github.jovi-yashi.zentts.svg
+      - install -Dm644 tts.png /app/share/icons/hicolor/scalable/apps/io.github.jovi-yashi.zentts.png
       - install -Dm644 tts-zen.desktop /app/share/applications/io.github.jovi-yashi.zentts.desktop
       - install -Dm644 flatpak/io.github.jovi-yashi.zentts.metainfo.xml /app/share/metainfo/io.github.jovi-yashi.zentts.metainfo.xml
       # Launcher wrapper
@@ -94,6 +94,6 @@ modules:
           - launcher.rb
           - launcher.sh
           - Gemfile
-          - tts-zen.svg
+          - tts.png
           - tts-zen.desktop
           - flatpak/io.github.jovi-yashi.zentts.metainfo.xml
