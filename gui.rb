@@ -111,6 +111,15 @@ end
 # ══════════════════════════════════════════════
 
 CSS = <<~CSS
+  window {
+    background: #0a0a1c;
+    border: none;
+  }
+  decoration {
+    border: none;
+    box-shadow: none;
+  }
+
   headerbar {
     background: #0d0d1f;
     border-bottom: 1px solid rgba(167,139,250,0.1);
@@ -120,7 +129,6 @@ CSS = <<~CSS
     font-size: 13px; font-weight: 600; color: #c4b5fd;
   }
 
-  window { background: #0a0a1c; }
   .body { padding: 24px; }
 
   .status-card {
@@ -136,9 +144,9 @@ CSS = <<~CSS
   .indicator {
     min-width: 10px; min-height: 10px; border-radius: 50%; margin-right: 10px;
   }
-  .dot-on  { background: #34d399; box-shadow: 0 0 10px rgba(52,211,153,0.5); }
-  .dot-off { background: #f87171; box-shadow: 0 0 10px rgba(248,113,113,0.35); }
-  .dot-warn { background: #fbbf24; box-shadow: 0 0 10px rgba(251,191,36,0.4); }
+  .dot-on  { background: #34d399; }
+  .dot-off { background: #f87171; }
+  .dot-warn { background: #fbbf24; }
 
   .status-text { font-size: 14px; font-weight: 600; }
   .text-on   { color: #34d399; }
@@ -155,22 +163,32 @@ CSS = <<~CSS
 
   button {
     font-size: 12px; font-weight: 600; padding: 10px 18px;
-    border-radius: 10px; border: none; transition: all 0.15s ease; outline: none;
+    border-radius: 10px; border: none;
+    outline: none;
+    background: rgba(255,255,255,0.04);
+    color: #9ca3af;
   }
   button:disabled { opacity: 0.3; }
+  button:hover {
+    background: rgba(167,139,250,0.12);
+  }
 
   .btn-primary {
     background: #7c3aed; color: #fff;
-    box-shadow: 0 2px 12px rgba(124,58,237,0.25);
+    border: none;
   }
   .btn-primary:hover {
-    background: #8b5cf6; box-shadow: 0 4px 20px rgba(124,58,237,0.4);
+    background: #8b5cf6;
   }
+
   .btn-danger {
     background: rgba(248,113,113,0.1); color: #f87171;
     border: 1px solid rgba(248,113,113,0.15);
   }
-  .btn-danger:hover { background: rgba(248,113,113,0.18); }
+  .btn-danger:hover {
+    background: rgba(248,113,113,0.18);
+  }
+
   .btn-zen {
     background: transparent; color: #7e8aa0;
     border: 1px solid rgba(255,255,255,0.06);
