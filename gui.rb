@@ -9,6 +9,11 @@ require 'net/http'
 # Identify as TTS-zen in taskbars, docks, and alt-tab
 GLib.set_prgname('tts-zen')
 
+# Default icon for all windows
+default_icon = File.join(PROJECT_DIR, 'tts.png')
+default_icon = '/app/share/icons/hicolor/scalable/apps/io.github.jovi-yashi.zentts.png' unless File.exist?(default_icon)
+Gtk::Window.set_default_icon_from_file(default_icon) if File.exist?(default_icon)
+
 PORT = 8765
 PROJECT_DIR = File.dirname(File.expand_path(__FILE__))
 
@@ -240,10 +245,19 @@ class TTSZenApp
 
     # App icon in taskbar/dock
     icon = File.join(PROJECT_DIR, 'tts.png')
-    unless File.exist?(icon)
-      icon = '/app/share/icons/hicolor/scalable/apps/io.github.jovi-yashi.zentts.png'
+    icon = '/app/share/icons/hicolor/scalable/apps/io.github.jovi-yashi.zentts.png' unless File.exist?(icon)
+    if File.exist?(icon)
+      begin
+        @window.set_icon_from_file(icon)
+      rescue
+        begin
+          pixbuf = GdkPixbuf::Pixbuf.new(file: icon, width: 128, height: 128)
+          @window.set_icon(pixbuf)
+        rescue
+          # Fallback: GTK will use default icon
+        end
+      end
     end
-    @window.set_icon_from_file(icon) if File.exist?(icon)
 
     # Force dark theme so system borders/widgets match our palette
     settings = Gtk::Settings.default
