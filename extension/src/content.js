@@ -231,6 +231,68 @@ function cleanText(text) {
     .trim();
 }
 
+// ---- Dynamic content observer ----
+
+var contentObserver = null;
+var lastExtractedLength = 0;
+
+function startContentObserver() {
+  stopContentObserver();
+  contentObserver = new MutationObserver(function(mutations) {
+    var newText = '';
+    mutations.forEach(function(m) {
+      m.addedNodes.forEach(function(node) {
+        if (node.nodeType === 1) {
+          var txt = (node.innerText || node.textContent || '').trim();
+          if (txt.length > 50) newText += txt + '\n\n';
+        }
+      });
+    });
+    if (newText.trim().length > 50) {
+      onNewContent(newText.trim());
+    }
+  });
+  contentObserver.observe(document.body, { childList: true, subtree: true });
+}
+
+function stopContentObserver() {
+  if (contentObserver) { contentObserver.disconnect(); contentObserver = null; }
+}
+
+async function onNewContent(newText) {
+  newText = cleanText(newText);
+  window.__tts_zen_last_text = (window.__tts_zen_last_text || '') + '\n\n' + newText;
+
+  var st = window.__tts_zen_state || {};
+  var langOut = st.langOut || 'es';
+  if (langOut && langOut !== 'auto') {
+    try {
+      var resp = await browser.runtime.sendMessage({ action: 'translate', text: newText, from: 'auto', to: langOut });
+      if (resp && resp.text && resp.text !== newText) {
+        newText = resp.text;
+      }
+    } catch (_) {}
+  }
+
+  appendToPreview(newText);
+}
+
+function appendToPreview(text) {
+  var host = document.getElementById('tts-zen-host');
+  if (!host || !host.shadowRoot) return;
+  var overlay = host.shadowRoot.getElementById('tts-zen-preview-overlay');
+  if (!overlay || overlay.classList.contains('hidden')) return;
+  var content = host.shadowRoot.getElementById('tts-zen-preview-content');
+  if (!content) return;
+
+  var p = document.createElement('p');
+  p.style.cssText = 'margin:0 0 6px 0;line-height:inherit;opacity:0.5;font-size:11px;border-left:2px solid rgba(167,139,250,0.3);padding-left:8px;';
+  p.textContent = text.substring(0, 300);
+  if (text.length > 300) p.textContent += '…';
+  content.appendChild(p);
+  content.scrollTop = content.scrollHeight;
+}
+
 // ---- Server TTS Player (edge-tts) with chunking ----
 
 var serverAudio = null;
@@ -508,6 +570,9 @@ async function dispatchReadPage(extractFn) {
 
   setStatus(ts('starting'));
 
+  // Start watching for new content (infinite scroll pages)
+  startContentObserver();
+
   var st = window.__tts_zen_state || {};
   var langIn = st.langIn || 'auto';
   var langOut = st.langOut || 'es';
@@ -568,6 +633,7 @@ function handlePause() {
 }
 
 function handleStop() {
+  stopContentObserver();
   stopSpeech();
   setStatus(ts('stopped'));
   setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
