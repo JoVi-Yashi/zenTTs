@@ -6,7 +6,7 @@
 <title>zenTTS — Text-to-Speech para Zen Browser</title>
 <link rel="icon" type="image/png" href="ZenTTs.png">
 <meta property="og:title" content="zenTTS — Text-to-Speech para Zen Browser">
-<meta property="og:description" content="Panel TTS flotante para Zen Browser. Leé cualquier página web con un solo click — SpeechSynthesis nativo o edge-tts neural.">
+<meta property="og:description" content="Panel TTS flotante para Zen Browser. SpeechSynthesis nativo o edge-tts neural. App de escritorio GTK3. Linux y Windows.">
 <meta property="og:image" content="https://jovi-yashi.github.io/zenTTs/logo.svg">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
@@ -353,7 +353,7 @@ footer p{margin:0}
   <div class="petal" style="top:6%;left:45%;--dur:15s;--delay:5s;--sz:24px;--drift:50px;--spin:90deg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg></div>
   <div class="petal" style="top:4%;left:65%;--dur:9s;--delay:6s;--sz:15px;--drift:-30px;--spin:300deg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg></div>
   <h1><span class="hl-zen">zen</span><span class="hl-tts">TTS</span></h1>
-  <p class="subtitle">Text-to-speech flotante para Zen Browser. El motor que quieras: nativo del navegador o edge-tts con voces neurales de Microsoft. Sin configuraciones.</p>
+  <p class="subtitle">Text-to-speech flotante para Zen Browser. Dos motores: nativo del navegador o edge-tts con voces neurales de Microsoft. App de escritorio incluida — Linux y Windows.</p>
   <div class="hero-buttons">
     <a href="https://github.com/JoVi-Yashi/zenTTs" class="btn btn-primary">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
@@ -513,8 +513,8 @@ footer p{margin:0}
     <div class="step">
       <div class="step-num">1</div>
       <div class="step-content">
-        <strong>Flatpak (recomendado — cualquier distro)</strong>
-        <p>Ruby, edge-tts, trafilatura y launcher incluidos. Cero dependencias manuales.</p>
+        <strong>Flatpak — Linux (recomendado)</strong>
+        <p>Ruby, edge-tts, trafilatura, y launcher incluidos. Cero dependencias manuales.</p>
         <pre>git clone https://github.com/JoVi-Yashi/zenTTs.git
 cd zenTTs
 make flatpak</pre>
@@ -524,11 +524,11 @@ make flatpak</pre>
     <div class="step">
       <div class="step-num">2</div>
       <div class="step-content">
-        <strong>Instalación manual</strong>
-        <p>Necesitás Ruby ≥ 3.2, edge-tts CLI y trafilatura CLI.</p>
+        <strong>Instalación manual — Linux / Windows</strong>
+        <p>Linux: Ruby ≥ 3.2, edge-tts CLI, trafilatura CLI. Windows: RubyInstaller + MSYS2.</p>
         <pre>git clone https://github.com/JoVi-Yashi/zenTTs.git
 cd zenTTs
-make install          # gem install sinatra puma rackup
+make install          # gem install sinatra puma rackup gtk3
 cd extension && npm install && cd ..
 make build-extension</pre>
       </div>
@@ -538,10 +538,19 @@ make build-extension</pre>
       <div class="step-content">
         <strong>Cargar en Zen Browser</strong>
         <p>Abrí <code>about:debugging</code> → <strong>Cargar complemento temporal</strong> → seleccioná <code>extension/manifest.json</code></p>
-        <p style="margin-top:6px">Si Zen está instalado vía Flatpak:</p>
+        <p style="margin-top:6px">Si Zen está en Flatpak:</p>
         <pre>flatpak override --user \
   --filesystem=$HOME/Proyectos/zenTTs \
   app.zen_browser.zen</pre>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-content">
+        <strong>App de escritorio</strong>
+        <p>Abrí la GUI para gestionar el servidor sin terminal:</p>
+        <pre>make gui          # Linux
+ruby gui.rb       # Linux / Windows</pre>
       </div>
     </div>
   </div>
