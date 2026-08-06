@@ -73,10 +73,22 @@
   }
   .btn-outline:hover{background:rgba(167,139,250,.1);border-color:#a78bfa;color:#c4b5fd}
 
-  /* Panel Preview — pixel-perfect recreation */
-  .preview-section{padding:60px 20px;display:flex;justify-content:center;perspective:800px}
-  .panel-wrapper{transform:rotateX(3deg) rotateY(-4deg);transition:transform .5s ease}
-  .panel-wrapper:hover{transform:rotateX(0deg) rotateY(0deg)}
+  /* Panel Preview — 3D floating */
+  .preview-section{padding:60px 20px 80px;display:flex;justify-content:center;perspective:1000px}
+  .panel-stage{position:relative;transform-style:preserve-3d}
+  .panel-shadow{
+    position:absolute;inset:-20px -20px -30px;border-radius:24px;
+    background:radial-gradient(ellipse at 50% 120%,rgba(124,58,237,.25),transparent 60%);
+    filter:blur(15px);transform:translateZ(-10px);
+    transition:all .5s ease;
+  }
+  .panel-wrapper{
+    transform:rotateX(8deg) rotateY(-6deg) translateZ(0);
+    transition:transform .6s cubic-bezier(0.4,0,0.2,1);
+    position:relative;z-index:1;
+  }
+  .panel-wrapper:hover{transform:rotateX(-2deg) rotateY(2deg) translateZ(20px)}
+  .panel-wrapper:hover ~ .panel-shadow{filter:blur(25px);opacity:.8}
   .panel-preview{
     width:290px;
     background:linear-gradient(145deg,#14142b 0%,#1a1a35 100%);
@@ -148,6 +160,24 @@
   .step-content pre{background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.04);border-radius:10px;padding:14px;overflow-x:auto;margin-top:8px;font-size:12px;color:#7e8aa0;line-height:1.8}
   .step-content p{font-size:12px;color:#7e8aa0;margin-top:4px}
 
+  /* Native Sites */
+  .sites-section{padding:0 20px 60px;text-align:center}
+  .sites-section h2{font-size:20px;font-weight:700;color:#f3f4f6;margin-bottom:8px}
+  .sites-sub{font-size:13px;color:#7e8aa0;margin-bottom:28px}
+  .sites-grid{display:flex;justify-content:center;gap:12px;flex-wrap:wrap}
+  .site-badge{
+    display:flex;align-items:center;gap:8px;
+    padding:10px 18px;border-radius:12px;
+    background:linear-gradient(145deg,rgba(20,20,43,.8),rgba(26,26,53,.8));
+    border:1px solid rgba(167,139,250,.08);
+    transition:all .3s ease;
+  }
+  .site-badge:hover{transform:translateY(-2px);border-color:rgba(167,139,250,.2);box-shadow:0 8px 24px rgba(0,0,0,.3)}
+  .site-badge img{width:24px;height:24px;border-radius:4px}
+  .site-badge span{font-size:13px;color:#d1d5db;font-weight:500}
+  .site-badge.generic{border-style:dashed}
+  .generic-icon{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:4px;background:rgba(167,139,250,.12);color:#a78bfa;font-weight:700;font-size:14px}
+
   /* Branches */
   .branches{padding:60px 20px 80px;max-width:700px;margin:0 auto;text-align:center}
   .branches h2{font-size:24px;color:#f3f4f6;margin-bottom:28px}
@@ -192,9 +222,10 @@ footer p{margin:0}
   </div>
 </section>
 
-<!-- Pixel-perfect panel recreation -->
+<!-- 3D Panel preview -->
 <section class="preview-section">
-  <div class="panel-wrapper">
+  <div class="panel-stage">
+    <div class="panel-wrapper">
     <div class="panel-preview">
       <div class="panel-header">
         <div class="panel-header-l">
@@ -253,6 +284,36 @@ footer p{margin:0}
         </div>
       </div>
       <div class="panel-st">Reproduciendo...</div>
+    </div>
+  </div>
+  <div class="panel-shadow"></div>
+  </div>
+</section>
+
+<!-- Native Sites -->
+<section class="sites-section">
+  <h2>▸ Sitios nativos</h2>
+  <p class="sites-sub">Extractores optimizados para estas plataformas</p>
+  <div class="sites-grid">
+    <div class="site-badge">
+      <img src="https://www.google.com/s2/favicons?domain=wattpad.com&sz=48" width="32" height="32" alt="Wattpad">
+      <span>Wattpad</span>
+    </div>
+    <div class="site-badge">
+      <img src="https://www.google.com/s2/favicons?domain=archiveofourown.org&sz=48" width="32" height="32" alt="AO3">
+      <span>AO3</span>
+    </div>
+    <div class="site-badge">
+      <img src="https://www.google.com/s2/favicons?domain=fanfiction.net&sz=48" width="32" height="32" alt="FanFiction">
+      <span>FanFiction</span>
+    </div>
+    <div class="site-badge">
+      <img src="https://www.google.com/s2/favicons?domain=webnovel.com&sz=48" width="32" height="32" alt="Webnovel">
+      <span>Webnovel</span>
+    </div>
+    <div class="site-badge generic">
+      <span class="generic-icon">+</span>
+      <span>Cualquier sitio</span>
     </div>
   </div>
 </section>
