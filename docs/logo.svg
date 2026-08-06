@@ -1,32 +1,31 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#7c3aed"/>
-      <stop offset="100%" stop-color="#4c1d95"/>
+      <stop offset="0%" stop-color="#14142b"/>
+      <stop offset="100%" stop-color="#1a1a35"/>
     </linearGradient>
-    <linearGradient id="shine" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="rgba(255,255,255,0.25)"/>
-      <stop offset="45%" stop-color="rgba(255,255,255,0)"/>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#a78bfa"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
     </linearGradient>
-    <clipPath id="squircle">
-      <path d="M128 12c64 0 116 52 116 116s-52 116-116 116S12 192 12 128 64 12 128 12Z"/>
-    </clipPath>
   </defs>
 
-  <!-- Squircle base -->
-  <path d="M128 12c64 0 116 52 116 116s-52 116-116 116S12 192 12 128 64 12 128 12Z" fill="url(#bg)"/>
+  <!-- Background squircle -->
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
 
-  <!-- Glossy overlay -->
-  <rect x="12" y="12" width="232" height="160" rx="72" fill="url(#shine)" clip-path="url(#squircle)"/>
+  <!-- Subtle border -->
+  <rect x="4" y="4" width="504" height="504" rx="94" fill="none" stroke="rgba(167,139,250,0.15)" stroke-width="2"/>
 
-  <!-- Inner shadow ring -->
-  <path d="M128 18c60.7 0 110 49.3 110 110s-49.3 110-110 110S18 188.7 18 128 67.3 18 128 18Z"
-        fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="2"/>
+  <!-- Speaker icon -->
+  <g transform="translate(256,200)" fill="none" stroke="url(#accent)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="-80,-60 -40,-20 -80,-20 -80,60 -40,20 -80,60"/>
+    <path d="M-20,-30a50 50 0 0 1 0 60"/>
+    <path d="M30,-60a90 90 0 0 1 0 120"/>
+  </g>
 
-  <!-- Play button glyph -->
-  <polygon points="100,78 100,178 180,128" fill="white" opacity="0.95"/>
+  <!-- Subtle glow behind icon -->
+  <circle cx="256" cy="200" r="100" fill="rgba(167,139,250,0.04)"/>
 
-  <!-- Subtle bottom edge highlight -->
-  <path d="M18 200c0 20 20 38 46 38h128c26 0 46-18 46-38" fill="none"
-        stroke="rgba(255,255,255,0.06)" stroke-width="4"/>
+  <!-- Text -->
+  <text x="256" y="400" text-anchor="middle" font-family="'Nimbus Mono PS',Courier,monospace" font-size="48" font-weight="700" fill="url(#accent)" letter-spacing="4">zenTTS</text>
 </svg>
