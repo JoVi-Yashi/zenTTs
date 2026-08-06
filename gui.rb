@@ -238,6 +238,13 @@ class TTSZenApp
     @window.resizable = false
     @window.window_position = :center
 
+    # App icon in taskbar/dock
+    icon = File.join(PROJECT_DIR, 'tts.png')
+    unless File.exist?(icon)
+      icon = '/app/share/icons/hicolor/scalable/apps/io.github.jovi-yashi.zentts.png'
+    end
+    @window.set_icon_from_file(icon) if File.exist?(icon)
+
     # Force dark theme so system borders/widgets match our palette
     settings = Gtk::Settings.default
     settings.gtk_application_prefer_dark_theme = true
@@ -317,13 +324,21 @@ class TTSZenApp
   end
 
   def title_widget
-    logo_path = File.join(PROJECT_DIR, 'tts.png')
     box = Gtk::Box.new(:horizontal, 7)
-    if File.exist?(logo_path)
-      logo = Gtk::Image.new(file: logo_path)
-      logo.set_size_request(18, 18)
-      box.pack_start(logo, expand: false, fill: false, padding: 0)
+    da = Gtk::DrawingArea.new
+    da.set_size_request(16, 16)
+    da.signal_connect('draw') do |_, cr|
+      cr.set_source_rgba(0.655, 0.545, 0.980, 1.0)
+      cr.set_line_width(1.5)
+      cr.move_to(5, 4); cr.line_to(2, 7);  cr.line_to(2, 10)
+      cr.line_to(5, 13); cr.line_to(8, 13); cr.line_to(8, 4)
+      cr.close_path; cr.fill_preserve; cr.stroke
+      cr.set_line_width(1.2)
+      cr.move_to(10.5, 6); cr.curve_to(12, 7, 12, 10, 10.5, 11); cr.stroke
+      cr.move_to(12.5, 4.5); cr.curve_to(14, 6, 14, 11, 12.5, 12.5); cr.stroke
+      false
     end
+    box.pack_start(da, expand: false, fill: false, padding: 0)
     box.show_all
     box
   end
