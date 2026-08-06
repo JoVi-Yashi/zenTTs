@@ -7,7 +7,7 @@
   "homepage_url": "https://github.com/JoVi-Yashi/zenTTs",
   "browser_specific_settings": {
     "gecko": {
-      "id": "tts-zen@gentle-ai.local",
+      "id": "zentts@jovi-yashi.github.io",
       "strict_min_version": "142.0",
       "data_collection_permissions": {
         "usage": "none",
