@@ -1,5 +1,5 @@
 <h1 align="center"><img alt="zenTTS" src="tts.png" width="140"></h1>
-<p align="center">Text-to-speech flotante para Zen Browser. Elegí el motor que quieras.</p>
+<p align="center">Text-to-speech flotante para Zen Browser. Elige el motor que quieras.</p>
 <p align="center">
     <a href="https://github.com/JoVi-Yashi/zenTTs/blob/main/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
     <a href="https://github.com/JoVi-Yashi/zenTTs"><img alt="GitHub stars" src="https://img.shields.io/github/stars/JoVi-Yashi/zenTTs?style=social"></a>
@@ -22,7 +22,7 @@ Diseñado para lectores de Wattpad, AO3 y FanFiction. Construido sobre la [Web S
 | **Nativo** | SpeechSynthesis del navegador | Panel → ⚙ → Motor: Nativo |
 | **Neural** | edge-tts · 45 voces Microsoft | `ruby server.rb` + Panel → ⚙ → Motor: Neural |
 
-Cambiás de modo con un click desde el panel de ajustes. La extensión detecta si el servidor está corriendo. Si elegís Neural sin servidor, te avisa.
+Cambias de modo con un click desde el panel de ajustes. La extensión detecta si el servidor está corriendo. Si eliges Neural sin servidor, te avisa.
 
 ---
 
@@ -51,7 +51,7 @@ cd zenTTs
 make flatpak
 ```
 
-Un solo comando. Ruby, edge-tts, trafilatura, GTK3 — todo incluido. Buscá **TTS-zen** en el menú de apps.
+Un solo comando. Ruby, edge-tts, trafilatura, GTK3 — todo incluido. Busca **TTS-zen** en el menú de apps.
 
 ### Linux — Manual
 
@@ -82,7 +82,7 @@ make build-extension
 ### Cargar la extensión en Zen
 
 1. `about:debugging` → **Cargar complemento temporal**
-2. Seleccioná `extension/manifest.json`
+2. Selecciona `extension/manifest.json`
 
 ---
 
@@ -92,7 +92,7 @@ make build-extension
 Shadow DOM encapsulado. El CSS del sitio jamás interfiere. Aparece abajo a la derecha, colapsable a un círculo de 44px.
 
 ### Dos motores TTS
-Elegí entre SpeechSynthesis nativo (sin dependencias) o edge-tts con voces neurales de Microsoft. Cambiás desde ⚙ → Motor sin reiniciar.
+Elige entre SpeechSynthesis nativo (sin dependencias) o edge-tts con voces neurales de Microsoft. Cambias desde ⚙ → Motor sin reiniciar.
 
 ### Highlighting sincronizado
 Cada oración se resalta en el DOM del sitio (outline violeta + scroll) y en un pop-up sincronizado con tipografía ajustable.
@@ -101,7 +101,7 @@ Cada oración se resalta en el DOM del sitio (outline violeta + scroll) y en un 
 Wattpad, AO3, FanFiction y Webnovel tienen extractores optimizados con selectores específicos. Ignoran headers, navs y sidebars.
 
 ### Site Manager
-Activá o desactivá la herramienta por dominio con toggle switches. Favicons reales. Persiste entre sesiones.
+Activa o desactiva la herramienta por dominio con toggle switches. Favicons reales. Persiste entre sesiones.
 
 ### App de escritorio
 GUI nativa con GTK3. Compatible Linux y Windows. Tema oscuro, header bar del sistema, estado en tiempo real.

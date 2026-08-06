@@ -20,7 +20,7 @@ const PANEL_HTML = `
       </span>
     </div>
     <div id="tts-zen-header-right">
-      <button id="tts-zen-preview-btn" title="Ver texto extraido">
+      <button id="tts-zen-preview-btn" title="Ver texto extraído">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
           <circle cx="12" cy="12" r="3"></circle>
@@ -118,7 +118,7 @@ const PANEL_HTML = `
 <div id="tts-zen-preview-overlay" class="hidden">
   <div id="tts-zen-preview-modal">
     <div id="tts-zen-preview-header">
-      <span>Texto extraido</span>
+      <span>Texto extraído</span>
       <div id="tts-zen-preview-tools">
         <button class="preview-tool" data-font="serif" title="Serif">Serif</button>
         <button class="preview-tool active" data-font="sans" title="Sans">Sans</button>
@@ -128,7 +128,7 @@ const PANEL_HTML = `
         <button class="preview-tool" data-size="up" title="Aumentar">A+</button>
         <span class="tool-sep"></span>
         <button class="preview-tool" data-spacing="down" title="Menos espacio">-</button>
-        <button class="preview-tool" data-spacing="up" title="Mas espacio">+</button>
+        <button class="preview-tool" data-spacing="up" title="Más espacio">+</button>
       </div>
       <button id="tts-zen-preview-close">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
@@ -631,7 +631,7 @@ export function setStatus(text, isError) {
 export function setCounter(current, total) {
   const el = getEl('tts-zen-counter');
   if (!el) return;
-  el.textContent = 'Linea ' + current + ' de ' + total;
+  el.textContent = 'Línea ' + current + ' de ' + total;
 }
 
 export function setButtonsEnabled(btns) {

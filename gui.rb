@@ -364,7 +364,7 @@ class TTSZenApp
     if pid && healthy
       set_dot('dot-on')
       swap_class(@status_label, %w[text-off text-warn], 'text-on')
-      @status_label.text = 'En ejecucion'
+      @status_label.text = 'En ejecución'
       @detail.text = "localhost:#{PORT}  ·  PID #{pid}  ·  saludable"
       @start_btn.sensitive = false; @stop_btn.sensitive = true
     elsif pid

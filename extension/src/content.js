@@ -264,7 +264,7 @@ async function startServerPlayback(text) {
     setStatus('Reproduciendo (edge-tts)...');
   } catch (e) {
     window.__tts_zen_state.serverAvailable = false;
-    setStatus('Servidor no disponible — usá modo Nativo', true);
+    setStatus('Servidor no disponible — usa modo Nativo', true);
     setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
   }
 }
