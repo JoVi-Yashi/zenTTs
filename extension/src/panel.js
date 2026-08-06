@@ -930,7 +930,7 @@ export async function createPanel(shadow, handlers) {
     state.lang = langSelect.value;
     window.__tts_zen_state.lang = langSelect.value;
     saveSettings();
-    applyLanguage(shadow);
+    try { applyLanguage(shadow); } catch(e) { console.error(e); }
   });
 
   var langIn = shadow.getElementById('tts-zen-lang-in');
@@ -957,7 +957,7 @@ export async function createPanel(shadow, handlers) {
   speedSlider.value = Math.round(state.currentRate * 100);
   speedLabel.textContent = state.currentRate.toFixed(1) + 'x';
   loadVoices();
-  applyLanguage(shadow);
+  try { applyLanguage(shadow); } catch(e) { console.error('applyLanguage error:', e); }
 }
 
 // ---- Minimize / Collapse ----

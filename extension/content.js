@@ -3009,7 +3009,11 @@
       state.lang = langSelect.value;
       window.__tts_zen_state.lang = langSelect.value;
       saveSettings();
-      applyLanguage(shadow);
+      try {
+        applyLanguage(shadow);
+      } catch (e) {
+        console.error(e);
+      }
     });
     var langIn = shadow.getElementById("tts-zen-lang-in");
     if (langIn) {
@@ -3050,7 +3054,11 @@
     speedSlider.value = Math.round(state.currentRate * 100);
     speedLabel.textContent = state.currentRate.toFixed(1) + "x";
     loadVoices();
-    applyLanguage(shadow);
+    try {
+      applyLanguage(shadow);
+    } catch (e) {
+      console.error("applyLanguage error:", e);
+    }
   }
   var panelCollapsed = false;
   async function loadCollapsedState() {
@@ -3495,48 +3503,38 @@
   }
   var serverAudio = null;
   var serverSentences = [];
-  var chunkIdx = 0;
-  var globalSentenceOffset = 0;
-  function splitIntoChunks(text, maxLen) {
-    maxLen = maxLen || 2e3;
-    if (text.length <= maxLen) return [text];
-    var chunks = [];
-    var sentences = text.match(/[^.!?…\n]+[.!?…]*(\n|$)?/g) || [text];
-    var current = "";
-    for (var i = 0; i < sentences.length; i++) {
-      if (current.length + sentences[i].length > maxLen && current.length > 0) {
-        chunks.push(current.trim());
-        current = "";
+  async function startServerPlayback(text) {
+    stopSpeech();
+    var st = window.__tts_zen_state || {};
+    var voice = st.currentVoice || "es-ES-AlvaroNeural";
+    var rate = st.currentRate || 1;
+    var rateStr = rate >= 1 ? "+" + Math.round((rate - 1) * 100) + "%" : "-" + Math.round((1 - rate) * 100) + "%";
+    setStatus(ts("connecting"));
+    try {
+      var resp = await browser.runtime.sendMessage({ action: "read_page_sync", text, voice, rate: rateStr });
+      if (!resp.success) throw new Error(ts("serverError"));
+      if (!resp.sentences || resp.sentences.length === 0) throw new Error(ts("noTiming"));
+      serverSentences = resp.sentences;
+      window.__tts_zen_sentences = serverSentences;
+      window.__tts_zen_state.serverAvailable = true;
+      sentenceData = serverSentences.map(function(s) {
+        return { text: s.text, start: s.start, end: s.end };
+      });
+      var audioBytes = Uint8Array.from(atob(resp.audio), function(c) {
+        return c.charCodeAt(0);
+      });
+      var blob = new Blob([audioBytes], { type: "audio/mpeg" });
+      var url = URL.createObjectURL(blob);
+      if (serverAudio) {
+        serverAudio.pause();
+        URL.revokeObjectURL(serverAudio.src);
       }
-      current += sentences[i];
-    }
-    if (current.trim()) chunks.push(current.trim());
-    return chunks;
-  }
-  async function preloadChunk(text, voice, rate) {
-    return await browser.runtime.sendMessage({ action: "read_page_sync", text, voice, rate });
-  }
-  async function playChunk(chunkData, rate, totalChunks) {
-    serverSentences = chunkData.sentences;
-    window.__tts_zen_sentences = serverSentences;
-    sentenceData = serverSentences.map(function(s) {
-      return { text: s.text, start: s.start, end: s.end };
-    });
-    var audioBytes = Uint8Array.from(atob(chunkData.audio), function(c) {
-      return c.charCodeAt(0);
-    });
-    var blob = new Blob([audioBytes], { type: "audio/mpeg" });
-    var url = URL.createObjectURL(blob);
-    if (serverAudio) {
-      serverAudio.pause();
-      URL.revokeObjectURL(serverAudio.src);
-    }
-    serverAudio = new Audio(url);
-    serverAudio.playbackRate = rate;
-    currentSentenceIdx = 0;
-    isSpeaking = true;
-    setPauseIcon(true);
-    return new Promise(function(resolve, reject) {
+      serverAudio = new Audio(url);
+      serverAudio.playbackRate = rate;
+      currentSentenceIdx = 0;
+      isSpeaking = true;
+      setButtonsEnabled({ read: false, pause: true, stop: true, prev: true, next: true });
+      setPauseIcon(true);
       serverAudio.ontimeupdate = function() {
         if (!isSpeaking || serverSentences.length === 0) return;
         var t2 = serverAudio.currentTime;
@@ -3544,64 +3542,29 @@
           if (t2 >= serverSentences[i].start && t2 < serverSentences[i].end) {
             if (i !== currentSentenceIdx) {
               currentSentenceIdx = i;
-              updateHighlightServer(globalSentenceOffset + i);
+              updateHighlightServer(i);
             }
             break;
           }
         }
       };
       serverAudio.onended = function() {
-        resolve();
+        isSpeaking = false;
+        setStatus(ts("ready"));
+        setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
+        setPauseIcon(false);
       };
       serverAudio.onerror = function() {
-        reject(new Error("audio"));
+        setStatus(ts("audioError"), true);
+        setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
+        isSpeaking = false;
       };
-      serverAudio.play().catch(reject);
-    });
-  }
-  async function startServerPlayback(text) {
-    stopSpeech();
-    window.__tts_zen_state.serverAvailable = true;
-    var st = window.__tts_zen_state || {};
-    var voice = st.currentVoice || "es-ES-AlvaroNeural";
-    var rate = st.currentRate || 1;
-    var rateStr = rate >= 1 ? "+" + Math.round((rate - 1) * 100) + "%" : "-" + Math.round((1 - rate) * 100) + "%";
-    var allChunks = splitIntoChunks(text, 2e3);
-    var totalChunks = allChunks.length;
-    setStatus(ts("connecting"));
-    try {
-      var nextChunk = null;
-      for (var ci = 0; ci < totalChunks; ci++) {
-        chunkIdx = ci;
-        globalSentenceOffset = ci > 0 ? sentenceData.length : 0;
-        var chunkProgress = " [" + (ci + 1) + "/" + totalChunks + "]";
-        setStatus(ts("serverMode") + chunkProgress);
-        var chunkData;
-        if (nextChunk && ci > 0) {
-          chunkData = nextChunk;
-          nextChunk = null;
-        } else {
-          setStatus(ts("connecting") + chunkProgress);
-          var resp = await browser.runtime.sendMessage({ action: "read_page_sync", text: allChunks[ci], voice, rate: rateStr });
-          if (!resp.success) throw new Error(ts("serverError"));
-          chunkData = resp;
-        }
-        if (ci + 1 < totalChunks) {
-          preloadChunk(allChunks[ci + 1], voice, rateStr).then(function(data) {
-            nextChunk = data;
-          }).catch(function() {
-          });
-        }
-        await playChunk(chunkData, rate, totalChunks);
-      }
-      isSpeaking = false;
-      setStatus(ts("ready"));
-      setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
-      setPauseIcon(false);
+      await serverAudio.play();
+      setStatus(ts("serverMode"));
     } catch (e) {
       window.__tts_zen_state.serverAvailable = false;
-      setStatus(ts("noServer") + " \u2014 usando modo Nativo", true);
-      startSpeechPlayback(text);
+      setStatus(ts("noServer"), true);
+      setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
     }
   }
   function updateHighlightServer(idx) {

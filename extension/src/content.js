@@ -235,49 +235,39 @@ function cleanText(text) {
 
 var serverAudio = null;
 var serverSentences = [];
-var chunkQueue = [];
-var chunkIdx = 0;
-var globalSentenceOffset = 0;
 
-function splitIntoChunks(text, maxLen) {
-  maxLen = maxLen || 2000;
-  if (text.length <= maxLen) return [text];
-  var chunks = [];
-  var sentences = text.match(/[^.!?…\n]+[.!?…]*(\n|$)?/g) || [text];
-  var current = '';
-  for (var i = 0; i < sentences.length; i++) {
-    if (current.length + sentences[i].length > maxLen && current.length > 0) {
-      chunks.push(current.trim());
-      current = '';
-    }
-    current += sentences[i];
-  }
-  if (current.trim()) chunks.push(current.trim());
-  return chunks;
-}
+async function startServerPlayback(text) {
+  stopSpeech();
+  var st = window.__tts_zen_state || {};
+  var voice = st.currentVoice || 'es-ES-AlvaroNeural';
+  var rate = st.currentRate || 1.0;
+  var rateStr = rate >= 1.0 ? '+' + Math.round((rate - 1) * 100) + '%' : '-' + Math.round((1 - rate) * 100) + '%';
 
-async function preloadChunk(text, voice, rate) {
-  return await browser.runtime.sendMessage({ action: 'read_page_sync', text: text, voice: voice, rate: rate });
-}
+  setStatus(ts('connecting'));
+  try {
+    var resp = await browser.runtime.sendMessage({ action: 'read_page_sync', text: text, voice: voice, rate: rateStr });
+    if (!resp.success) throw new Error(ts('serverError'));
+    if (!resp.sentences || resp.sentences.length === 0) throw new Error(ts('noTiming'));
 
-async function playChunk(chunkData, rate, totalChunks) {
-  serverSentences = chunkData.sentences;
-  window.__tts_zen_sentences = serverSentences;
-  sentenceData = serverSentences.map(function(s) { return { text: s.text, start: s.start, end: s.end }; });
+    serverSentences = resp.sentences;
+    window.__tts_zen_sentences = serverSentences;
+    window.__tts_zen_state.serverAvailable = true;
 
-  var audioBytes = Uint8Array.from(atob(chunkData.audio), function(c) { return c.charCodeAt(0); });
-  var blob = new Blob([audioBytes], { type: 'audio/mpeg' });
-  var url = URL.createObjectURL(blob);
+    sentenceData = serverSentences.map(function(s) { return { text: s.text, start: s.start, end: s.end }; });
 
-  if (serverAudio) { serverAudio.pause(); URL.revokeObjectURL(serverAudio.src); }
-  serverAudio = new Audio(url);
-  serverAudio.playbackRate = rate;
+    var audioBytes = Uint8Array.from(atob(resp.audio), function(c) { return c.charCodeAt(0); });
+    var blob = new Blob([audioBytes], { type: 'audio/mpeg' });
+    var url = URL.createObjectURL(blob);
 
-  currentSentenceIdx = 0;
-  isSpeaking = true;
-  setPauseIcon(true);
+    if (serverAudio) { serverAudio.pause(); URL.revokeObjectURL(serverAudio.src); }
+    serverAudio = new Audio(url);
+    serverAudio.playbackRate = rate;
 
-  return new Promise(function(resolve, reject) {
+    currentSentenceIdx = 0;
+    isSpeaking = true;
+    setButtonsEnabled({ read: false, pause: true, stop: true, prev: true, next: true });
+    setPauseIcon(true);
+
     serverAudio.ontimeupdate = function() {
       if (!isSpeaking || serverSentences.length === 0) return;
       var t = serverAudio.currentTime;
@@ -285,72 +275,32 @@ async function playChunk(chunkData, rate, totalChunks) {
         if (t >= serverSentences[i].start && t < serverSentences[i].end) {
           if (i !== currentSentenceIdx) {
             currentSentenceIdx = i;
-            updateHighlightServer(globalSentenceOffset + i);
+            updateHighlightServer(i);
           }
           break;
         }
       }
     };
-    serverAudio.onended = function() { resolve(); };
-    serverAudio.onerror = function() { reject(new Error('audio')); };
-    serverAudio.play().catch(reject);
-  });
-}
 
-async function startServerPlayback(text) {
-  stopSpeech();
-  window.__tts_zen_state.serverAvailable = true;
-  var st = window.__tts_zen_state || {};
-  var voice = st.currentVoice || 'es-ES-AlvaroNeural';
-  var rate = st.currentRate || 1.0;
-  var rateStr = rate >= 1.0 ? '+' + Math.round((rate - 1) * 100) + '%' : '-' + Math.round((1 - rate) * 100) + '%';
+    serverAudio.onended = function() {
+      isSpeaking = false;
+      setStatus(ts('ready'));
+      setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
+      setPauseIcon(false);
+    };
 
-  // Split into chunks
-  var allChunks = splitIntoChunks(text, 2000);
-  var totalChunks = allChunks.length;
-  setStatus(ts('connecting'));
+    serverAudio.onerror = function() {
+      setStatus(ts('audioError'), true);
+      setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
+      isSpeaking = false;
+    };
 
-  try {
-    var nextChunk = null;
-
-    for (var ci = 0; ci < totalChunks; ci++) {
-      chunkIdx = ci;
-      globalSentenceOffset = ci > 0 ? sentenceData.length : 0;
-      var chunkProgress = ' [' + (ci + 1) + '/' + totalChunks + ']';
-      setStatus(ts('serverMode') + chunkProgress);
-
-      // If we have a preloaded chunk, use it
-      var chunkData;
-      if (nextChunk && ci > 0) {
-        chunkData = nextChunk;
-        nextChunk = null;
-      } else {
-        setStatus(ts('connecting') + chunkProgress);
-        var resp = await browser.runtime.sendMessage({ action: 'read_page_sync', text: allChunks[ci], voice: voice, rate: rateStr });
-        if (!resp.success) throw new Error(ts('serverError'));
-        chunkData = resp;
-      }
-
-      // Preload next chunk while current plays
-      if (ci + 1 < totalChunks) {
-        preloadChunk(allChunks[ci + 1], voice, rateStr).then(function(data) {
-          nextChunk = data;
-        }).catch(function() {});
-      }
-
-      // Play current chunk
-      await playChunk(chunkData, rate, totalChunks);
-    }
-
-    // Done all chunks
-    isSpeaking = false;
-    setStatus(ts('ready'));
-    setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
-    setPauseIcon(false);
+    await serverAudio.play();
+    setStatus(ts('serverMode'));
   } catch (e) {
     window.__tts_zen_state.serverAvailable = false;
-    setStatus(ts('noServer') + ' — usando modo Nativo', true);
-    startSpeechPlayback(text);
+    setStatus(ts('noServer'), true);
+    setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
   }
 }
 
