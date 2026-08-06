@@ -215,8 +215,8 @@ footer p{margin:0}
     .btn{width:100%;max-width:280px;justify-content:center}
     .preview-section{padding:30px 12px 50px}
     .panel-preview{width:100%;max-width:290px}
-    .panel-wrapper{transform:rotateX(3deg) rotateY(-3deg)}
-    .panel-wrapper:hover{transform:rotateX(0deg) rotateY(0deg) translateZ(10px)}
+    .panel-wrapper{transform:rotateX(5deg) rotateY(-4deg)}
+    .panel-wrapper:hover{transform:rotateX(0deg) rotateY(0deg) translateZ(15px)}
     .features{padding:40px 16px}
     .features h2{font-size:24px;margin-bottom:32px}
     .features-grid{grid-template-columns:1fr;gap:10px}
@@ -224,8 +224,11 @@ footer p{margin:0}
     .install{padding:40px 16px}
     .install h2{font-size:24px}
     .steps{gap:8px}
-    .step{padding:14px}
-    .step-content pre{font-size:11px;padding:10px}
+    .step{flex-direction:column;align-items:flex-start;gap:10px;padding:16px}
+    .step-num{min-width:32px;height:32px;font-size:15px;border-radius:10px}
+    .step-content{width:100%}
+    .step-content pre{font-size:11px;padding:12px;word-break:break-all;white-space:pre-wrap}
+    .step-content code{word-break:break-all}
     .sites-section{padding:0 16px 40px}
     .sites-section h2{font-size:16px}
     .sites-grid{gap:8px}
@@ -233,8 +236,8 @@ footer p{margin:0}
     .site-badge span{font-size:12px}
     .branches{padding:40px 16px 60px}
     .branch-cards{grid-template-columns:1fr}
-    .panel-stage{perspective:600px}
-    .panel-shadow{inset:-10px -10px -20px}
+    .panel-stage{perspective:800px}
+    .panel-shadow{inset:-10px -10px -20px;filter:blur(12px)}
     .petal{animation-duration:calc(var(--dur) * .7) !important}
     footer{padding:30px 16px;font-size:12px}
   }
