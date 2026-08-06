@@ -20,7 +20,7 @@ extension: install-extension build-extension
 # ── Launcher ───────────────────────────────────────────
 
 launcher:
-	./launcher.sh
+	python3 launcher.py
 
 stop:
 	pkill -f "uvicorn tts_zen" 2>/dev/null || true
