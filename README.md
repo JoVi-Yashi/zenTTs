@@ -29,10 +29,21 @@ gem install sinatra puma rackup --user-install
 make backend        # o ruby server.rb
 ```
 
-Y la TUI para gestionarlo:
+### App de escritorio (GUI)
+
+TTS-zen incluye una mini app visual con GTK3 para gestionar el servidor sin tocar la terminal:
+
 ```bash
-ruby launcher.rb    # Iniciar, detener, ver estado del servidor
+make gui             # o ruby gui.rb
 ```
+
+La ventana muestra:
+- ● Estado del servidor en tiempo real (verde = corriendo, rojo = detenido)
+- Botones **Iniciar / Detener** el servidor
+- Selector de voz predeterminada (se carga desde edge-tts)
+- Botón **Abrir Zen Browser** (inicia el server automáticamente si hace falta)
+
+No necesitás saber qué es un puerto, un PID ni una terminal. Dos botones y listo.
 
 ## Características
 
@@ -137,12 +148,11 @@ make build-extension
 make install-desktop   # agrega TTS-zen al menú de aplicaciones
 ```
 
-### Server opcional (edge-tts)
+### App de escritorio
 
 ```bash
-gem install sinatra puma rackup --user-install
-make backend        # o ruby server.rb
-./launcher.rb       # TUI interactiva (ruby launcher.rb)
+make install        # gem install sinatra puma rackup gtk3
+make gui            # abrir la app visual
 ```
 
 ## Estructura
@@ -158,7 +168,8 @@ zenTTs/
 │   │   └── panel.js        # Fuente: UI del panel, modales
 │   └── icons/              # PNG 16→128 + SVG
 ├── server.rb               # API REST Ruby/Sinatra (edge-tts)
-├── launcher.rb              # TUI interactiva Ruby
+├── gui.rb                   # App de escritorio GTK3 (GUI)
+├── launcher.rb              # TUI interactiva Ruby (terminal)
 ├── launcher.sh              # TUI interactiva Bash (alternativa)
 ├── docs/                   # GitHub Pages landing
 ├── Makefile
@@ -171,6 +182,8 @@ zenTTs/
 - **TTS**: SpeechSynthesis API (nativo) / edge-tts 7.2.8 + Sinatra (Ruby)
 - **Extracción**: @mozilla/readability v0.6.0 + selectores específicos por sitio
 - **Server**: Ruby 3.4, Sinatra, trafilatura CLI, edge-tts CLI
+- **App**: GTK3 + Ruby (GUI nativa Linux)
+- **Packaging**: Flatpak (cross-distro), instalación manual
 
 ## Licencia
 

@@ -1,7 +1,10 @@
-.PHONY: install build-extension extension launcher stop install-desktop flatpak flatpak-install flatpak-run
+.PHONY: install build-extension extension launcher gui stop install-desktop flatpak flatpak-install flatpak-run
 
 install:
-	gem install sinatra puma rackup --user-install
+	gem install sinatra puma rackup gtk3 --user-install
+
+gui:
+	ruby gui.rb
 
 backend:
 	ruby server.rb

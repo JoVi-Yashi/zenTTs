@@ -1,11 +1,11 @@
 [Desktop Entry]
 Name=TTS-zen
 Name[es]=TTS-zen
-Comment=Text-to-speech for Zen Browser
-Comment[es]=Texto a voz para Zen Browser
-Exec=ruby /home/johao/Proyectos/TTS-zen/launcher.rb
+Comment=Text-to-speech server manager for Zen Browser
+Comment[es]=Gestor de servidor texto-a-voz para Zen Browser
+Exec=ruby /home/johao/Proyectos/TTS-zen/gui.rb
 Icon=tts-zen
-Terminal=true
+Terminal=false
 Type=Application
 Categories=Audio;Utility;
 Keywords=tts;text-to-speech;voz;lectura;zen;browser;

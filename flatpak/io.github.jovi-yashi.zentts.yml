@@ -46,11 +46,11 @@ modules:
       - /app/lib/pkgconfig
       - /app/lib/libruby-static.a
 
-  # ── Ruby gems (Sinatra + Puma) ──
+  # ── Ruby gems (Sinatra + Puma + GTK3) ──
   - name: ruby-gems
     buildsystem: simple
     build-commands:
-      - gem install sinatra puma rackup --no-document --install-dir /app/lib/ruby/gems/3.4.0
+      - gem install sinatra puma rackup gtk3 --no-document --install-dir /app/lib/ruby/gems/3.4.0
       - mkdir -p /app/bin
       - ln -sf /app/lib/ruby/gems/3.4.0/bin/puma /app/bin/puma
       - ln -sf /app/lib/ruby/gems/3.4.0/bin/rackup /app/bin/rackup
@@ -64,7 +64,7 @@ modules:
     buildsystem: simple
     build-commands:
       - install -Dm755 server.rb /app/share/zentts/server.rb
-      - install -Dm755 launcher.rb /app/share/zentts/launcher.rb
+      - install -Dm755 gui.rb /app/share/zentts/gui.rb
       - install -Dm755 launcher.sh /app/share/zentts/launcher.sh
       - install -Dm644 Gemfile /app/share/zentts/Gemfile
       - install -Dm644 tts-zen.svg /app/share/icons/hicolor/scalable/apps/io.github.jovi-yashi.zentts.svg
@@ -78,7 +78,7 @@ modules:
         export GEM_PATH=/app/lib/ruby/gems/3.4.0
         export PATH="/app/bin:/app/share/zentts:$PATH"
         cd /app/share/zentts
-        exec ruby launcher.rb
+        exec ruby gui.rb
         LAUNCHER
       - chmod +x /app/bin/zentts-launcher
       # Update desktop file for Flatpak
@@ -90,6 +90,7 @@ modules:
         path: .
         only:
           - server.rb
+          - gui.rb
           - launcher.rb
           - launcher.sh
           - Gemfile
