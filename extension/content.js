@@ -2138,13 +2138,22 @@
         </div>
       </div>
       <div class="setting-row">
+        <label>Motor</label>
+        <div class="select-wrap">
+          <select id="tts-zen-engine">
+            <option value="native">Nativo (Browser)</option>
+            <option value="server">Neural (edge-tts)</option>
+          </select>
+        </div>
+      </div>
+      <div class="setting-row">
         <label>Velocidad</label>
         <div class="speed-group">
           <input type="range" id="tts-zen-speed" min="50" max="300" value="100" step="10">
           <span id="tts-zen-speed-label">1.0x</span>
+        </div>
       </div>
     </div>
-  </div>
 
     <div id="tts-zen-counter">\u2014</div>
 
@@ -2556,23 +2565,29 @@
   var state = {
     voices: [],
     currentVoice: "es-ES-AlvaroNeural",
-    currentRate: 1
+    currentRate: 1,
+    currentEngine: "native"
   };
   async function loadSettings() {
     try {
-      const stored = await browser.storage.local.get(["voice", "rate"]);
+      const stored = await browser.storage.local.get(["voice", "rate", "engine"]);
       if (stored.voice) state.currentVoice = stored.voice;
       if (stored.rate) state.currentRate = stored.rate;
+      if (stored.engine) state.currentEngine = stored.engine;
     } catch (_) {
     }
   }
   async function saveSettings() {
     try {
-      await browser.storage.local.set({ voice: state.currentVoice, rate: state.currentRate });
+      await browser.storage.local.set({ voice: state.currentVoice, rate: state.currentRate, engine: state.currentEngine });
     } catch (_) {
     }
   }
   async function loadVoices() {
+    if (state.currentEngine === "server") {
+      await loadServerVoices();
+      return;
+    }
     var voices = speechSynthesis.getVoices();
     if (voices.length > 0) {
       state.voices = voices.map(function(v) {
@@ -2588,6 +2603,22 @@
       });
       populateVoiceDropdown();
     };
+  }
+  async function loadServerVoices() {
+    try {
+      var resp = await browser.runtime.sendMessage({ action: "get_voices" });
+      if (resp.success && resp.voices) {
+        state.voices = resp.voices.map(function(v) {
+          return { name: v.name, lang: v.locale, voiceURI: v.name, default: false };
+        });
+        populateVoiceDropdown();
+        window.__tts_zen_state.serverAvailable = true;
+      } else {
+        window.__tts_zen_state.serverAvailable = false;
+      }
+    } catch (_) {
+      window.__tts_zen_state.serverAvailable = false;
+    }
   }
   function populateVoiceDropdown() {
     var select = getEl("tts-zen-voice");
@@ -2697,6 +2728,14 @@
       state.currentVoice = voiceSelect.value;
       window.__tts_zen_state.currentVoice = voiceSelect.value;
       saveSettings();
+    });
+    const engineSelect = shadow.getElementById("tts-zen-engine");
+    engineSelect.value = state.currentEngine;
+    engineSelect.addEventListener("change", async function() {
+      state.currentEngine = engineSelect.value;
+      window.__tts_zen_state.currentEngine = engineSelect.value;
+      saveSettings();
+      await loadVoices();
     });
     const speedSlider = shadow.getElementById("tts-zen-speed");
     const speedLabel = shadow.getElementById("tts-zen-speed-label");
@@ -3089,6 +3128,103 @@
       currentHighlight = null;
     }
   }
+  var serverAudio = null;
+  var serverSentences = [];
+  async function startServerPlayback(text) {
+    stopSpeech();
+    var st = window.__tts_zen_state || {};
+    var voice = st.currentVoice || "es-ES-AlvaroNeural";
+    var rate = st.currentRate || 1;
+    var rateStr = rate >= 1 ? "+" + Math.round((rate - 1) * 100) + "%" : "-" + Math.round((1 - rate) * 100) + "%";
+    setStatus("Conectando al servidor...");
+    try {
+      var resp = await browser.runtime.sendMessage({ action: "read_page_sync", text, voice, rate: rateStr });
+      if (!resp.success) throw new Error(resp.error || "Error del servidor");
+      if (!resp.sentences || resp.sentences.length === 0) throw new Error("Sin datos de timing");
+      serverSentences = resp.sentences;
+      window.__tts_zen_sentences = serverSentences;
+      window.__tts_zen_state.serverAvailable = true;
+      sentenceData = serverSentences.map(function(s) {
+        return { text: s.text, start: s.start, end: s.end };
+      });
+      var audioBytes = Uint8Array.from(atob(resp.audio), function(c) {
+        return c.charCodeAt(0);
+      });
+      var blob = new Blob([audioBytes], { type: "audio/mpeg" });
+      var url = URL.createObjectURL(blob);
+      if (serverAudio) {
+        serverAudio.pause();
+        URL.revokeObjectURL(serverAudio.src);
+      }
+      serverAudio = new Audio(url);
+      serverAudio.playbackRate = rate;
+      currentSentenceIdx = 0;
+      isSpeaking = true;
+      setButtonsEnabled({ read: false, pause: true, stop: true, prev: true, next: true });
+      setPauseIcon(true);
+      serverAudio.ontimeupdate = function() {
+        if (!isSpeaking || serverSentences.length === 0) return;
+        var t = serverAudio.currentTime;
+        for (var i = currentSentenceIdx; i < serverSentences.length; i++) {
+          if (t >= serverSentences[i].start && t < serverSentences[i].end) {
+            if (i !== currentSentenceIdx) {
+              currentSentenceIdx = i;
+              updateHighlightServer(i);
+            }
+            break;
+          }
+        }
+      };
+      serverAudio.onended = function() {
+        isSpeaking = false;
+        setStatus("Listo");
+        setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
+        setPauseIcon(false);
+      };
+      serverAudio.onerror = function() {
+        setStatus("Error de audio", true);
+        setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
+        isSpeaking = false;
+      };
+      await serverAudio.play();
+      setStatus("Reproduciendo (edge-tts)...");
+    } catch (e) {
+      window.__tts_zen_state.serverAvailable = false;
+      setStatus("Servidor no disponible \u2014 us\xE1 modo Nativo", true);
+      setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
+    }
+  }
+  function updateHighlightServer(idx) {
+    if (idx < 0 || idx >= serverSentences.length) return;
+    setCounter(idx + 1, serverSentences.length);
+    var host = document.getElementById("tts-zen-host");
+    if (host && host.shadowRoot) {
+      var overlay = host.shadowRoot.getElementById("tts-zen-preview-overlay");
+      if (overlay && !overlay.classList.contains("hidden")) {
+        refreshPreviewContent(host.shadowRoot);
+        var prevActive = host.shadowRoot.querySelector("#tts-zen-preview-content .sentence.active");
+        if (prevActive) {
+          prevActive.classList.remove("active");
+          prevActive.classList.add("played");
+        }
+        var prevEl = host.shadowRoot.getElementById("tts-zen-preview-s-" + idx);
+        if (prevEl) {
+          prevEl.classList.add("active");
+          prevEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+      }
+    }
+    var s = serverSentences[idx];
+    for (var i = 0; i < extractedRefs.length; i++) {
+      var ref = extractedRefs[i];
+      var refText = ref.el.textContent.trim();
+      var pos = refText.indexOf(s.text);
+      if (pos !== -1) {
+        highlightOnPage([ref], pos, s.text.length);
+        return;
+      }
+    }
+  }
   var sentenceData = [];
   var currentSentenceIdx = -1;
   var extractedRefs = [];
@@ -3104,6 +3240,11 @@
   }
   function stopSpeech() {
     speechSynthesis.cancel();
+    if (serverAudio) {
+      serverAudio.pause();
+      URL.revokeObjectURL(serverAudio.src);
+      serverAudio = null;
+    }
     isSpeaking = false;
     isPaused = false;
     currentSentenceIdx = -1;
@@ -3229,10 +3370,30 @@
     var text = result.text;
     window.__tts_zen_last_text = text;
     setStatus("Iniciando lectura...");
-    startSpeechPlayback(text);
+    var st = window.__tts_zen_state || {};
+    if (st.currentEngine === "server") {
+      await startServerPlayback(text);
+    } else {
+      startSpeechPlayback(text);
+    }
   }
   function handlePause() {
     if (!isSpeaking) return;
+    var st = window.__tts_zen_state || {};
+    if (st.currentEngine === "server" && serverAudio) {
+      if (isPaused) {
+        serverAudio.play();
+        isPaused = false;
+        setStatus("Reproduciendo (edge-tts)...");
+        setPauseIcon(true);
+      } else {
+        serverAudio.pause();
+        isPaused = true;
+        setStatus("Pausado");
+        setPauseIcon(false);
+      }
+      return;
+    }
     if (isPaused) {
       speechSynthesis.resume();
       isPaused = false;
@@ -3253,15 +3414,31 @@
   }
   function handlePrev() {
     if (!sentenceData.length) return;
+    var st = window.__tts_zen_state || {};
+    if (st.currentEngine === "server" && serverAudio) {
+      var idx = Math.max(0, currentSentenceIdx - 2);
+      serverAudio.currentTime = serverSentences[idx].start;
+      currentSentenceIdx = idx;
+      updateHighlightServer(idx);
+      return;
+    }
     var idx = Math.max(0, currentSentenceIdx - 2);
     jumpToSentence(idx);
   }
   function handleNext() {
     if (!sentenceData.length) return;
+    var st = window.__tts_zen_state || {};
+    if (st.currentEngine === "server" && serverAudio) {
+      var idx = Math.min(sentenceData.length - 1, currentSentenceIdx + 1);
+      serverAudio.currentTime = serverSentences[idx].start;
+      currentSentenceIdx = idx;
+      updateHighlightServer(idx);
+      return;
+    }
     var idx = Math.min(sentenceData.length - 1, currentSentenceIdx + 1);
     jumpToSentence(idx);
   }
-  window.__tts_zen_state = { currentVoice: "es-ES-AlvaroNeural", currentRate: 1 };
+  window.__tts_zen_state = { currentVoice: "es-ES-AlvaroNeural", currentRate: 1, currentEngine: "native", serverAvailable: false };
   window.__tts_zen_enabled_sites = { "wattpad.com": true, "archiveofourown.org": true, "fanfiction.net": true, "webnovel.com": true, "generic": true };
   function injectPanel() {
     const host = document.createElement("div");

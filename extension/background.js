@@ -5,6 +5,12 @@ console.log('[TTS-zen] Background loaded');
 
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   switch (message.action) {
+    case 'health':
+      handleHealth()
+        .then(sendResponse)
+        .catch(err => sendResponse({ success: false, error: err.message }));
+      return true;
+
     case 'get_voices':
       handleGetVoices()
         .then(sendResponse)
@@ -34,6 +40,17 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return false;
   }
 });
+
+async function handleHealth() {
+  try {
+    const resp = await fetch('http://localhost:8765/health');
+    if (!resp.ok) return { success: false, error: 'Server unhealthy' };
+    const data = await resp.json();
+    return { success: data.status === 'ok', status: data.status };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
 
 async function handleGetVoices() {
   const resp = await fetch('http://localhost:8765/voices?locale=es-');

@@ -5,7 +5,7 @@
     <a href="https://github.com/JoVi-Yashi/zenTTs"><img alt="GitHub stars" src="https://img.shields.io/github/stars/JoVi-Yashi/zenTTs?style=social"></a>
 </p>
 
-Un panel TTS que se inyecta en cualquier página con Shadow DOM. Extrae el texto, lo lee con SpeechSynthesis, y resalta cada oración en tiempo real — en el sitio y en un pop-up sincronizado. Sin servidores, sin dependencias externas.
+Un panel TTS que se inyecta en cualquier página con Shadow DOM. Extrae el texto, lo lee con **SpeechSynthesis nativo** o con **edge-tts** (45 voces neurales de Microsoft), y resalta cada oración en tiempo real — en el sitio y en un pop-up sincronizado. Elegís el motor desde el panel de ajustes.
 
 Diseñado para lectores de Wattpad, AO3 y FanFiction: extractores nativos por plataforma que ignoran headers, navs y sidebars. Solo el contenido de la historia.
 
@@ -16,12 +16,23 @@ Construido sobre la [Web Speech API](https://developer.mozilla.org/en-US/docs/We
 
 ## Modos de funcionamiento
 
-| Modo | Motor | Dependencias |
-|---|---|---|
-| Nativo | SpeechSynthesis | **Ninguna** |
-| Neural | edge-tts (45 voces Microsoft) | Ruby, Sinatra, edge-tts CLI |
+| Modo | Motor | Dependencias | Cómo activar |
+|---|---|---|---|
+| Nativo | SpeechSynthesis | **Ninguna** | Panel ⚙ → Motor: Nativo |
+| Neural | edge-tts (45 voces Microsoft) | Ruby + edge-tts CLI | Panel ⚙ → Motor: Neural + `ruby server.rb` |
 
-La extensión funciona **sin servidor**: SpeechSynthesis nativo del navegador, cero configuración. Si querés voces neurales de Microsoft, levantás el server Ruby con `make backend` o `ruby launcher.rb`.
+**La extensión detecta automáticamente** si el servidor está corriendo. Cambiá de modo desde el panel de ajustes (⚙) sin reiniciar nada. Si elegís Neural y el servidor no está disponible, te avisa y podés volver a Nativo con un click.
+
+Para usar el modo Neural, levantá el servidor:
+```bash
+gem install sinatra puma rackup --user-install
+make backend        # o ruby server.rb
+```
+
+Y la TUI para gestionarlo:
+```bash
+ruby launcher.rb    # Iniciar, detener, ver estado del servidor
+```
 
 ## Características
 

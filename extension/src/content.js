@@ -189,6 +189,119 @@ function clearHighlight() {
   }
 }
 
+// ---- Server TTS Player (edge-tts) ----
+
+var serverAudio = null;
+var serverSentences = [];
+
+async function startServerPlayback(text) {
+  stopSpeech();
+  var st = window.__tts_zen_state || {};
+  var voice = st.currentVoice || 'es-ES-AlvaroNeural';
+  var rate = st.currentRate || 1.0;
+  var rateStr = rate >= 1.0 ? '+' + Math.round((rate - 1) * 100) + '%' : '-' + Math.round((1 - rate) * 100) + '%';
+
+  setStatus('Conectando al servidor...');
+  try {
+    var resp = await browser.runtime.sendMessage({ action: 'read_page_sync', text: text, voice: voice, rate: rateStr });
+    if (!resp.success) throw new Error(resp.error || 'Error del servidor');
+    if (!resp.sentences || resp.sentences.length === 0) throw new Error('Sin datos de timing');
+
+    serverSentences = resp.sentences;
+    window.__tts_zen_sentences = serverSentences;
+    window.__tts_zen_state.serverAvailable = true;
+
+    // Build sentenceData for highlighting
+    sentenceData = serverSentences.map(function(s) { return { text: s.text, start: s.start, end: s.end }; });
+
+    // Create audio from base64
+    var audioBytes = Uint8Array.from(atob(resp.audio), function(c) { return c.charCodeAt(0); });
+    var blob = new Blob([audioBytes], { type: 'audio/mpeg' });
+    var url = URL.createObjectURL(blob);
+
+    if (serverAudio) {
+      serverAudio.pause();
+      URL.revokeObjectURL(serverAudio.src);
+    }
+
+    serverAudio = new Audio(url);
+    serverAudio.playbackRate = rate;
+
+    currentSentenceIdx = 0;
+    isSpeaking = true;
+    setButtonsEnabled({ read: false, pause: true, stop: true, prev: true, next: true });
+    setPauseIcon(true);
+
+    serverAudio.ontimeupdate = function() {
+      if (!isSpeaking || serverSentences.length === 0) return;
+      var t = serverAudio.currentTime;
+      // Find current sentence
+      for (var i = currentSentenceIdx; i < serverSentences.length; i++) {
+        if (t >= serverSentences[i].start && t < serverSentences[i].end) {
+          if (i !== currentSentenceIdx) {
+            currentSentenceIdx = i;
+            updateHighlightServer(i);
+          }
+          break;
+        }
+      }
+    };
+
+    serverAudio.onended = function() {
+      isSpeaking = false;
+      setStatus('Listo');
+      setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
+      setPauseIcon(false);
+    };
+
+    serverAudio.onerror = function() {
+      setStatus('Error de audio', true);
+      setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
+      isSpeaking = false;
+    };
+
+    await serverAudio.play();
+    setStatus('Reproduciendo (edge-tts)...');
+  } catch (e) {
+    window.__tts_zen_state.serverAvailable = false;
+    setStatus('Servidor no disponible — usá modo Nativo', true);
+    setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
+  }
+}
+
+function updateHighlightServer(idx) {
+  if (idx < 0 || idx >= serverSentences.length) return;
+  setCounter(idx + 1, serverSentences.length);
+
+  // Update preview overlay
+  var host = document.getElementById('tts-zen-host');
+  if (host && host.shadowRoot) {
+    var overlay = host.shadowRoot.getElementById('tts-zen-preview-overlay');
+    if (overlay && !overlay.classList.contains('hidden')) {
+      refreshPreviewContent(host.shadowRoot);
+      var prevActive = host.shadowRoot.querySelector('#tts-zen-preview-content .sentence.active');
+      if (prevActive) { prevActive.classList.remove('active'); prevActive.classList.add('played'); }
+      var prevEl = host.shadowRoot.getElementById('tts-zen-preview-s-' + idx);
+      if (prevEl) {
+        prevEl.classList.add('active');
+        prevEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+  }
+
+  // Page-level highlight
+  var s = serverSentences[idx];
+  for (var i = 0; i < extractedRefs.length; i++) {
+    var ref = extractedRefs[i];
+    var refText = ref.el.textContent.trim();
+    var pos = refText.indexOf(s.text);
+    if (pos !== -1) {
+      highlightOnPage([ref], pos, s.text.length);
+      return;
+    }
+  }
+}
+
 // ---- SpeechSynthesis Player ----
 
 let sentenceData = [];
@@ -205,6 +318,11 @@ function splitIntoSentences(text) {
 
 function stopSpeech() {
   speechSynthesis.cancel();
+  if (serverAudio) {
+    serverAudio.pause();
+    URL.revokeObjectURL(serverAudio.src);
+    serverAudio = null;
+  }
   isSpeaking = false;
   isPaused = false;
   currentSentenceIdx = -1;
@@ -350,13 +468,34 @@ async function dispatchReadPage(extractFn) {
   window.__tts_zen_last_text = text;
 
   setStatus('Iniciando lectura...');
-  startSpeechPlayback(text);
+
+  var st = window.__tts_zen_state || {};
+  if (st.currentEngine === 'server') {
+    await startServerPlayback(text);
+  } else {
+    startSpeechPlayback(text);
+  }
 }
 
 // ---- Audio Controls ----
 
 function handlePause() {
   if (!isSpeaking) return;
+  var st = window.__tts_zen_state || {};
+  if (st.currentEngine === 'server' && serverAudio) {
+    if (isPaused) {
+      serverAudio.play();
+      isPaused = false;
+      setStatus('Reproduciendo (edge-tts)...');
+      setPauseIcon(true);
+    } else {
+      serverAudio.pause();
+      isPaused = true;
+      setStatus('Pausado');
+      setPauseIcon(false);
+    }
+    return;
+  }
   if (isPaused) {
     speechSynthesis.resume();
     isPaused = false;
@@ -379,12 +518,28 @@ function handleStop() {
 
 function handlePrev() {
   if (!sentenceData.length) return;
+  var st = window.__tts_zen_state || {};
+  if (st.currentEngine === 'server' && serverAudio) {
+    var idx = Math.max(0, currentSentenceIdx - 2);
+    serverAudio.currentTime = serverSentences[idx].start;
+    currentSentenceIdx = idx;
+    updateHighlightServer(idx);
+    return;
+  }
   var idx = Math.max(0, currentSentenceIdx - 2);
   jumpToSentence(idx);
 }
 
 function handleNext() {
   if (!sentenceData.length) return;
+  var st = window.__tts_zen_state || {};
+  if (st.currentEngine === 'server' && serverAudio) {
+    var idx = Math.min(sentenceData.length - 1, currentSentenceIdx + 1);
+    serverAudio.currentTime = serverSentences[idx].start;
+    currentSentenceIdx = idx;
+    updateHighlightServer(idx);
+    return;
+  }
   var idx = Math.min(sentenceData.length - 1, currentSentenceIdx + 1);
   jumpToSentence(idx);
 }
@@ -392,7 +547,7 @@ function handleNext() {
 // ---- Panel state bridge ----
 
 // State shared with panel via global
-window.__tts_zen_state = { currentVoice: 'es-ES-AlvaroNeural', currentRate: 1.0 };
+window.__tts_zen_state = { currentVoice: 'es-ES-AlvaroNeural', currentRate: 1.0, currentEngine: 'native', serverAvailable: false };
 // Default enabled sites (panel.js overrides from storage after async load)
 window.__tts_zen_enabled_sites = { 'wattpad.com': true, 'archiveofourown.org': true, 'fanfiction.net': true, 'webnovel.com': true, 'generic': true };
 

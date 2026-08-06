@@ -51,13 +51,22 @@ const PANEL_HTML = `
         </div>
       </div>
       <div class="setting-row">
+        <label>Motor</label>
+        <div class="select-wrap">
+          <select id="tts-zen-engine">
+            <option value="native">Nativo (Browser)</option>
+            <option value="server">Neural (edge-tts)</option>
+          </select>
+        </div>
+      </div>
+      <div class="setting-row">
         <label>Velocidad</label>
         <div class="speed-group">
           <input type="range" id="tts-zen-speed" min="50" max="300" value="100" step="10">
           <span id="tts-zen-speed-label">1.0x</span>
+        </div>
       </div>
     </div>
-  </div>
 
     <div id="tts-zen-counter">—</div>
 
@@ -473,27 +482,34 @@ let state = {
   voices: [],
   currentVoice: 'es-ES-AlvaroNeural',
   currentRate: 1.0,
+  currentEngine: 'native',
 };
 
 // ---- Storage ----
 
 async function loadSettings() {
   try {
-    const stored = await browser.storage.local.get(['voice', 'rate']);
+    const stored = await browser.storage.local.get(['voice', 'rate', 'engine']);
     if (stored.voice) state.currentVoice = stored.voice;
     if (stored.rate) state.currentRate = stored.rate;
+    if (stored.engine) state.currentEngine = stored.engine;
   } catch (_) {}
 }
 
 async function saveSettings() {
   try {
-    await browser.storage.local.set({ voice: state.currentVoice, rate: state.currentRate });
+    await browser.storage.local.set({ voice: state.currentVoice, rate: state.currentRate, engine: state.currentEngine });
   } catch (_) {}
 }
 
 // ---- Voice Loading ----
 
 async function loadVoices() {
+  if (state.currentEngine === 'server') {
+    await loadServerVoices();
+    return;
+  }
+
   // Use browser's built-in speech synthesis voices
   var voices = speechSynthesis.getVoices();
   if (voices.length > 0) {
@@ -512,6 +528,23 @@ async function loadVoices() {
     });
     populateVoiceDropdown();
   };
+}
+
+async function loadServerVoices() {
+  try {
+    var resp = await browser.runtime.sendMessage({ action: 'get_voices' });
+    if (resp.success && resp.voices) {
+      state.voices = resp.voices.map(function(v) {
+        return { name: v.name, lang: v.locale, voiceURI: v.name, default: false };
+      });
+      populateVoiceDropdown();
+      window.__tts_zen_state.serverAvailable = true;
+    } else {
+      window.__tts_zen_state.serverAvailable = false;
+    }
+  } catch (_) {
+    window.__tts_zen_state.serverAvailable = false;
+  }
 }
 
 function populateVoiceDropdown() {
@@ -635,6 +668,15 @@ export async function createPanel(shadow, handlers) {
 
   const voiceSelect = shadow.getElementById('tts-zen-voice');
   voiceSelect.addEventListener('change', function() { state.currentVoice = voiceSelect.value; window.__tts_zen_state.currentVoice = voiceSelect.value; saveSettings(); });
+
+  const engineSelect = shadow.getElementById('tts-zen-engine');
+  engineSelect.value = state.currentEngine;
+  engineSelect.addEventListener('change', async function() {
+    state.currentEngine = engineSelect.value;
+    window.__tts_zen_state.currentEngine = engineSelect.value;
+    saveSettings();
+    await loadVoices();
+  });
 
   const speedSlider = shadow.getElementById('tts-zen-speed');
   const speedLabel = shadow.getElementById('tts-zen-speed-label');
