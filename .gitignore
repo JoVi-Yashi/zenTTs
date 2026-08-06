@@ -7,3 +7,4 @@ extension/package-lock.json
 .atl/
 build-dir/
 tts-original.png
+extension/*.zip
