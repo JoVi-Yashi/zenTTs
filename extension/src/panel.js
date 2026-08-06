@@ -752,9 +752,13 @@ function applyLanguage(shadow) {
   // Translation section header
   var translateHeader = shadow.querySelector('.section-header span:last-child');
   if (translateHeader) translateHeader.textContent = T[lang].translateTitle;
-  // Speed label
-  var speedRow = shadow.querySelector('.setting-row:nth-child(4) label');
-  if (speedRow) speedRow.textContent = T[lang].speed;
+  // Speed label (last .setting-row)
+  var allSettingRows = shadow.querySelectorAll('#tts-zen-settings .setting-row');
+  if (allSettingRows.length >= 4) {
+    var speedRow = allSettingRows[allSettingRows.length - 1];
+    var speedLabel = speedRow.querySelector('label');
+    if (speedLabel) speedLabel.textContent = T[lang].speed;
+  }
 
   // Update button texts
   var readBtn = shadow.getElementById('tts-zen-read');
