@@ -152,8 +152,22 @@ const SITE_EXTRACTORS = [
   {
     test: () => window.location.hostname.includes('webnovel.com'),
     extract: () => {
-      const content = document.querySelector('.cha-content, .chapter-content, .read-content, [class*="cha-words"]');
-      return content?.textContent || null;
+      // Webnovel loads content dynamically — try multiple selectors
+      var content = document.querySelector('.cha-words, .cha-content, .chapter-content, .read-content, [class*="cha-words"], [class*="cha-content"], .reader-content, .reader-main, [class*="reader"]');
+      if (!content) {
+        // Fallback: find the largest text block
+        var divs = document.querySelectorAll('div');
+        var best = null; var maxLen = 0;
+        for (var i = 0; i < divs.length; i++) {
+          var txt = divs[i].textContent.trim();
+          if (txt.length > maxLen && txt.length > 500) {
+            maxLen = txt.length; best = divs[i];
+          }
+        }
+        if (best) return best.textContent;
+        return null;
+      }
+      return content.textContent;
     }
   },
 ];
@@ -591,8 +605,20 @@ function refreshPreviewContent(shadow) {
 
 async function dispatchReadPage(extractFn) {
   stopContentObserver();
+
+  // Wait for dynamic content to load (websites like Webnovel)
+  if (window.location.hostname.includes('webnovel.com') || 
+      window.location.hostname.includes('wattpad.com')) {
+    await new Promise(function(r) { setTimeout(r, 1500); });
+  }
+
   var result = extractFn();
-  if (!result || !result.text) {
+  if (!result || !result.text || result.text.trim().length < 20) {
+    // Retry after delay
+    await new Promise(function(r) { setTimeout(r, 2000); });
+    result = extractFn();
+  }
+  if (!result || !result.text || result.text.trim().length < 20) {
     setStatus('No se encontró texto en esta página', true);
     return;
   }
