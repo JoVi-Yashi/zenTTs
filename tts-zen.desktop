@@ -10,3 +10,4 @@ Type=Application
 Categories=Audio;Utility;
 Keywords=tts;text-to-speech;voz;lectura;zen;browser;
 StartupNotify=true
+StartupWMClass=tts-zen

@@ -6,6 +6,9 @@ require 'gtk3'
 require 'fileutils'
 require 'net/http'
 
+# Identify as TTS-zen in taskbars, docks, and alt-tab
+GLib.set_prgname('tts-zen')
+
 PORT = 8765
 PROJECT_DIR = File.dirname(File.expand_path(__FILE__))
 
