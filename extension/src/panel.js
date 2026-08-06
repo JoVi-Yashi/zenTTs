@@ -801,7 +801,7 @@ export async function createPanel(shadow, handlers) {
   shadow.appendChild(style);
 
   const container = document.createElement('div');
-  container.insertAdjacentHTML('beforeend', PANEL_HTML);
+  container.innerHTML = PANEL_HTML;
   shadow.appendChild(container);
 
   // Minimize button

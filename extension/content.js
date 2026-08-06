@@ -2889,7 +2889,7 @@
     style.textContent = PANEL_CSS;
     shadow.appendChild(style);
     const container = document.createElement("div");
-    container.insertAdjacentHTML("beforeend", PANEL_HTML);
+    container.innerHTML = PANEL_HTML;
     shadow.appendChild(container);
     const minimizeBtn = shadow.getElementById("tts-zen-minimize");
     minimizeBtn.addEventListener("click", toggleCollapse);
