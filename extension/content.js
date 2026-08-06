@@ -2360,10 +2360,10 @@
 #tts-zen-body { transition: opacity .3s ease; }
 
 #tts-zen-settings {
-  padding: 0 12px; border-bottom: 1px solid rgba(255,255,255,0.06);
+  padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.06);
   display: flex; flex-direction: column; gap: 8px;
   max-height: 400px; overflow: hidden;
-  transition: max-height .35s cubic-bezier(.25,.8,.25,1), padding .35s ease, opacity .25s ease;
+  transition: max-height .4s cubic-bezier(.25,.8,.25,1), padding .4s ease, border-color .4s ease, opacity .3s ease;
   opacity: 1;
 }
 #tts-zen-settings.collapsed {
