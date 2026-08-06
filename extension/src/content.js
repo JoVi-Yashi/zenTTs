@@ -512,16 +512,19 @@ async function dispatchReadPage(extractFn) {
   var langIn = st.langIn || 'auto';
   var langOut = st.langOut || 'es';
 
-  // Translate if input != output language
-  if (langIn !== langOut && langIn !== 'auto') {
+  // Translate if output language is set
+  if (langOut && langOut !== 'auto') {
     try {
       setStatus('Traduciendo...');
+      console.log('[TTS-zen] Translating from=' + langIn + ' to=' + langOut + ' text=' + text.substring(0,50) + '...');
       var resp = await browser.runtime.sendMessage({ action: 'translate', text: text, from: langIn, to: langOut });
-      if (resp.success && resp.text) {
+      console.log('[TTS-zen] Translate resp:', resp);
+      if (resp && resp.text && resp.text !== text) {
         text = resp.text;
+        console.log('[TTS-zen] Translated OK, first 50 chars:', text.substring(0,50));
       }
-    } catch (_) {
-      // Translation failed, continue with original text
+    } catch (e) {
+      console.error('[TTS-zen] Translate error:', e.message || e);
     }
   }
 

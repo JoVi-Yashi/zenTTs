@@ -59,13 +59,17 @@ async function handleHealth() {
 }
 
 async function handleTranslate(text, from, to) {
+  console.log('[TTS-zen bg] handleTranslate: from=' + from + ' to=' + to + ' len=' + text.length);
   const resp = await fetch('http://localhost:8765/translate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text, from: from || 'auto', to: to || 'es' })
   });
-  if (!resp.ok) throw new Error('Translate failed');
-  return await resp.json();
+  console.log('[TTS-zen bg] handleTranslate: status=' + resp.status);
+  if (!resp.ok) throw new Error('Translate failed: ' + resp.status);
+  const result = await resp.json();
+  console.log('[TTS-zen bg] handleTranslate: result.text=' + (result.text ? result.text.substring(0,50) : 'null'));
+  return result;
 }
 
 async function handleGetVoices() {

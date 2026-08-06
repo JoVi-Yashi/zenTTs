@@ -3754,14 +3754,18 @@
     var st = window.__tts_zen_state || {};
     var langIn = st.langIn || "auto";
     var langOut = st.langOut || "es";
-    if (langIn !== langOut && langIn !== "auto") {
+    if (langOut && langOut !== "auto") {
       try {
         setStatus("Traduciendo...");
+        console.log("[TTS-zen] Translating from=" + langIn + " to=" + langOut + " text=" + text.substring(0, 50) + "...");
         var resp = await browser.runtime.sendMessage({ action: "translate", text, from: langIn, to: langOut });
-        if (resp.success && resp.text) {
+        console.log("[TTS-zen] Translate resp:", resp);
+        if (resp && resp.text && resp.text !== text) {
           text = resp.text;
+          console.log("[TTS-zen] Translated OK, first 50 chars:", text.substring(0, 50));
         }
-      } catch (_) {
+      } catch (e) {
+        console.error("[TTS-zen] Translate error:", e.message || e);
       }
     }
     if (st.currentEngine === "server") {
