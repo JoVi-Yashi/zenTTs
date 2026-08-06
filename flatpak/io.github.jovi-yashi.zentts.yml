@@ -1,0 +1,98 @@
+app-id: io.github.jovi-yashi.zentts
+runtime: org.freedesktop.Platform
+runtime-version: '24.08'
+sdk: org.freedesktop.Sdk
+command: zentts-launcher
+finish-args:
+  - --share=network
+  - --share=ipc
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --talk-name=org.freedesktop.Notifications
+  - --filesystem=home
+modules:
+  # ── Python: edge-tts + trafilatura ──
+  - name: python-deps
+    buildsystem: simple
+    build-commands:
+      - pip3 install --no-build-isolation --prefix=/app edge-tts trafilatura
+    cleanup:
+      - /lib/python3.*/site-packages/**/*.pyc
+      - /lib/python3.*/site-packages/pip
+    modules:
+      - name: python3-setuptools
+        buildsystem: simple
+        build-commands:
+          - pip3 install --prefix=/app setuptools
+        sources:
+          - type: file
+            url: https://files.pythonhosted.org/packages/source/s/setuptools/setuptools-75.8.0.tar.gz
+            sha256: 507ac18f7c2f06d2489e8d0af6fe62762e4efcdbdab828ef3b0c3622f79e41f6
+
+  # ── Ruby ──
+  - name: ruby
+    buildsystem: autotools
+    config-opts:
+      - --disable-install-doc
+      - --disable-install-rdoc
+      - --enable-shared
+      - --prefix=/app
+    sources:
+      - type: archive
+        url: https://cache.ruby-lang.org/pub/ruby/3.4/ruby-3.4.2.tar.gz
+        sha256: eb358569a53a22206f6cab65231b87c6191be6ce2cdaf05a5be10b2e2633b56c
+    cleanup:
+      - /app/include
+      - /app/lib/pkgconfig
+      - /app/lib/libruby-static.a
+
+  # ── Ruby gems (Sinatra + Puma) ──
+  - name: ruby-gems
+    buildsystem: simple
+    build-commands:
+      - gem install sinatra puma rackup --no-document --install-dir /app/lib/ruby/gems/3.4.0
+      - mkdir -p /app/bin
+      - ln -sf /app/lib/ruby/gems/3.4.0/bin/puma /app/bin/puma
+      - ln -sf /app/lib/ruby/gems/3.4.0/bin/rackup /app/bin/rackup
+    build-options:
+      env:
+        GEM_HOME: /app/lib/ruby/gems/3.4.0
+        GEM_PATH: /app/lib/ruby/gems/3.4.0
+
+  # ── App files ──
+  - name: zentts
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 server.rb /app/share/zentts/server.rb
+      - install -Dm755 launcher.rb /app/share/zentts/launcher.rb
+      - install -Dm755 launcher.sh /app/share/zentts/launcher.sh
+      - install -Dm644 Gemfile /app/share/zentts/Gemfile
+      - install -Dm644 tts-zen.svg /app/share/icons/hicolor/scalable/apps/io.github.jovi-yashi.zentts.svg
+      - install -Dm644 tts-zen.desktop /app/share/applications/io.github.jovi-yashi.zentts.desktop
+      - install -Dm644 flatpak/io.github.jovi-yashi.zentts.metainfo.xml /app/share/metainfo/io.github.jovi-yashi.zentts.metainfo.xml
+      # Launcher wrapper
+      - |
+        cat > /app/bin/zentts-launcher << 'LAUNCHER'
+        #!/bin/sh
+        export GEM_HOME=/app/lib/ruby/gems/3.4.0
+        export GEM_PATH=/app/lib/ruby/gems/3.4.0
+        export PATH="/app/bin:/app/share/zentts:$PATH"
+        cd /app/share/zentts
+        exec ruby launcher.rb
+        LAUNCHER
+      - chmod +x /app/bin/zentts-launcher
+      # Update desktop file for Flatpak
+      - |
+        sed -i 's|^Exec=.*|Exec=zentts-launcher|' /app/share/applications/io.github.jovi-yashi.zentts.desktop
+        sed -i 's|^Icon=.*|Icon=io.github.jovi-yashi.zentts|' /app/share/applications/io.github.jovi-yashi.zentts.desktop
+    sources:
+      - type: dir
+        path: .
+        only:
+          - server.rb
+          - launcher.rb
+          - launcher.sh
+          - Gemfile
+          - tts-zen.svg
+          - tts-zen.desktop
+          - flatpak/io.github.jovi-yashi.zentts.metainfo.xml

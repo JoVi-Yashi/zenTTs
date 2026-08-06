@@ -1,7 +1,7 @@
-.PHONY: install build-extension extension launcher stop install-desktop
+.PHONY: install build-extension extension launcher stop install-desktop flatpak flatpak-install flatpak-run
 
 install:
-	bundle install
+	gem install sinatra puma rackup --user-install
 
 backend:
 	ruby server.rb
@@ -27,3 +27,14 @@ install-desktop:
 	@cp tts-zen.svg "$(HOME)/.local/share/icons/hicolor/scalable/apps/"
 	@update-desktop-database "$(HOME)/.local/share/applications/" 2>/dev/null || true
 	@echo "✅ TTS-zen instalado en el menú de aplicaciones"
+
+# ── Flatpak ────────────────────────────────────────────
+
+flatpak:
+	flatpak-builder --user --install --force-clean build-dir flatpak/io.github.jovi-yashi.zentts.yml
+
+flatpak-install:
+	flatpak-builder --user --install --force-clean build-dir flatpak/io.github.jovi-yashi.zentts.yml
+
+flatpak-run:
+	flatpak run io.github.jovi-yashi.zentts

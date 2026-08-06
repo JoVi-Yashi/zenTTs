@@ -87,21 +87,40 @@ Velocidad ajustable de 0.5x a 3.0x. La voz se selecciona entre las disponibles e
 
 ## Instalación
 
-### Requisitos
+### Flatpak (recomendado — cualquier distro)
+
+```bash
+# Clonar y buildear el Flatpak
+git clone https://github.com/JoVi-Yashi/zenTTs.git
+cd zenTTs
+make flatpak
+```
+
+Esto instala TTS-zen como aplicación del sistema con ícono en el menú. Incluye Ruby, edge-tts, trafilatura y todas las dependencias. Cero configuración.
+
+Para ejecutar: buscá "TTS-zen" en el menú de apps o `make flatpak-run`.
+
+### Instalación manual
+
+#### Requisitos
 
 - [Zen Browser](https://zen-browser.app/) (Firefox-based)
+- Ruby ≥ 3.2
 - Node.js ≥ 18
+- edge-tts CLI (`pip install edge-tts`)
+- trafilatura CLI (`pip install trafilatura`)
 
-### Clonar y buildear
+#### Clonar y buildear
 
 ```bash
 git clone https://github.com/JoVi-Yashi/zenTTs.git
 cd zenTTs
+make install         # gems de Ruby
 cd extension && npm install && cd ..
 make build-extension
 ```
 
-### Cargar en Zen
+#### Cargar en Zen
 
 1. Abrí Zen → `about:debugging` → **Cargar complemento temporal**
 2. Seleccioná `extension/manifest.json`
@@ -111,6 +130,12 @@ make build-extension
 > ```bash
 > flatpak override --user --filesystem=$HOME/Proyectos/zenTTs app.zen_browser.zen
 > ```
+
+#### Integración con el escritorio
+
+```bash
+make install-desktop   # agrega TTS-zen al menú de aplicaciones
+```
 
 ### Server opcional (edge-tts)
 

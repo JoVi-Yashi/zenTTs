@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.jovi-yashi.zentts</id>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+  <name>TTS-zen</name>
+  <name xml:lang="es">TTS-zen</name>
+  <summary>Floating text-to-speech panel for Zen Browser</summary>
+  <summary xml:lang="es">Panel flotante de texto a voz para Zen Browser</summary>
+
+  <description>
+    <p>
+      TTS-zen injects a floating TTS panel into any webpage using Shadow DOM.
+      Extract text with platform-specific extractors (Wattpad, AO3, FanFiction, Webnovel)
+      and listen with native SpeechSynthesis or Microsoft edge-tts neural voices.
+      Each sentence is highlighted in real time on the page and in a synchronized pop-up.
+    </p>
+    <p xml:lang="es">
+      TTS-zen inyecta un panel TTS flotante en cualquier página web con Shadow DOM.
+      Extrae texto con extractores específicos por plataforma (Wattpad, AO3, FanFiction, Webnovel)
+      y reproduce con SpeechSynthesis nativo o voces neurales de Microsoft edge-tts.
+      Cada oración se resalta en tiempo real en la página y en un pop-up sincronizado.
+    </p>
+  </description>
+
+  <url type="homepage">https://github.com/JoVi-Yashi/zenTTs</url>
+  <url type="bugtracker">https://github.com/JoVi-Yashi/zenTTs/issues</url>
+
+  <launchable type="desktop-id">io.github.jovi-yashi.zentts.desktop</launchable>
+
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/JoVi-Yashi/zenTTs/main/ZenTTs.png</image>
+    </screenshot>
+  </screenshots>
+
+  <releases>
+    <release version="0.4.0" date="2026-08-05">
+      <description>
+        <p>Ruby port — Sinatra server replaces FastAPI. Dual engine selector (Native + edge-tts). Flatpak support.</p>
+      </description>
+    </release>
+  </releases>
+
+  <categories>
+    <category>Audio</category>
+    <category>Utility</category>
+  </categories>
+
+  <content_rating type="oars-1.1" />
+
+  <provides>
+    <binary>zentts-launcher</binary>
+  </provides>
+</component>
