@@ -264,8 +264,9 @@ async function startServerPlayback(text) {
     setStatus(ts('serverMode'));
   } catch (e) {
     window.__tts_zen_state.serverAvailable = false;
-    setStatus(ts('noServer'), true);
-    setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
+    // Auto-fallback to native mode
+    setStatus(ts('noServer') + ' — usando modo Nativo', true);
+    startSpeechPlayback(text);
   }
 }
 
@@ -476,9 +477,9 @@ async function dispatchReadPage(extractFn) {
   var st = window.__tts_zen_state || {};
   if (st.currentEngine === 'server') {
     await startServerPlayback(text);
-  } else {
-    startSpeechPlayback(text);
+    return;
   }
+  startSpeechPlayback(text);
 }
 
 // ---- Audio Controls ----

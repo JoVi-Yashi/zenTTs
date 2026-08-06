@@ -3438,8 +3438,8 @@
       setStatus(ts("serverMode"));
     } catch (e) {
       window.__tts_zen_state.serverAvailable = false;
-      setStatus(ts("noServer"), true);
-      setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
+      setStatus(ts("noServer") + " \u2014 usando modo Nativo", true);
+      startSpeechPlayback(text);
     }
   }
   function updateHighlightServer(idx) {
@@ -3624,9 +3624,9 @@
     var st = window.__tts_zen_state || {};
     if (st.currentEngine === "server") {
       await startServerPlayback(text);
-    } else {
-      startSpeechPlayback(text);
+      return;
     }
+    startSpeechPlayback(text);
   }
   function handlePause() {
     if (!isSpeaking) return;
