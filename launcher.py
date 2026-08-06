@@ -1,33 +1,24 @@
 #!/usr/bin/env python3
-"""zenTTS Launcher — Rich TUI with box drawing and keyboard navigation."""
+"""zenTTS Launcher — ANSI TUI, sin dependencias externas."""
 
 import os, sys, subprocess, time, termios, tty
 from pathlib import Path
-
-from rich.console import Console
-from rich.panel import Panel
-from rich.text import Text
-from rich.align import Align
-from rich.layout import Layout
-from rich.live import Live
-from rich.style import Style
-from rich import box
 
 PROJECT_DIR = Path(__file__).resolve().parent
 PID_FILE = Path.home() / ".local/share/tts-zen/server.pid"
 LOG_FILE = Path.home() / ".local/share/tts-zen/server.log"
 PORT = 8765
+W = 46
 PID_FILE.parent.mkdir(parents=True, exist_ok=True)
 
-console = Console()
-PURPLE = Style(color="#a78bfa")
-GREEN  = Style(color="#84cc76")
-RED    = Style(color="#f87171")
-YELLOW = Style(color="#fbbf24")
-GRAY   = Style(color="#6b7280", dim=True)
-WHITE  = Style(color="#f3f4f6", bold=True)
-SEL    = Style(bgcolor="#7c3aed", color="#ffffff")
-KEY    = Style(color="#a78bfa")
+# ── ANSI ──
+P = '\033[38;5;141m'; G = '\033[38;5;114m'; E = '\033[38;5;203m'
+K = '\033[38;5;243m'; W = '\033[38;5;255m'; R = '\033[0m'
+B = '\033[1m'; BS = '\033[48;5;99m'
+
+def top(): return f"  {P}╭{'─'*(W-2)}╮{R}"
+def bot(): return f"  {P}╰{'─'*(W-2)}╯{R}"
+def mid(s): return f"  {P}│{R}{s}{P}│{R}"
 
 def running():
     try:
@@ -82,67 +73,81 @@ def get_key():
         return c
     finally: termios.tcsetattr(fd, termios.TCSADRAIN, old)
 
-def build_ui(selected, msg=""):
-    layout = Layout()
-    layout.split(Layout(name="header",size=5),Layout(name="status",size=6),Layout(name="menu",size=12))
+def draw(sel, msg=""):
+    lines = []
+    lines.append("")
+    lines.append(top())
+    lines.append(mid(f"               {W}{B}zenTTS{R}"))
+    lines.append(mid(f"        {K}edge-tts · Zen Browser{R}"))
+    lines.append(bot())
+    lines.append("")
 
-    # Header
-    h = Text("\n  zenTTS\n",style=WHITE)
-    h.append("  edge-tts · Zen Browser",style=GRAY)
-    layout["header"].update(Panel(Align.center(h),border_style=PURPLE,box=box.ROUNDED))
-
-    # Status
     pid = running()
     ok = healthy() if pid else False
-    s = Text()
     if pid and ok:
-        s.append("  CORRIENDO",style=GREEN); s.append(f"  localhost:{PORT}",style=GRAY)
-        s.append(f"\n  saludable    PID {pid}",style=GRAY)
+        status = f"  {G}{B}CORRIENDO{R}  {K}localhost:{PORT}{R}  {G}saludable{R}  PID {pid}"
     elif pid:
-        s.append("  CORRIENDO",style=YELLOW); s.append(f"  localhost:{PORT}",style=GRAY)
-        s.append(f"\n  sin respuesta    PID {pid}",style=GRAY)
+        status = f"  {G}{B}CORRIENDO{R}  {K}localhost:{PORT}{R}  {G}sin respuesta{R}  PID {pid}"
     else:
-        s.append("  DETENIDO",style=RED); s.append(f"  localhost:{PORT}",style=GRAY)
-        s.append("\n  servidor sin iniciar",style=GRAY)
-    layout["status"].update(Panel(s,title="Estado",border_style=PURPLE,box=box.ROUNDED,title_align="left"))
+        status = f"  {E}{B}DETENIDO{R}  {K}localhost:{PORT}{R}  {E}sin iniciar{R}"
 
-    # Menu
-    items = ["Iniciar servidor","Detener servidor","Refrescar estado","Abrir Zen Browser"]
-    m = Text()
-    for i,item in enumerate(items):
-        if i == selected: m.append(f"    {item}\n",SEL)
-        else: m.append(f"    {item}\n",GRAY)
-    m.append("\n")
-    m.append("  ^ v mover    1-4 tecla    Enter elegir    q salir",GRAY)
-    menu_panel = Panel(m,title="Acciones",border_style=PURPLE,box=box.ROUNDED,title_align="left")
+    lines.append(top())
+    lines.append(mid(f"  {B}Estado{R}"))
+    lines.append(mid(f"  {status}"))
+    lines.append(bot())
+    lines.append("")
 
     if msg:
-        layout["menu"].update(Text(f"\n  {msg}\n",style=GREEN))
-        layout["menu"].update(menu_panel)
-    else:
-        layout["menu"].update(menu_panel)
+        lines.append(f"  {G}{msg}{R}")
+        lines.append("")
 
-    return layout
+    items = ["Iniciar servidor","Detener servidor","Refrescar estado","Abrir Zen Browser"]
+    lines.append(top())
+    lines.append(mid(f"  {B}Acciones{R}"))
+    for i, item in enumerate(items):
+        if i == sel:
+            lines.append(mid(f"  {BS}{B}  {item}  {R}"))
+        else:
+            lines.append(mid(f"    {K}{item}{R}"))
+    lines.append(mid(""))
+    lines.append(mid(f"  {K}^ v mover   1-4 tecla   Enter elegir   q salir{R}"))
+    lines.append(bot())
+
+    sys.stdout.write('\033[2J\033[H' + '\n'.join(lines))
+    sys.stdout.flush()
 
 def main():
     sel = 0; msg = ""
-    with Live(build_ui(sel), console=console, refresh_per_second=10, transient=True) as live:
+    fd = sys.stdin.fileno()
+    old = termios.tcgetattr(fd)
+    try:
+        tty.setraw(fd)
+        sys.stdout.write('\033[?25l\033[?1049h')
+        sys.stdout.flush()
         while True:
-            live.update(build_ui(sel, msg))
-            msg = ""
-            k = get_key()
+            draw(sel, msg); msg = ""
+            k = sys.stdin.read(1)
+            if k == '\x1b':
+                k2 = sys.stdin.read(1)
+                if k2 == '[':
+                    k3 = sys.stdin.read(1)
+                    if k3 == 'A': sel = (sel - 1) % 4
+                    elif k3 == 'B': sel = (sel + 1) % 4
+                continue
             if k in ('q','Q','\x03'): break
-            elif k == 'up':   sel = (sel - 1) % 4
-            elif k == 'down': sel = (sel + 1) % 4
-            elif k in ('\r','\n',' '):
-                if sel == 0: msg = "Iniciando servidor..."; live.update(build_ui(sel,msg)); action_start(); msg = "Servidor listo" if running() else "Error al iniciar"
-                elif sel == 1: msg = "Deteniendo..."; live.update(build_ui(sel,msg)); action_stop(); msg = "Servidor detenido"
-                elif sel == 2: msg = "Estado actualizado"
-                elif sel == 3: msg = "Abriendo Zen..."; live.update(build_ui(sel,msg)); action_open(); msg = "Zen Browser abierto"
-            elif k == '1': sel = 0
-            elif k == '2': sel = 1
-            elif k == '3': sel = 2
-            elif k == '4': sel = 3
+            if k in ('\r','\n',' '):
+                if sel == 0: msg = "Iniciando..."; draw(sel,msg); action_start(); msg = "Servidor listo" if running() else "Error"
+                elif sel == 1: msg = "Deteniendo..."; draw(sel,msg); action_stop(); msg = "Servidor detenido"
+                elif sel == 2: msg = "Actualizado"
+                elif sel == 3: msg = "Abriendo Zen..."; draw(sel,msg); action_open(); msg = "Zen Browser abierto"
+            if k == '1': sel = 0
+            if k == '2': sel = 1
+            if k == '3': sel = 2
+            if k == '4': sel = 3
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+        sys.stdout.write('\033[?25h\033[?1049l')
+        sys.stdout.flush()
 
 if __name__ == "__main__":
     main()
