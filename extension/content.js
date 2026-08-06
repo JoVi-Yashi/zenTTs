@@ -2841,9 +2841,18 @@
     { id: "webnovel.com", name: "Webnovel", domain: "webnovel.com" },
     { id: "generic", name: "Gen\xE9rico", domain: "otros sitios" }
   ];
+  var fallbackIcons = {
+    "wattpad.com": "icons/sites/wattpad.svg",
+    "archiveofourown.org": "icons/sites/ao3.svg",
+    "fanfiction.net": "icons/sites/fanfiction.svg",
+    "webnovel.com": "icons/sites/webnovel.svg"
+  };
   function faviconUrl(domain) {
     if (domain === "otros sitios") return "";
     return "https://www.google.com/s2/favicons?domain=" + domain + "&sz=32";
+  }
+  function faviconFallback(domain) {
+    return fallbackIcons[domain] || "";
   }
   var enabledSites = {};
   async function loadSiteSettings() {
@@ -2892,7 +2901,7 @@
       var enabled = enabledSites[site.id] !== false;
       var row = document.createElement("div");
       row.className = "site-row";
-      var iconHtml = site.id === "generic" ? '<div class="site-row-icon" style="font-size:16px">+</div>' : '<img class="site-row-icon" src="' + faviconUrl(site.domain) + `" width="24" height="24" style="border-radius:4px" onerror="this.style.display='none'">`;
+      var iconHtml = site.id === "generic" ? '<div class="site-row-icon" style="font-size:16px">+</div>' : '<img class="site-row-icon" src="' + faviconUrl(site.domain) + `" width="24" height="24" style="border-radius:4px" onerror="var f='` + faviconFallback(site.id) + `';if(f)this.src=f;">`;
       row.innerHTML = '<div class="site-row-left">' + iconHtml + '<div class="site-row-info"><div class="site-row-name">' + site.name + '</div><div class="site-row-domain">' + site.domain + '</div></div></div><button class="site-toggle' + (enabled ? " on" : "") + '" data-site="' + site.id + '"></button>';
       var toggle = row.querySelector(".site-toggle");
       toggle.addEventListener("click", function() {

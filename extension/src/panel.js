@@ -813,9 +813,20 @@ var ALL_SITES = [
   { id: 'generic', name: 'Genérico', domain: 'otros sitios' },
 ];
 
+var fallbackIcons = {
+  'wattpad.com': 'icons/sites/wattpad.svg',
+  'archiveofourown.org': 'icons/sites/ao3.svg',
+  'fanfiction.net': 'icons/sites/fanfiction.svg',
+  'webnovel.com': 'icons/sites/webnovel.svg',
+};
+
 function faviconUrl(domain) {
   if (domain === 'otros sitios') return '';
   return 'https://www.google.com/s2/favicons?domain=' + domain + '&sz=32';
+}
+
+function faviconFallback(domain) {
+  return fallbackIcons[domain] || '';
 }
 
 // Default: all enabled
@@ -862,7 +873,7 @@ function renderSitesList() {
     row.className = 'site-row';
     var iconHtml = site.id === 'generic'
       ? '<div class="site-row-icon" style="font-size:16px">+</div>'
-      : '<img class="site-row-icon" src="' + faviconUrl(site.domain) + '" width="24" height="24" style="border-radius:4px" onerror="this.style.display=\'none\'">';
+      : '<img class="site-row-icon" src="' + faviconUrl(site.domain) + '" width="24" height="24" style="border-radius:4px" onerror="var f=\'' + faviconFallback(site.id) + '\';if(f)this.src=f;">';
     row.innerHTML =
       '<div class="site-row-left">' +
         iconHtml +
