@@ -114,17 +114,10 @@ CSS = <<~CSS
   headerbar {
     background: #0d0d1f;
     border-bottom: 1px solid rgba(167,139,250,0.1);
-    min-height: 38px; padding: 0 10px;
+    min-height: 38px;
   }
   headerbar .title {
     font-size: 13px; font-weight: 600; color: #c4b5fd;
-  }
-  headerbar button {
-    background: transparent; border: none; box-shadow: none;
-    color: #7e8aa0; padding: 4px 8px; border-radius: 6px;
-  }
-  headerbar button:hover {
-    background: rgba(167,139,250,0.12); color: #a78bfa;
   }
 
   window { background: #0a0a1c; }
