@@ -6,6 +6,8 @@ import sys
 import signal
 import subprocess
 import time
+import termios
+import tty
 from pathlib import Path
 
 try:
@@ -206,6 +208,26 @@ def build_ui(selected: int, extra: str = "") -> Layout:
     return layout
 
 
+def get_key():
+    """Read a single keypress including arrow keys."""
+    fd = sys.stdin.fileno()
+    old = termios.tcgetattr(fd)
+    try:
+        tty.setraw(fd)
+        ch = sys.stdin.read(1)
+        if ch == '\x1b':
+            # Escape sequence
+            ch2 = sys.stdin.read(1)
+            if ch2 == '[':
+                ch3 = sys.stdin.read(1)
+                if ch3 == 'A': return 'up'
+                if ch3 == 'B': return 'down'
+                return ''
+        return ch
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+
+
 def main():
     selected = 0
     extra = ""
@@ -215,19 +237,14 @@ def main():
             live.update(build_ui(selected, extra))
             extra = ""
 
-            key = console.input("") if sys.stdin.isatty() else ""
-            if not key and not sys.stdin.isatty():
-                # Non-interactive mode — show status and exit
-                time.sleep(2)
+            key = get_key()
+            if key in ('q', 'Q', '\x03'):  # \x03 = Ctrl+C
                 break
-
-            if key in ("q", "Q"):
-                break
-            elif key == "\x1b[A":  # Up arrow
+            elif key == 'up':
                 selected = (selected - 1) % 4
-            elif key == "\x1b[B":  # Down arrow
+            elif key == 'down':
                 selected = (selected + 1) % 4
-            elif key in ("\r", "\n", ""):  # Enter
+            elif key in ('\r', '\n', ' '):  # Enter or Space
                 if selected == 0:
                     extra = "  +  Iniciando servidor..."
                     live.update(build_ui(selected, extra))
@@ -245,13 +262,13 @@ def main():
                     live.update(build_ui(selected, extra))
                     action_open()
                     extra = "  +  Zen Browser abierto"
-            elif key == "1":
+            elif key == '1':
                 selected = 0
-            elif key == "2":
+            elif key == '2':
                 selected = 1
-            elif key == "3":
+            elif key == '3':
                 selected = 2
-            elif key == "4":
+            elif key == '4':
                 selected = 3
 
 
