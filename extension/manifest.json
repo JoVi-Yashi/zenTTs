@@ -10,8 +10,7 @@
       "id": "tts-zen@gentle-ai.local",
       "strict_min_version": "142.0",
       "data_collection_permissions": {
-        "usage": "none",
-        "required": []
+        "usage": "none"
       }
     }
   },
