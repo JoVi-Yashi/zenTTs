@@ -2597,6 +2597,7 @@
       return;
     }
     speechSynthesis.onvoiceschanged = function() {
+      if (state.currentEngine !== "native") return;
       var v = speechSynthesis.getVoices();
       state.voices = v.map(function(x) {
         return { name: x.name, lang: x.lang, voiceURI: x.voiceURI, default: x.default };
@@ -2605,25 +2606,44 @@
     };
   }
   async function loadServerVoices() {
+    var select = getEl("tts-zen-voice");
+    if (select) {
+      select.innerHTML = '<option value="">Cargando voces edge-tts...</option>';
+      select.disabled = true;
+    }
     try {
       var resp = await browser.runtime.sendMessage({ action: "get_voices" });
-      if (resp.success && resp.voices) {
+      if (resp.success && resp.voices && resp.voices.length > 0) {
         state.voices = resp.voices.map(function(v) {
           return { name: v.name, lang: v.locale, voiceURI: v.name, default: false };
         });
         populateVoiceDropdown();
         window.__tts_zen_state.serverAvailable = true;
       } else {
+        state.voices = [];
+        populateVoiceDropdown();
         window.__tts_zen_state.serverAvailable = false;
+        if (select) {
+          select.innerHTML = '<option value="">Servidor no disponible</option>';
+          select.disabled = true;
+        }
       }
     } catch (_) {
+      state.voices = [];
+      populateVoiceDropdown();
       window.__tts_zen_state.serverAvailable = false;
+      if (select) {
+        select.innerHTML = '<option value="">Servidor no disponible</option>';
+        select.disabled = true;
+      }
     }
   }
   function populateVoiceDropdown() {
     var select = getEl("tts-zen-voice");
     if (!select) return;
     select.innerHTML = "";
+    select.disabled = false;
+    if (!state.voices || state.voices.length === 0) return;
     var groups = {};
     state.voices.forEach(function(v) {
       var lang = v.lang || "desconocido";
@@ -2643,9 +2663,15 @@
       "it-IT": "Italiano",
       "pt-BR": "Portugu\xEAs"
     };
+    function langLabel(lang) {
+      if (langNames[lang]) return langNames[lang];
+      if (lang.startsWith("es-")) return "Espa\xF1ol (" + lang.split("-")[1] + ")";
+      if (lang.startsWith("en-")) return "English (" + lang.split("-")[1] + ")";
+      return lang;
+    }
     Object.keys(groups).sort().forEach(function(lang) {
       var voices = groups[lang];
-      var label = langNames[lang] || lang;
+      var label = langLabel(lang);
       var optgroup = document.createElement("optgroup");
       optgroup.label = label;
       voices.forEach(function(v) {

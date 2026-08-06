@@ -505,6 +505,7 @@ async function saveSettings() {
 // ---- Voice Loading ----
 
 async function loadVoices() {
+  // Always clear and repopulate based on current engine
   if (state.currentEngine === 'server') {
     await loadServerVoices();
     return;
@@ -521,7 +522,10 @@ async function loadVoices() {
   }
 
   // Voices might not be loaded yet on first call
+  // IMPORTANT: guard against race with engine switch
   speechSynthesis.onvoiceschanged = function() {
+    // Only populate if we're still in native mode
+    if (state.currentEngine !== 'native') return;
     var v = speechSynthesis.getVoices();
     state.voices = v.map(function(x) {
       return { name: x.name, lang: x.lang, voiceURI: x.voiceURI, default: x.default };
@@ -531,19 +535,38 @@ async function loadVoices() {
 }
 
 async function loadServerVoices() {
+  // Show loading state
+  var select = getEl('tts-zen-voice');
+  if (select) {
+    select.innerHTML = '<option value="">Cargando voces edge-tts...</option>';
+    select.disabled = true;
+  }
+
   try {
     var resp = await browser.runtime.sendMessage({ action: 'get_voices' });
-    if (resp.success && resp.voices) {
+    if (resp.success && resp.voices && resp.voices.length > 0) {
       state.voices = resp.voices.map(function(v) {
         return { name: v.name, lang: v.locale, voiceURI: v.name, default: false };
       });
       populateVoiceDropdown();
       window.__tts_zen_state.serverAvailable = true;
     } else {
+      state.voices = [];
+      populateVoiceDropdown();
       window.__tts_zen_state.serverAvailable = false;
+      if (select) {
+        select.innerHTML = '<option value="">Servidor no disponible</option>';
+        select.disabled = true;
+      }
     }
   } catch (_) {
+    state.voices = [];
+    populateVoiceDropdown();
     window.__tts_zen_state.serverAvailable = false;
+    if (select) {
+      select.innerHTML = '<option value="">Servidor no disponible</option>';
+      select.disabled = true;
+    }
   }
 }
 
@@ -551,6 +574,9 @@ function populateVoiceDropdown() {
   var select = getEl('tts-zen-voice');
   if (!select) return;
   select.innerHTML = '';
+  select.disabled = false;
+
+  if (!state.voices || state.voices.length === 0) return;
 
   // Group by language
   var groups = {};
@@ -563,10 +589,17 @@ function populateVoiceDropdown() {
   var langNames = { 'es-ES': 'Español', 'es-MX': 'Español (MX)', 'es-US': 'Español (US)',
     'es': 'Español', 'en-US': 'English', 'en-GB': 'English (UK)', 'en': 'English',
     'fr-FR': 'Français', 'de-DE': 'Deutsch', 'it-IT': 'Italiano', 'pt-BR': 'Português' };
+  // edge-tts locales (es-AR, en-AU, etc.) — group by prefix
+  function langLabel(lang) {
+    if (langNames[lang]) return langNames[lang];
+    if (lang.startsWith('es-')) return 'Español (' + lang.split('-')[1] + ')';
+    if (lang.startsWith('en-')) return 'English (' + lang.split('-')[1] + ')';
+    return lang;
+  }
 
   Object.keys(groups).sort().forEach(function(lang) {
     var voices = groups[lang];
-    var label = langNames[lang] || lang;
+    var label = langLabel(lang);
     var optgroup = document.createElement('optgroup');
     optgroup.label = label;
     voices.forEach(function(v) {
