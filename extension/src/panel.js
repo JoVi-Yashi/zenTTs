@@ -650,49 +650,47 @@ async function loadVoices() {
 }
 
 async function loadServerVoices() {
-  // Show loading state
   var select = getEl('tts-zen-voice');
   if (select) {
     while (select.options.length > 0) select.remove(0);
     var opt = document.createElement('option');
-    opt.value = '';
-    opt.textContent = t('loadingEdgeVoices');
-    select.appendChild(opt);
-    select.disabled = true;
+    opt.value = ''; opt.textContent = t('loadingEdgeVoices');
+    select.appendChild(opt); select.disabled = true;
   }
 
   try {
+    console.log('[TTS-zen] loadServerVoices: sending get_voices...');
     var resp = await browser.runtime.sendMessage({ action: 'get_voices' });
+    console.log('[TTS-zen] loadServerVoices: got resp', resp);
     if (resp.success && resp.voices && resp.voices.length > 0) {
       state.voices = resp.voices.map(function(v) {
         return { name: v.name, lang: v.locale, voiceURI: v.name, default: false };
       });
       populateVoiceDropdown();
       window.__tts_zen_state.serverAvailable = true;
+      console.log('[TTS-zen] loadServerVoices: OK ' + resp.voices.length + ' voices');
     } else {
       state.voices = [];
       populateVoiceDropdown();
       window.__tts_zen_state.serverAvailable = false;
+      console.error('[TTS-zen] loadServerVoices: FAIL success=' + resp.success + ' voices=' + (resp.voices ? resp.voices.length : 0));
       if (select) {
         while (select.options.length > 0) select.remove(0);
         var opt2 = document.createElement('option');
-        opt2.value = '';
-        opt2.textContent = t('serverUnavailable');
-        select.appendChild(opt2);
-        select.disabled = true;
+        opt2.value = ''; opt2.textContent = t('serverUnavailable');
+        select.appendChild(opt2); select.disabled = true;
       }
     }
-  } catch (_) {
+  } catch (e) {
     state.voices = [];
     populateVoiceDropdown();
     window.__tts_zen_state.serverAvailable = false;
+    console.error('[TTS-zen] loadServerVoices: ERROR', e.message || e);
     if (select) {
       while (select.options.length > 0) select.remove(0);
       var opt3 = document.createElement('option');
-      opt3.value = '';
-      opt3.textContent = t('serverUnavailable');
-      select.appendChild(opt3);
-      select.disabled = true;
+      opt3.value = ''; opt3.textContent = t('serverUnavailable');
+      select.appendChild(opt3); select.disabled = true;
     }
   }
 }

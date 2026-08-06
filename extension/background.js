@@ -69,11 +69,14 @@ async function handleTranslate(text, from, to) {
 }
 
 async function handleGetVoices() {
+  console.log('[TTS-zen bg] handleGetVoices: fetching /voices...');
   const resp = await fetch('http://localhost:8765/voices?locale=es-');
+  console.log('[TTS-zen bg] handleGetVoices: status=' + resp.status);
   if (!resp.ok) {
     throw new Error(`Voices fetch failed: ${resp.status}`);
   }
   const voices = await resp.json();
+  console.log('[TTS-zen bg] handleGetVoices: OK ' + voices.length + ' voices');
   return { success: true, voices };
 }
 
