@@ -5,8 +5,6 @@
     <a href="https://github.com/JoVi-Yashi/zenTTs"><img alt="GitHub stars" src="https://img.shields.io/github/stars/JoVi-Yashi/zenTTs?style=social"></a>
 </p>
 
-https://github.com/user-attachments/assets/155511a6-0a6e-4681-9061-21be1e93e02a
-
 Un panel TTS que se inyecta en cualquier página con Shadow DOM. Extrae el texto, lo lee con SpeechSynthesis, y resalta cada oración en tiempo real — en el sitio y en un pop-up sincronizado. Sin servidores, sin dependencias externas.
 
 Diseñado para lectores de Wattpad, AO3 y FanFiction: extractores nativos por plataforma que ignoran headers, navs y sidebars. Solo el contenido de la historia.
