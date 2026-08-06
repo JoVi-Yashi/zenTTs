@@ -68,40 +68,41 @@ const PANEL_HTML = `
           </select>
         </div>
       </div>
-      <div class="setting-row">
-        <label>Idioma entrada</label>
-        <div class="select-wrap">
-          <select id="tts-zen-lang-in">
-            <option value="auto">Auto</option>
-            <option value="es">Español</option>
-            <option value="en">Inglés</option>
-            <option value="fr">Francés</option>
-            <option value="de">Alemán</option>
-            <option value="it">Italiano</option>
-            <option value="pt">Portugués</option>
-            <option value="ja">Japonés</option>
-            <option value="ko">Coreano</option>
-            <option value="zh">Chino</option>
-            <option value="ru">Ruso</option>
-          </select>
-        </div>
+      <div class="setting-row section-header">
+        <span class="section-icon">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        </span>
+        <span>Traducción</span>
       </div>
-      <div class="setting-row">
-        <label>Idioma salida</label>
-        <div class="select-wrap">
-          <select id="tts-zen-lang-out">
-            <option value="es">Español</option>
-            <option value="en">Inglés</option>
-            <option value="fr">Francés</option>
-            <option value="de">Alemán</option>
-            <option value="it">Italiano</option>
-            <option value="pt">Portugués</option>
-            <option value="ja">Japonés</option>
-            <option value="ko">Coreano</option>
-            <option value="zh">Chino</option>
-            <option value="ru">Ruso</option>
-          </select>
-        </div>
+      <div class="translate-row">
+        <select id="tts-zen-lang-in">
+          <option value="auto">Auto</option>
+          <option value="es">ES</option>
+          <option value="en">EN</option>
+          <option value="fr">FR</option>
+          <option value="de">DE</option>
+          <option value="it">IT</option>
+          <option value="pt">PT</option>
+          <option value="ja">JA</option>
+          <option value="ko">KO</option>
+          <option value="zh">ZH</option>
+          <option value="ru">RU</option>
+        </select>
+        <span class="translate-arrow">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </span>
+        <select id="tts-zen-lang-out">
+          <option value="es">ES</option>
+          <option value="en">EN</option>
+          <option value="fr">FR</option>
+          <option value="de">DE</option>
+          <option value="it">IT</option>
+          <option value="pt">PT</option>
+          <option value="ja">JA</option>
+          <option value="ko">KO</option>
+          <option value="zh">ZH</option>
+          <option value="ru">RU</option>
+        </select>
       </div>
       <div class="setting-row">
         <label>Velocidad</label>
@@ -305,6 +306,15 @@ const PANEL_CSS = `
   transition: transform .15s ease;
 }
 .speed-group input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.15); }
+
+/* Translation row */
+.section-header { display: flex; align-items: center; gap: 6px; margin-top: 6px; margin-bottom: 4px; font-size: 10px; font-weight: 600; color: #a78bfa; letter-spacing: 0.5px; }
+.section-icon { display: flex; align-items: center; color: #a78bfa; }
+.translate-row { display: flex; align-items: center; gap: 6px; padding: 0; margin-bottom: 6px; }
+.translate-row select { flex: 1; padding: 5px 20px 5px 8px; border-radius: 6px; border: 1px solid rgba(167,139,250,0.12); background: rgba(167,139,250,0.04); color: #c4b5fd; font-size: 11px; cursor: pointer; outline: none; appearance: none; text-align-last: center; }
+.translate-row select:hover { border-color: rgba(167,139,250,0.25); }
+.translate-arrow { display: flex; align-items: center; color: #5b6370; flex-shrink: 0; }
+
 #tts-zen-speed-label {
   font-size: 11px; color: #a78bfa; font-weight: 600; min-width: 30px; text-align: right;
 }
@@ -710,12 +720,6 @@ function populateVoiceDropdown() {
 
 function applyLanguage(shadow) {
   var lang = state.lang;
-  // Update labels
-  var labels = {
-    'tts-zen-voice-label': 'voice', 'tts-zen-engine-label': 'engine',
-    'tts-zen-speed-label-text': 'speed', 'tts-zen-lang-label': 'langLabel',
-    'tts-zen-status': null
-  };
   // Update settings label texts
   var voiceRow = shadow.querySelector('.setting-row:nth-child(1) label');
   if (voiceRow) voiceRow.textContent = T[lang].voice;
@@ -723,8 +727,6 @@ function applyLanguage(shadow) {
   if (engineRow) engineRow.textContent = T[lang].engine;
   var langRow = shadow.querySelector('.setting-row:nth-child(3) label');
   if (langRow) langRow.textContent = T[lang].langLabel;
-  var speedRow = shadow.querySelector('.setting-row:nth-child(4) label');
-  if (speedRow) speedRow.textContent = T[lang].speed;
 
   // Update button texts
   var readBtn = shadow.getElementById('tts-zen-read');
