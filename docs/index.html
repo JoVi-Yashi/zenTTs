@@ -18,6 +18,16 @@
     line-height:1.6;overflow-x:hidden;min-height:100vh;
   }
   .scene{perspective:1200px;position:relative;overflow:hidden}
+
+  /* Floating logo petals */
+  .petal{position:absolute;pointer-events:none;opacity:0;animation:fall var(--dur,8s) var(--delay,0s) ease-in forwards}
+  .petal svg{width:var(--sz,24px);height:var(--sz,24px);color:rgba(167,139,250,.18);filter:blur(.5px)}
+  @keyframes fall{
+    0%{opacity:0;transform:translateY(-40px) translateX(0) rotate(0deg) scale(.8)}
+    15%{opacity:.5}
+    70%{opacity:.3}
+    100%{opacity:0;transform:translateY(500px) translateX(var(--drift,30px)) rotate(var(--spin,180deg)) scale(.4)}
+  }
   a{color:#a78bfa;text-decoration:none;transition:color .2s}
   a:hover{color:#c4b5fd}
 
@@ -210,6 +220,14 @@ footer p{margin:0}
 <div class="orb orb-3"></div>
 
 <section class="hero">
+  <!-- Falling logo petals -->
+  <div class="petal" style="top:5%;left:10%;--dur:10s;--delay:0s;--sz:20px;--drift:40px;--spin:200deg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg></div>
+  <div class="petal" style="top:2%;left:30%;--dur:12s;--delay:2s;--sz:16px;--drift:-35px;--spin:-150deg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg></div>
+  <div class="petal" style="top:8%;left:55%;--dur:14s;--delay:4s;--sz:22px;--drift:25px;--spin:120deg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg></div>
+  <div class="petal" style="top:0%;left:75%;--dur:11s;--delay:1s;--sz:18px;--drift:-45px;--spin:250deg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg></div>
+  <div class="petal" style="top:3%;left:88%;--dur:13s;--delay:3s;--sz:14px;--drift:-20px;--spin:-180deg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg></div>
+  <div class="petal" style="top:6%;left:45%;--dur:15s;--delay:5s;--sz:24px;--drift:50px;--spin:90deg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg></div>
+  <div class="petal" style="top:4%;left:65%;--dur:9s;--delay:6s;--sz:15px;--drift:-30px;--spin:300deg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg></div>
   <h1>zenTTS</h1>
   <p class="subtitle">Text-to-speech flotante para Zen Browser. Leé cualquier página con un solo click — sin servidores, sin configuraciones.</p>
   <div class="hero-buttons">
@@ -422,6 +440,15 @@ document.querySelectorAll('.f-card').forEach(function(card){
     var r=card.getBoundingClientRect();
     card.style.setProperty('--mx',(e.clientX-r.left)+'px');
     card.style.setProperty('--my',(e.clientY-r.top)+'px');
+  });
+});
+
+// Petal loop — restart animation when it ends
+document.querySelectorAll('.petal').forEach(function(p){
+  p.addEventListener('animationend',function(){
+    this.style.animation='none';
+    this.offsetHeight; // trigger reflow
+    this.style.animation='';
   });
 });
 </script>
