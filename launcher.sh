@@ -29,7 +29,7 @@ BOT() { printf "  ${P}╰%s╯${R}\n" "$(printf '─%.0s' $(seq 1 $((W-2))))"; }
 # ── Server helpers ───────────────────────────────────────
 
 running() {
-    local pid=$(pgrep -f "uvicorn tts_zen.main:app" 2>/dev/null | head -1)
+    local pid=$(pgrep -f "ruby server.rb" 2>/dev/null | head -1)
     [ -n "$pid" ] && echo "$pid" && return 0
     if [ -f "$PID_FILE" ]; then
         pid=$(cat "$PID_FILE" 2>/dev/null || true)
@@ -39,7 +39,7 @@ running() {
 }
 
 stop_server() {
-    local pid=$(pgrep -f "uvicorn tts_zen.main:app" 2>/dev/null || true)
+    local pid=$(pgrep -f "ruby server.rb" 2>/dev/null || true)
     [ -n "$pid" ] && { kill "$pid" 2>/dev/null; sleep 0.5; kill -9 "$pid" 2>/dev/null; }
     rm -f "$PID_FILE"
 }
@@ -100,8 +100,8 @@ redraw() {
 
 action_start() {
     if running &>/dev/null; then return; fi
-    cd "$PROJECT_DIR/server"
-    nohup uv run uvicorn tts_zen.main:app --port "$PORT" --host 127.0.0.1 > "$LOG_FILE" 2>&1 &
+    cd "$PROJECT_DIR"
+    nohup ruby server.rb > "$LOG_FILE" 2>&1 &
     echo "$!" > "$PID_FILE"
     for i in $(seq 1 15); do curl -s "http://127.0.0.1:$PORT/health" &>/dev/null && break; sleep 0.3; done
     command -v notify-send &>/dev/null && notify-send -i audio-card "zenTTS" "Servidor listo" 2>/dev/null || true

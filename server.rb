@@ -30,11 +30,14 @@ TRAFILATURA = ENV.fetch('TRAFILATURA_PATH', 'trafilatura').freeze
 # ── Helpers ──
 
 def run_tts(text, voice: 'es-ES-AlvaroNeural', rate: '+0%')
+  tmp_text  = Tempfile.new(['tts-text', '.txt'])
   tmp_audio = Tempfile.new(['tts', '.mp3'])
   tmp_subs  = Tempfile.new(['tts', '.vtt'])
   begin
+    tmp_text.write(text)
+    tmp_text.close
     cmd = [EDGE_TTS, '--voice', voice, '--rate', rate,
-           '--text', text,
+           '--file', tmp_text.path,
            '--write-media', tmp_audio.path,
            '--write-subtitles', tmp_subs.path]
     _out, err, status = Open3.capture3(*cmd)
@@ -44,6 +47,7 @@ def run_tts(text, voice: 'es-ES-AlvaroNeural', rate: '+0%')
     subs  = File.read(tmp_subs.path) rescue ''
     [audio, subs]
   ensure
+    tmp_text.close!
     tmp_audio.close!
     tmp_subs.close!
   end
@@ -51,7 +55,9 @@ end
 
 def parse_vtt(vtt)
   sentences = []
-  vtt.scan(/^(\d{2}:\d{2}:\d{2}\.\d{3}) --> (\d{2}:\d{2}:\d{2}\.\d{3})\n(.+?)(?=\n\n|\z)/m) do
+  # WebVTT uses comma as millisecond separator: 00:00:00,050
+  # Cues may have an optional numeric identifier line
+  vtt.scan(/(?:^\d+\n)?(\d{2}:\d{2}:\d{2}[.,]\d{3}) --> (\d{2}:\d{2}:\d{2}[.,]\d{3})\n(.+?)(?=\n\n|\z)/m) do
     start = parse_timestamp(Regexp.last_match(1))
     endt  = parse_timestamp(Regexp.last_match(2))
     text  = Regexp.last_match(3).gsub(/<[^>]+>/, '').strip
@@ -61,8 +67,26 @@ def parse_vtt(vtt)
 end
 
 def parse_timestamp(ts)
+  ts = ts.tr(',', '.')
   h, m, s = ts.split(':').map(&:to_f)
   (h * 3600 + m * 60 + s).round(3)
+end
+
+def parse_voice_table(output)
+  lines = output.lines
+  # Skip header and separator lines (first two)
+  lines.drop(2).filter_map do |line|
+    cols = line.strip.split(/\s{2,}/)
+    next if cols.size < 2
+    name = cols[0]
+    locale = name.split('-').first(2).join('-')
+    {
+      name: name,
+      locale: locale,
+      gender: cols[1] || '',
+      friendly: name
+    }
+  end
 end
 
 # ── Routes ──
@@ -94,14 +118,8 @@ get '/voices' do
     halt 500, { error: 'Failed to list voices' }.to_json
   end
 
-  voices = JSON.parse(out).map do |v|
-    {
-      name: v['ShortName'],
-      locale: v['Locale'],
-      gender: v['Gender'] || '',
-      friendly: v['FriendlyName'] || v['ShortName']
-    }
-  end
+  # edge-tts CLI outputs a formatted table, not JSON
+  voices = parse_voice_table(out)
 
   voices.select! { |v| v[:locale].start_with?(locale) } if locale
   content_type :json
@@ -159,7 +177,7 @@ post '/extract' do
 
   begin
     # Extract text from URL using trafilatura CLI
-    out, err, status = Open3.capture3(TRAFILATURA, '--url', url)
+    out, err, status = Open3.capture3(TRAFILATURA, '-u', url)
     halt 502, { error: "extraction failed: #{err}" }.to_json unless status.success?
     text = out.strip
     halt 400, { error: 'no text extracted' }.to_json if text.empty?

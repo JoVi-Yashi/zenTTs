@@ -26,8 +26,8 @@ def mid(s) "  #{P}│#{R}#{s.ljust(W-2)}#{P}│#{R}" end
 # ── Server helpers ──
 
 def running?
-  pid = `pgrep -f "uvicorn tts_zen.main:app" 2>/dev/null`.strip.split("\n").first
-  return pid if pid && !pid.empty?
+  pid = `fuser #{PORT}/tcp 2>/dev/null`.strip
+  return pid unless pid.empty?
   if File.exist?(PID_FILE)
     pid = File.read(PID_FILE).strip
     return pid if pid && !pid.empty? && Process.kill(0, pid.to_i) rescue nil
@@ -58,7 +58,7 @@ def action_start
 end
 
 def action_stop
-  system('pkill', '-f', 'uvicorn tts_zen.main:app', err: File::NULL) rescue nil
+  system('fuser', '-k', "#{PORT}/tcp", err: File::NULL) rescue nil
   sleep 0.5
   FileUtils.rm_f(PID_FILE)
 end
