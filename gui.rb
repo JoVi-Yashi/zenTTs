@@ -267,13 +267,12 @@ CSS = <<~CSS
   }
 
   .lang-toggle {
-    font-size: 9px; font-weight: 700; padding: 2px 6px;
-    border-radius: 4px; border: 1px solid rgba(167,139,250,0.15);
-    background: rgba(167,139,250,0.08); color: #a78bfa;
-    min-width: 28px;
+    font-size: 10px; font-weight: 600; padding: 4px 12px;
+    border-radius: 6px; border: 1px solid rgba(167,139,250,0.15);
+    background: rgba(167,139,250,0.06); color: #7e8aa0;
   }
   .lang-toggle:hover {
-    background: rgba(167,139,250,0.18);
+    background: rgba(167,139,250,0.14); color: #a78bfa;
   }
 
   .footer {
@@ -388,6 +387,20 @@ class TTSZenApp
     @zen_btn.signal_connect('clicked') { open_browser }
     body.pack_start(@zen_btn, expand: false, fill: true, padding: 0)
 
+    # Language toggle
+    lang_row = Gtk::Box.new(:horizontal, 0)
+    lang_row.halign = :center; lang_row.margin_top = 10
+    @lang_btn = Gtk::Button.new(label: @lang == 'en' ? 'English' : 'Español')
+    @lang_btn.style_context.add_class('lang-toggle')
+    @lang_btn.signal_connect('clicked') do
+      @lang = @lang == 'es' ? 'en' : 'es'
+      @lang_btn.label = @lang == 'en' ? 'English' : 'Español'
+      save_lang(@lang)
+      apply_language
+    end
+    lang_row.pack_start(@lang_btn, expand: false, fill: false, padding: 0)
+    body.pack_start(lang_row, expand: false, fill: false, padding: 0)
+
     footer = Gtk::Label.new("TTS-zen v0.4  ·  Ruby #{RUBY_VERSION}")
     footer.style_context.add_class('footer'); footer.halign = :center
     body.pack_start(footer, expand: false, fill: false, padding: 0)
@@ -412,18 +425,27 @@ class TTSZenApp
       false
     end
     box.pack_start(da, expand: false, fill: false, padding: 0)
-
-    @lang_btn = Gtk::Button.new(label: @lang == 'en' ? 'EN' : 'ES')
-    @lang_btn.style_context.add_class('lang-toggle')
-    @lang_btn.signal_connect('clicked') do
-      @lang = @lang == 'es' ? 'en' : 'es'
-      @lang_btn.label = @lang == 'en' ? 'EN' : 'ES'
-      save_lang(@lang)
-      refresh_status
-    end
-    box.pack_end(@lang_btn, expand: false, fill: false, padding: 0)
     box.show_all
     box
+  end
+
+  def apply_language
+    @start_btn.label = l(:start)
+    @stop_btn.label = l(:stop)
+    @zen_btn.label = l(:open_zen)
+    # Update static labels
+    @window.child.children.each do |child|
+      if child.is_a?(Gtk::Box)
+        child.children.each do |c|
+          if c.is_a?(Gtk::Label) && c.style_context.has_class?('status-header')
+            c.text = l(:status_header)
+          elsif c.is_a?(Gtk::Label) && c.style_context.has_class?('section-label')
+            c.text = l(:actions)
+          end
+        end
+      end
+    end
+    refresh_status
   end
 
   def refresh_status

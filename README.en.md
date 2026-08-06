@@ -1,6 +1,10 @@
 <h1 align="center"><img alt="zenTTS" src="tts.png" width="140"></h1>
 <p align="center">Floating text-to-speech for Zen Browser. Pick your engine.</p>
 <p align="center">
+    <a href="README.md">🇪🇸 Español</a> &nbsp;·&nbsp;
+    <a href="README.en.md">🇬🇧 English</a>
+</p>
+<p align="center">
     <a href="https://github.com/JoVi-Yashi/zenTTs/blob/main/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
     <a href="https://github.com/JoVi-Yashi/zenTTs"><img alt="GitHub stars" src="https://img.shields.io/github/stars/JoVi-Yashi/zenTTs?style=social"></a>
     <img alt="Platform" src="https://img.shields.io/badge/platform-Linux%20%7C%20Windows-purple">
