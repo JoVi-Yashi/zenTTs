@@ -20,10 +20,10 @@ extension: install-extension build-extension
 # ── Launcher ───────────────────────────────────────────
 
 launcher:
-	python3 launcher.py
+	./launcher.sh
 
 stop:
-	pkill -f "uvicorn tts_zen" 2>/dev/null; echo "Servidor detenido"
+	pkill -f "uvicorn tts_zen" 2>/dev/null || true
 
 install-desktop:
 	@mkdir -p "$(HOME)/.local/share/applications"
