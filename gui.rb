@@ -1,10 +1,9 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
-# TTS-zen GUI — Visual server manager with dark theme
+# TTS-zen — Server manager with native GTK3 header bar
 
 require 'gtk3'
 require 'fileutils'
-require 'json'
 require 'net/http'
 
 PORT = 8765
@@ -53,115 +52,104 @@ def stop_server!
   FileUtils.rm_f(PID_FILE)
 end
 
-def fetch_voices
-  uri = URI("http://127.0.0.1:#{PORT}/voices?locale=es-")
-  JSON.parse(Net::HTTP.get(uri))
-rescue
-  [{ 'name' => 'es-ES-AlvaroNeural', 'locale' => 'es-ES', 'gender' => 'Male' }]
-end
-
 # ══════════════════════════════════════════════
-#  GTK3 CSS Theme
+#  CSS
 # ══════════════════════════════════════════════
 
 CSS = <<~CSS
-  window {
-    background: #0a0a1a;
-    font-family: 'Inter', 'Cantarell', 'Segoe UI', system-ui, sans-serif;
+  headerbar {
+    background: #0d0d1f;
+    border-bottom: 1px solid rgba(167,139,250,0.1);
+    min-height: 38px;
+    padding: 0 8px;
   }
-  .window-box { padding: 0; }
-
-  /* ── Header ── */
-  .header {
-    background: #111128;
-    padding: 28px 28px 22px;
-    border-bottom: 1px solid rgba(167,139,250,0.08);
+  headerbar .title {
+    font-size: 13px; font-weight: 600; color: #c4b5fd;
   }
-  .logo-row { margin-bottom: 6px; }
-  .app-title { font-size: 20px; font-weight: 700; color: #c4b5fd; }
-  .app-title accent { color: #a78bfa; font-style: italic; }
-  .app-subtitle { font-size: 11px; color: #5b6370; margin-top: 2px; }
+  headerbar .subtitle {
+    font-size: 10px; font-weight: 400; color: #5b6370;
+  }
+  headerbar button {
+    background: transparent; border: none; box-shadow: none;
+    color: #7e8aa0; padding: 4px 8px; border-radius: 6px;
+  }
+  headerbar button:hover {
+    background: rgba(167,139,250,0.12); color: #a78bfa;
+  }
 
-  /* ── Body ── */
-  .body { padding: 20px 24px 24px; }
+  window { background: #0a0a1c; }
+  .body { padding: 24px; }
 
-  /* ── Status card ── */
   .status-card {
-    background: rgba(20,20,43,0.7);
+    background: #111128;
     border: 1px solid rgba(167,139,250,0.08);
     border-radius: 14px;
-    padding: 16px 18px;
-    margin-bottom: 18px;
+    padding: 20px 22px;
+    margin-bottom: 20px;
   }
-  .status-header { font-size: 10px; font-weight: 600; color: #5b6370; letter-spacing: 0.5px; margin-bottom: 8px; }
-  .status-row-box { margin: 4px 0; }
-  .status-indicator {
-    min-width: 10px; min-height: 10px;
-    border-radius: 50%; margin-right: 8px;
+  .status-header {
+    font-size: 10px; font-weight: 600; color: #5b6370;
+    letter-spacing: 0.6px; margin-bottom: 12px;
   }
-  .indicator-on { background: #34d399; box-shadow: 0 0 8px rgba(52,211,153,0.4); }
-  .indicator-off { background: #f87171; box-shadow: 0 0 8px rgba(248,113,113,0.3); }
-  .status-text { font-size: 13px; font-weight: 600; }
-  .text-on { color: #34d399; }
-  .text-off { color: #f87171; }
-  .text-warn { color: #fbbf24; }
-  .status-detail { font-size: 10px; color: #4b5563; margin-top: 5px; }
 
-  /* ── Section header ── */
+  .status-row { margin: 6px 0; }
+  .indicator {
+    min-width: 10px; min-height: 10px; border-radius: 50%; margin-right: 10px;
+  }
+  .dot-on  { background: #34d399; box-shadow: 0 0 10px rgba(52,211,153,0.5); }
+  .dot-off { background: #f87171; box-shadow: 0 0 10px rgba(248,113,113,0.35); }
+  .dot-warn { background: #fbbf24; box-shadow: 0 0 10px rgba(251,191,36,0.4); }
+
+  .status-text { font-size: 14px; font-weight: 600; }
+  .text-on   { color: #34d399; }
+  .text-off  { color: #f87171; }
+  .text-warn { color: #fbbf24; }
+
+  .detail {
+    font-size: 10px; color: #4b5563; margin-top: 6px;
+    font-family: monospace;
+  }
+
   .section-label {
     font-size: 10px; font-weight: 600; color: #5b6370;
-    letter-spacing: 0.5px; margin-bottom: 8px; margin-top: 2px;
+    letter-spacing: 0.6px; margin-top: 4px; margin-bottom: 10px;
   }
 
-  /* ── Combobox ── */
-  combobox {
-    font-size: 12px; min-height: 30px;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 8px; padding: 2px;
-    color: #c4b5fd;
-  }
-  combobox button { background: transparent; border: none; color: #c4b5fd; }
-  combobox box.linked { background: transparent; }
-
-  /* ── Buttons ── */
   button {
     font-size: 12px; font-weight: 600;
-    padding: 10px 16px; border-radius: 10px;
-    border: none; transition: all 0.2s ease;
-    outline: none;
+    padding: 10px 18px; border-radius: 10px;
+    border: none; transition: all 0.15s ease; outline: none;
   }
-  button:disabled { opacity: 0.35; }
+  button:disabled { opacity: 0.3; }
+
   .btn-primary {
-    background: #7c3aed;
-    color: #fff;
+    background: #7c3aed; color: #fff;
     box-shadow: 0 2px 12px rgba(124,58,237,0.25);
   }
   .btn-primary:hover {
     background: #8b5cf6;
     box-shadow: 0 4px 20px rgba(124,58,237,0.4);
   }
+
   .btn-danger {
     background: rgba(248,113,113,0.1);
     color: #f87171;
     border: 1px solid rgba(248,113,113,0.15);
   }
   .btn-danger:hover { background: rgba(248,113,113,0.18); }
-  .btn-ghost {
-    background: transparent;
-    color: #7e8aa0;
+
+  .btn-zen {
+    background: transparent; color: #7e8aa0;
     border: 1px solid rgba(255,255,255,0.06);
   }
-  .btn-ghost:hover {
+  .btn-zen:hover {
     background: rgba(167,139,250,0.08);
-    border-color: rgba(167,139,250,0.18);
-    color: #a78bfa;
+    border-color: rgba(167,139,250,0.18); color: #a78bfa;
   }
 
-  /* ── Footer ── */
   .footer {
-    font-size: 10px; color: #3a3f50; margin-top: 16px;
-    padding-top: 12px;
+    font-size: 10px; color: #3a3f50;
+    padding-top: 16px; margin-top: 8px;
     border-top: 1px solid rgba(255,255,255,0.03);
   }
 CSS
@@ -180,7 +168,7 @@ class TTSZenApp
   def build_ui
     @window = Gtk::Window.new
     @window.title = 'TTS-zen'
-    @window.set_size_request(380, 440)
+    @window.set_size_request(360, 340)
     @window.resizable = false
     @window.window_position = :center
     @window.signal_connect('destroy') { Gtk.main_quit }
@@ -191,189 +179,152 @@ class TTSZenApp
       Gdk::Screen.default, provider, Gtk::StyleProvider::PRIORITY_APPLICATION
     )
 
-    # Root
-    root = Gtk::Box.new(:vertical, 0)
-    root.style_context.add_class('window-box')
-
-    # ── Header ──
-    header = Gtk::Box.new(:vertical, 0)
-    header.style_context.add_class('header')
-
-    logo_row = Gtk::Box.new(:horizontal, 8)
-    logo_row.style_context.add_class('logo-row')
-    logo_row.pack_start(speaker_icon, expand: false, fill: false, padding: 0)
-
-    title = Gtk::Label.new
-    title.markup = '<span size="large" weight="bold" foreground="#c4b5fd">zen</span><span size="large" weight="bold" foreground="#a78bfa" style="italic">TTS</span>'
-    title.halign = :start
-    logo_row.pack_start(title, expand: false, fill: false, padding: 0)
-    header.pack_start(logo_row, expand: false, fill: false, padding: 0)
-
-    subtitle = Gtk::Label.new('Servidor edge-tts  ·  45 voces neurales Microsoft')
-    subtitle.style_context.add_class('app-subtitle')
-    subtitle.halign = :start
-    header.pack_start(subtitle, expand: false, fill: false, padding: 0)
-
-    root.pack_start(header, expand: false, fill: true, padding: 0)
+    # ── Header bar (native CSD) ──
+    header = Gtk::HeaderBar.new
+    header.show_close_button = true
+    header.custom_title = title_widget
+    @window.titlebar = header
 
     # ── Body ──
     body = Gtk::Box.new(:vertical, 0)
     body.style_context.add_class('body')
 
     # Status card
-    @status_card = Gtk::Box.new(:vertical, 0)
-    @status_card.style_context.add_class('status-card')
+    card = Gtk::Box.new(:vertical, 0)
+    card.style_context.add_class('status-card')
 
-    status_header = Gtk::Label.new('ESTADO DEL SERVIDOR')
-    status_header.style_context.add_class('status-header')
-    status_header.halign = :start
-    @status_card.pack_start(status_header, expand: false, fill: false, padding: 0)
+    sh = Gtk::Label.new('ESTADO DEL SERVIDOR')
+    sh.style_context.add_class('status-header'); sh.halign = :start
+    card.pack_start(sh, expand: false, fill: false, padding: 0)
 
-    status_row = Gtk::Box.new(:horizontal, 8)
-    status_row.style_context.add_class('status-row-box')
-    @status_dot = Gtk::DrawingArea.new
-    @status_dot.set_size_request(10, 10)
-    @status_dot.style_context.add_class('status-indicator')
-    status_row.pack_start(@status_dot, expand: false, fill: false, padding: 0)
+    row = Gtk::Box.new(:horizontal, 8)
+    row.style_context.add_class('status-row')
+    @dot = Gtk::DrawingArea.new
+    @dot.set_size_request(10, 10)
+    @dot.style_context.add_class('indicator')
+    row.pack_start(@dot, expand: false, fill: false, padding: 0)
 
     @status_label = Gtk::Label.new('Detenido')
-    status_row.pack_start(@status_label, expand: false, fill: false, padding: 0)
-    @status_card.pack_start(status_row, expand: false, fill: false, padding: 0)
+    row.pack_start(@status_label, expand: false, fill: false, padding: 0)
+    card.pack_start(row, expand: false, fill: false, padding: 0)
 
-    @detail_label = Gtk::Label.new("localhost:#{PORT}  ·  sin iniciar")
-    @detail_label.style_context.add_class('status-detail')
-    @detail_label.halign = :start
-    @status_card.pack_start(@detail_label, expand: false, fill: false, padding: 0)
+    @detail = Gtk::Label.new("localhost:#{PORT}  ·  sin iniciar")
+    @detail.style_context.add_class('detail'); @detail.halign = :start
+    card.pack_start(@detail, expand: false, fill: false, padding: 0)
+    body.pack_start(card, expand: false, fill: true, padding: 0)
 
-    body.pack_start(@status_card, expand: false, fill: true, padding: 0)
-
-    # Voice section
-    voice_label = Gtk::Label.new('VOZ PREDETERMINADA')
-    voice_label.style_context.add_class('section-label')
-    voice_label.halign = :start
-    body.pack_start(voice_label, expand: false, fill: false, padding: 0)
-
-    @voice_combo = Gtk::ComboBoxText.new
-    @voice_combo.append_text('Cargando voces...')
-    @voice_combo.active = 0
-    body.pack_start(@voice_combo, expand: false, fill: true, padding: 0)
+    # Actions label
+    al = Gtk::Label.new('ACCIONES')
+    al.style_context.add_class('section-label'); al.halign = :start
+    body.pack_start(al, expand: false, fill: false, padding: 0)
 
     # Buttons
-    btn_box = Gtk::Box.new(:horizontal, 8)
-    btn_box.margin_top = 18
-
+    btn_row = Gtk::Box.new(:horizontal, 8)
     @start_btn = Gtk::Button.new(label: 'Iniciar servidor')
     @start_btn.style_context.add_class('btn-primary')
-    @start_btn.signal_connect('clicked') { start_server!; refresh_status; load_voices_async }
+    @start_btn.signal_connect('clicked') { start_server!; refresh_status }
 
     @stop_btn = Gtk::Button.new(label: 'Detener')
     @stop_btn.style_context.add_class('btn-danger')
     @stop_btn.signal_connect('clicked') { stop_server!; refresh_status }
 
-    btn_box.pack_start(@start_btn, expand: true, fill: true, padding: 0)
-    btn_box.pack_start(@stop_btn, expand: false, fill: false, padding: 0)
-    body.pack_start(btn_box, expand: false, fill: true, padding: 0)
+    btn_row.pack_start(@start_btn, expand: true, fill: true, padding: 0)
+    btn_row.pack_start(@stop_btn, expand: false, fill: false, padding: 0)
+    body.pack_start(btn_row, expand: false, fill: true, padding: 0)
 
-    # Open Zen
-    @open_btn = Gtk::Button.new(label: 'Abrir Zen Browser')
-    @open_btn.style_context.add_class('btn-ghost')
-    @open_btn.margin_top = 10
-    @open_btn.signal_connect('clicked') do
+    @zen_btn = Gtk::Button.new(label: 'Abrir Zen Browser')
+    @zen_btn.style_context.add_class('btn-zen')
+    @zen_btn.margin_top = 10
+    @zen_btn.signal_connect('clicked') do
       start_server! unless server_running?
       sleep 0.5
       spawn('flatpak', 'run', 'app.zen_browser.zen', out: File::NULL, err: File::NULL)
     end
-    body.pack_start(@open_btn, expand: false, fill: true, padding: 0)
-
-    root.pack_start(body, expand: true, fill: true, padding: 0)
+    body.pack_start(@zen_btn, expand: false, fill: true, padding: 0)
 
     # Footer
     footer = Gtk::Label.new("TTS-zen v0.4  ·  Ruby #{RUBY_VERSION}")
-    footer.style_context.add_class('footer')
-    footer.halign = :center
-    root.pack_start(footer, expand: false, fill: false, padding: 0)
+    footer.style_context.add_class('footer'); footer.halign = :center
+    body.pack_start(footer, expand: false, fill: false, padding: 0)
 
-    @window.add(root)
+    @window.add(body)
     @window.show_all
   end
 
-  def speaker_icon
-    icon = Gtk::DrawingArea.new
-    icon.set_size_request(18, 18)
-    icon.signal_connect('draw') do |_, cr|
-      cr.set_source_rgba(0.655, 0.545, 0.980, 1.0) # #a78bfa
-      cr.set_line_width(1.5)
-      cr.move_to(6, 5);  cr.line_to(2, 9);  cr.line_to(2, 12)
-      cr.line_to(6, 16); cr.line_to(10, 16); cr.line_to(10, 5)
-      cr.close_path; cr.fill_preserve; cr.set_source_rgba(0.655, 0.545, 0.980, 1.0); cr.stroke
-      cr.set_line_width(1.2)
-      cr.move_to(13, 7); cr.curve_to(15, 8.5, 15, 12.5, 13, 14); cr.stroke
-      cr.move_to(15.5, 5); cr.curve_to(17.5, 7, 17.5, 14, 15.5, 16); cr.stroke
-      false
-    end
-    icon
+  def title_widget
+    box = Gtk::Box.new(:horizontal, 7)
+    icon = speaker_icon
+    box.pack_start(icon, expand: false, fill: false, padding: 0)
+    box.show_all
+    box
   end
 
-  # ── Status refresh ──
+  def speaker_icon
+    da = Gtk::DrawingArea.new
+    da.set_size_request(16, 16)
+    da.signal_connect('draw') do |_, cr|
+      cr.set_source_rgba(0.655, 0.545, 0.980, 1.0)
+      cr.set_line_width(1.5)
+      cr.move_to(5, 4)
+      cr.line_to(2, 7)
+      cr.line_to(2, 10)
+      cr.line_to(5, 13)
+      cr.line_to(8, 13)
+      cr.line_to(8, 4)
+      cr.close_path
+      cr.fill_preserve
+      cr.stroke
+      cr.set_line_width(1.2)
+      cr.move_to(10.5, 6)
+      cr.curve_to(12, 7, 12, 10, 10.5, 11)
+      cr.stroke
+      cr.move_to(12.5, 4.5)
+      cr.curve_to(14, 6, 14, 11, 12.5, 12.5)
+      cr.stroke
+      false
+    end
+    da
+  end
+
+  # ── Status ──
 
   def refresh_status
     pid = server_running?
     healthy = pid ? server_healthy? : false
 
     if pid && healthy
-      set_indicator(:on)
-      @status_label.style_context.remove_class('text-off')
-      @status_label.style_context.remove_class('text-warn')
-      @status_label.style_context.add_class('text-on')
+      set_dot('dot-on')
+      swap_class(@status_label, %w[text-off text-warn], 'text-on')
       @status_label.text = 'En ejecucion'
-      @detail_label.text = "localhost:#{PORT}  ·  PID #{pid}  ·  saludable"
+      @detail.text = "localhost:#{PORT}  ·  PID #{pid}  ·  saludable"
       @start_btn.sensitive = false
       @stop_btn.sensitive = true
     elsif pid
-      set_indicator(:warn)
-      @status_label.style_context.remove_class('text-on')
-      @status_label.style_context.remove_class('text-off')
-      @status_label.style_context.add_class('text-warn')
+      set_dot('dot-warn')
+      swap_class(@status_label, %w[text-on text-off], 'text-warn')
       @status_label.text = 'Sin respuesta'
-      @detail_label.text = "localhost:#{PORT}  ·  PID #{pid}  ·  sin responder"
+      @detail.text = "localhost:#{PORT}  ·  PID #{pid}  ·  sin responder"
       @start_btn.sensitive = true
       @stop_btn.sensitive = true
     else
-      set_indicator(:off)
-      @status_label.style_context.remove_class('text-on')
-      @status_label.style_context.remove_class('text-warn')
-      @status_label.style_context.add_class('text-off')
+      set_dot('dot-off')
+      swap_class(@status_label, %w[text-on text-warn], 'text-off')
       @status_label.text = 'Detenido'
-      @detail_label.text = "localhost:#{PORT}  ·  sin iniciar"
+      @detail.text = "localhost:#{PORT}  ·  sin iniciar"
       @start_btn.sensitive = true
       @stop_btn.sensitive = false
     end
-
     true
   end
 
-  def set_indicator(state)
-    @status_dot.style_context.remove_class('indicator-on')
-    @status_dot.style_context.remove_class('indicator-off')
-    case state
-    when :on   then @status_dot.style_context.add_class('indicator-on')
-    when :warn then @status_dot.style_context.add_class('indicator-off')
-    when :off  then @status_dot.style_context.add_class('indicator-off')
-    end
+  def set_dot(cls)
+    %w[dot-on dot-off dot-warn].each { |c| @dot.style_context.remove_class(c) }
+    @dot.style_context.add_class(cls)
   end
 
-  def load_voices_async
-    Thread.new do
-      voices = fetch_voices
-      GLib::Idle.add do
-        @voice_combo.remove_all
-        voices.each do |v|
-          @voice_combo.append_text("#{v['name']}  ·  #{v['gender']}")
-        end
-        @voice_combo.active = 0
-        false
-      end
-    end
+  def swap_class(widget, remove, add)
+    remove.each { |c| widget.style_context.remove_class(c) }
+    widget.style_context.add_class(add)
   end
 end
 
