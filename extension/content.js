@@ -3507,29 +3507,47 @@
     }).join("\n").replace(/^\n+/, "").replace(/\n+$/, "").replace(/ {2,}/g, " ").trim();
   }
   var contentObserver = null;
+  var scrollCheckInterval = null;
+  var lastKnownText = "";
+  var chunkCount = 0;
   function startContentObserver() {
     stopContentObserver();
-    contentObserver = new MutationObserver(function(mutations) {
-      var newText = "";
-      mutations.forEach(function(m) {
-        m.addedNodes.forEach(function(node) {
-          if (node.nodeType === 1) {
-            var txt = (node.innerText || node.textContent || "").trim();
-            if (txt.length > 50) newText += txt + "\n\n";
-          }
-        });
-      });
-      if (newText.trim().length > 50) {
-        onNewContent(newText.trim());
-      }
+    lastKnownText = window.__tts_zen_last_text || "";
+    chunkCount = 0;
+    var target = document.querySelector('article, main, [role="main"], .cha-content, .chapter-content, .read-content, #chapters, .userstuff, .storytext, .panel-reading');
+    if (!target) target = document.body;
+    contentObserver = new MutationObserver(function() {
+      checkForNewContent(target);
     });
-    contentObserver.observe(document.body, { childList: true, subtree: true });
+    contentObserver.observe(target, { childList: true, subtree: true, characterData: true });
+    scrollCheckInterval = setInterval(function() {
+      checkForNewContent(target);
+    }, 2e3);
   }
   function stopContentObserver() {
     if (contentObserver) {
       contentObserver.disconnect();
       contentObserver = null;
     }
+    if (scrollCheckInterval) {
+      clearInterval(scrollCheckInterval);
+      scrollCheckInterval = null;
+    }
+  }
+  function checkForNewContent(target) {
+    var currentText = target.innerText || target.textContent || "";
+    currentText = currentText.replace(/\s+/g, " ").trim();
+    if (currentText.length <= lastKnownText.length) return;
+    var newPortion = currentText.substring(lastKnownText.length).trim();
+    if (newPortion.length < 20) return;
+    var chunk = newPortion;
+    if (newPortion.length > 2e3) {
+      chunk = newPortion.substring(newPortion.length - 2e3);
+    }
+    lastKnownText = currentText;
+    chunkCount++;
+    console.log("[TTS-zen] Chunk #" + chunkCount + " detected, " + chunk.length + " chars");
+    onNewContent(chunk);
   }
   async function onNewContent(newText) {
     newText = cleanText(newText);
@@ -3554,10 +3572,14 @@
     if (!overlay || overlay.classList.contains("hidden")) return;
     var content = host.shadowRoot.getElementById("tts-zen-preview-content");
     if (!content) return;
+    var chunkLabel = document.createElement("div");
+    chunkLabel.style.cssText = "font-size:9px;color:#5b6370;margin-top:12px;margin-bottom:2px;letter-spacing:0.5px;";
+    chunkLabel.textContent = "\u2014 chunk " + chunkCount + " \u2014";
+    content.appendChild(chunkLabel);
     var p = document.createElement("p");
-    p.style.cssText = "margin:0 0 6px 0;line-height:inherit;opacity:0.5;font-size:11px;border-left:2px solid rgba(167,139,250,0.3);padding-left:8px;";
-    p.textContent = text.substring(0, 300);
-    if (text.length > 300) p.textContent += "\u2026";
+    p.style.cssText = "margin:0 0 6px 0;line-height:1.6;opacity:0.7;font-size:11px;border-left:2px solid rgba(167,139,250,0.25);padding-left:8px;color:#8b94a5;";
+    p.textContent = text.substring(0, 400);
+    if (text.length > 400) p.textContent += "\u2026";
     content.appendChild(p);
     content.scrollTop = content.scrollHeight;
   }
