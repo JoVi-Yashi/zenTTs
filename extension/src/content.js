@@ -447,7 +447,7 @@ function refreshPreviewContent(shadow) {
   if (!content) return;
   var sentences = window.__tts_zen_sentences || [];
   if (sentences.length === 0) return;
-  content.innerHTML = '';
+  content.replaceChildren();
   for (var i = 0; i < sentences.length; i++) {
     var p = document.createElement('p');
     p.style.cssText = 'margin:0 0 6px 0;line-height:inherit;';

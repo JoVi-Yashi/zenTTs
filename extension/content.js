@@ -2698,7 +2698,11 @@
   async function loadServerVoices() {
     var select = getEl("tts-zen-voice");
     if (select) {
-      select.innerHTML = '<option value="">Cargando voces edge-tts...</option>';
+      while (select.options.length > 0) select.remove(0);
+      var opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = t("loadingEdgeVoices");
+      select.appendChild(opt);
       select.disabled = true;
     }
     try {
@@ -2714,7 +2718,11 @@
         populateVoiceDropdown();
         window.__tts_zen_state.serverAvailable = false;
         if (select) {
-          select.innerHTML = '<option value="">Servidor no disponible</option>';
+          while (select.options.length > 0) select.remove(0);
+          var opt2 = document.createElement("option");
+          opt2.value = "";
+          opt2.textContent = t("serverUnavailable");
+          select.appendChild(opt2);
           select.disabled = true;
         }
       }
@@ -2723,7 +2731,11 @@
       populateVoiceDropdown();
       window.__tts_zen_state.serverAvailable = false;
       if (select) {
-        select.innerHTML = '<option value="">Servidor no disponible</option>';
+        while (select.options.length > 0) select.remove(0);
+        var opt3 = document.createElement("option");
+        opt3.value = "";
+        opt3.textContent = t("serverUnavailable");
+        select.appendChild(opt3);
         select.disabled = true;
       }
     }
@@ -2731,7 +2743,7 @@
   function populateVoiceDropdown() {
     var select = getEl("tts-zen-voice");
     if (!select) return;
-    select.innerHTML = "";
+    while (select.options.length > 0) select.remove(0);
     select.disabled = false;
     if (!state.voices || state.voices.length === 0) return;
     var groups = {};
@@ -2998,7 +3010,7 @@
   }
   function renderPreviewContent(content) {
     var sentences = window.__tts_zen_sentences || [];
-    content.innerHTML = "";
+    content.replaceChildren();
     if (sentences.length > 0) {
       for (var i = 0; i < sentences.length; i++) {
         var p = document.createElement("p");
@@ -3128,14 +3140,48 @@
   function renderSitesList() {
     var list = getEl("tts-zen-sites-list");
     if (!list) return;
-    list.innerHTML = "";
+    list.replaceChildren();
     ALL_SITES.forEach(function(site) {
       var enabled = enabledSites[site.id] !== false;
       var row = document.createElement("div");
       row.className = "site-row";
-      var iconHtml = site.id === "generic" ? '<div class="site-row-icon" style="font-size:16px">+</div>' : '<img class="site-row-icon" src="' + faviconUrl(site.domain) + `" width="24" height="24" style="border-radius:4px" onerror="var f='` + faviconFallback(site.id) + `';if(f)this.src=f;">`;
-      row.innerHTML = '<div class="site-row-left">' + iconHtml + '<div class="site-row-info"><div class="site-row-name">' + site.name + '</div><div class="site-row-domain">' + site.domain + '</div></div></div><button class="site-toggle' + (enabled ? " on" : "") + '" data-site="' + site.id + '"></button>';
-      var toggle = row.querySelector(".site-toggle");
+      var left = document.createElement("div");
+      left.className = "site-row-left";
+      if (site.id === "generic") {
+        var iconDiv = document.createElement("div");
+        iconDiv.className = "site-row-icon";
+        iconDiv.style.fontSize = "16px";
+        iconDiv.textContent = "+";
+        left.appendChild(iconDiv);
+      } else {
+        var iconImg = document.createElement("img");
+        iconImg.className = "site-row-icon";
+        iconImg.src = faviconUrl(site.domain);
+        iconImg.width = 24;
+        iconImg.height = 24;
+        iconImg.style.borderRadius = "4px";
+        iconImg.onerror = function() {
+          var fb = faviconFallback(site.id);
+          if (fb) this.src = fb;
+        };
+        left.appendChild(iconImg);
+      }
+      var info = document.createElement("div");
+      info.className = "site-row-info";
+      var nameEl = document.createElement("div");
+      nameEl.className = "site-row-name";
+      nameEl.textContent = site.name;
+      var domainEl = document.createElement("div");
+      domainEl.className = "site-row-domain";
+      domainEl.textContent = site.domain;
+      info.appendChild(nameEl);
+      info.appendChild(domainEl);
+      left.appendChild(info);
+      row.appendChild(left);
+      var toggle = document.createElement("button");
+      toggle.className = "site-toggle" + (enabled ? " on" : "");
+      toggle.dataset.site = site.id;
+      row.appendChild(toggle);
       toggle.addEventListener("click", function() {
         var siteId = this.dataset.site;
         enabledSites[siteId] = !(enabledSites[siteId] !== false);
@@ -3147,12 +3193,20 @@
     var addRow = document.createElement("div");
     addRow.className = "site-row";
     addRow.style.cssText = "padding:6px 10px;gap:8px;";
-    addRow.innerHTML = '<input id="tts-zen-add-site-input" type="text" placeholder="ejemplo.com" style="flex:1;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#d1d5db;font-size:11px;outline:none"><button id="tts-zen-add-site-btn" style="padding:6px 12px;border-radius:6px;border:1px solid rgba(167,139,250,0.3);background:rgba(167,139,250,0.1);color:#a78bfa;font-size:11px;cursor:pointer;white-space:nowrap">A\xF1adir</button>';
+    var input = document.createElement("input");
+    input.id = "tts-zen-add-site-input";
+    input.type = "text";
+    input.placeholder = t("addSitePlaceholder");
+    input.style.cssText = "flex:1;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#d1d5db;font-size:11px;outline:none";
+    var addBtn = document.createElement("button");
+    addBtn.id = "tts-zen-add-site-btn";
+    addBtn.textContent = t("addSite");
+    addBtn.style.cssText = "padding:6px 12px;border-radius:6px;border:1px solid rgba(167,139,250,0.3);background:rgba(167,139,250,0.1);color:#a78bfa;font-size:11px;cursor:pointer;white-space:nowrap";
+    addRow.appendChild(input);
+    addRow.appendChild(addBtn);
     list.appendChild(addRow);
-    var addInput = list.querySelector("#tts-zen-add-site-input");
-    var addBtn = list.querySelector("#tts-zen-add-site-btn");
     addBtn.addEventListener("click", function() {
-      var domain = addInput.value.trim().toLowerCase();
+      var domain = input.value.trim().toLowerCase();
       if (!domain || domain === "otros sitios") return;
       domain = domain.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
       if (!domain.includes(".")) return;
@@ -3162,10 +3216,10 @@
       ALL_SITES.push({ id: domain, name: domain.split(".")[0], domain });
       enabledSites[domain] = true;
       saveSiteSettings();
-      addInput.value = "";
+      input.value = "";
       renderSitesList();
     });
-    addInput.addEventListener("keydown", function(e) {
+    input.addEventListener("keydown", function(e) {
       if (e.key === "Enter") addBtn.click();
     });
   }
@@ -3544,7 +3598,7 @@
     if (!content) return;
     var sentences = window.__tts_zen_sentences || [];
     if (sentences.length === 0) return;
-    content.innerHTML = "";
+    content.replaceChildren();
     for (var i = 0; i < sentences.length; i++) {
       var p = document.createElement("p");
       p.style.cssText = "margin:0 0 6px 0;line-height:inherit;";

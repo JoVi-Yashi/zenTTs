@@ -8,16 +8,16 @@
   "browser_specific_settings": {
     "gecko": {
       "id": "tts-zen@gentle-ai.local",
-      "strict_min_version": "109.0"
+      "strict_min_version": "109.0",
+      "data_collection_permissions": {
+        "usage": "none"
+      }
     }
   },
   "permissions": [
     "storage",
     "activeTab"
   ],
-  "data_collection_permissions": {
-    "usage": "none"
-  },
   "host_permissions": [
     "http://localhost:8765/*"
   ],
