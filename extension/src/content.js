@@ -590,19 +590,21 @@ function refreshPreviewContent(shadow) {
 }
 
 async function dispatchReadPage(extractFn) {
+  stopContentObserver();
   var result = extractFn();
   if (!result || !result.text) {
-    setStatus(ts('noTextFound'), true);
+    setStatus('No se encontró texto en esta página', true);
     return;
   }
 
   extractedRefs = result.refs || [];
   var text = cleanText(result.text);
   window.__tts_zen_last_text = text;
+  console.log('[TTS-zen] Texto extraido: ' + text.length + ' chars, ~' + text.split(/[.!?…]/).length + ' oraciones');
 
   setStatus(ts('starting'));
 
-  // Start watching for new content (infinite scroll pages)
+  // Start watching for new content
   startContentObserver();
 
   var st = window.__tts_zen_state || {};

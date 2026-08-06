@@ -3819,14 +3819,16 @@
     }
   }
   async function dispatchReadPage(extractFn) {
+    stopContentObserver();
     var result = extractFn();
     if (!result || !result.text) {
-      setStatus(ts("noTextFound"), true);
+      setStatus("No se encontr\xF3 texto en esta p\xE1gina", true);
       return;
     }
     extractedRefs = result.refs || [];
     var text = cleanText(result.text);
     window.__tts_zen_last_text = text;
+    console.log("[TTS-zen] Texto extraido: " + text.length + " chars, ~" + text.split(/[.!?…]/).length + " oraciones");
     setStatus(ts("starting"));
     startContentObserver();
     var st = window.__tts_zen_state || {};
