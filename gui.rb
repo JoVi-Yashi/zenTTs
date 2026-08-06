@@ -111,6 +111,8 @@ end
 # ══════════════════════════════════════════════
 
 CSS = <<~CSS
+  * { border-color: transparent; }
+
   window {
     background: #0a0a1c;
     border: none;
@@ -118,12 +120,19 @@ CSS = <<~CSS
   decoration {
     border: none;
     box-shadow: none;
+    border-color: transparent;
   }
 
   headerbar {
     background: #0d0d1f;
+    border: none;
     border-bottom: 1px solid rgba(167,139,250,0.1);
     min-height: 38px;
+    box-shadow: none;
+  }
+  headerbar decoration,
+  headerbar * {
+    border-color: transparent;
   }
   headerbar .title {
     font-size: 13px; font-weight: 600; color: #c4b5fd;
@@ -143,6 +152,7 @@ CSS = <<~CSS
   .status-row { margin: 6px 0; }
   .indicator {
     min-width: 10px; min-height: 10px; border-radius: 50%; margin-right: 10px;
+    border: none;
   }
   .dot-on  { background: #34d399; }
   .dot-off { background: #f87171; }
@@ -163,14 +173,18 @@ CSS = <<~CSS
 
   button {
     font-size: 12px; font-weight: 600; padding: 10px 18px;
-    border-radius: 10px; border: none;
+    border-radius: 10px;
+    border: 1px solid transparent;
     outline: none;
-    background: rgba(255,255,255,0.04);
+    background: rgba(255,255,255,0.05);
     color: #9ca3af;
+    box-shadow: none;
   }
   button:disabled { opacity: 0.3; }
   button:hover {
-    background: rgba(167,139,250,0.12);
+    background: rgba(167,139,250,0.1);
+    border-color: rgba(167,139,250,0.2);
+    color: #c4b5fd;
   }
 
   .btn-primary {
@@ -223,6 +237,10 @@ class TTSZenApp
     @window.set_size_request(360, 340)
     @window.resizable = false
     @window.window_position = :center
+
+    # Force dark theme so system borders/widgets match our palette
+    settings = Gtk::Settings.default
+    settings.gtk_application_prefer_dark_theme = true
 
     # Proper WM_CLASS so taskbars/docks show "TTS-zen"
     @window.set_wmclass('tts-zen', 'TTS-zen')
