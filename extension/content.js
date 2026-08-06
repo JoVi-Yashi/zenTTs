@@ -2156,6 +2156,41 @@
         </div>
       </div>
       <div class="setting-row">
+        <label>Idioma entrada</label>
+        <div class="select-wrap">
+          <select id="tts-zen-lang-in">
+            <option value="auto">Auto</option>
+            <option value="es">Espa\xF1ol</option>
+            <option value="en">Ingl\xE9s</option>
+            <option value="fr">Franc\xE9s</option>
+            <option value="de">Alem\xE1n</option>
+            <option value="it">Italiano</option>
+            <option value="pt">Portugu\xE9s</option>
+            <option value="ja">Japon\xE9s</option>
+            <option value="ko">Coreano</option>
+            <option value="zh">Chino</option>
+            <option value="ru">Ruso</option>
+          </select>
+        </div>
+      </div>
+      <div class="setting-row">
+        <label>Idioma salida</label>
+        <div class="select-wrap">
+          <select id="tts-zen-lang-out">
+            <option value="es">Espa\xF1ol</option>
+            <option value="en">Ingl\xE9s</option>
+            <option value="fr">Franc\xE9s</option>
+            <option value="de">Alem\xE1n</option>
+            <option value="it">Italiano</option>
+            <option value="pt">Portugu\xE9s</option>
+            <option value="ja">Japon\xE9s</option>
+            <option value="ko">Coreano</option>
+            <option value="zh">Chino</option>
+            <option value="ru">Ruso</option>
+          </select>
+        </div>
+      </div>
+      <div class="setting-row">
         <label>Velocidad</label>
         <div class="speed-group">
           <input type="range" id="tts-zen-speed" min="50" max="300" value="100" step="10">
@@ -2655,21 +2690,25 @@
     currentVoice: "es-ES-AlvaroNeural",
     currentRate: 1,
     currentEngine: "native",
+    langIn: "auto",
+    langOut: "es",
     lang: "es"
   };
   async function loadSettings() {
     try {
-      const stored = await browser.storage.local.get(["voice", "rate", "engine", "lang"]);
+      const stored = await browser.storage.local.get(["voice", "rate", "engine", "lang", "langIn", "langOut"]);
       if (stored.voice) state.currentVoice = stored.voice;
       if (stored.rate) state.currentRate = stored.rate;
       if (stored.engine) state.currentEngine = stored.engine;
       if (stored.lang) state.lang = stored.lang;
+      if (stored.langIn) state.langIn = stored.langIn;
+      if (stored.langOut) state.langOut = stored.langOut;
     } catch (_) {
     }
   }
   async function saveSettings() {
     try {
-      await browser.storage.local.set({ voice: state.currentVoice, rate: state.currentRate, engine: state.currentEngine, lang: state.lang });
+      await browser.storage.local.set({ voice: state.currentVoice, rate: state.currentRate, engine: state.currentEngine, lang: state.lang, langIn: state.langIn, langOut: state.langOut });
     } catch (_) {
     }
   }
@@ -2941,6 +2980,24 @@
       saveSettings();
       applyLanguage(shadow);
     });
+    var langIn = shadow.getElementById("tts-zen-lang-in");
+    if (langIn) {
+      langIn.value = state.langIn;
+      langIn.addEventListener("change", function() {
+        state.langIn = langIn.value;
+        window.__tts_zen_state.langIn = langIn.value;
+        saveSettings();
+      });
+    }
+    var langOut = shadow.getElementById("tts-zen-lang-out");
+    if (langOut) {
+      langOut.value = state.langOut;
+      langOut.addEventListener("change", function() {
+        state.langOut = langOut.value;
+        window.__tts_zen_state.langOut = langOut.value;
+        saveSettings();
+      });
+    }
     const speedSlider = shadow.getElementById("tts-zen-speed");
     const speedLabel = shadow.getElementById("tts-zen-speed-label");
     speedSlider.addEventListener("input", function() {
@@ -3259,7 +3316,6 @@
     return sites["generic"] !== false;
   }
   function extractTextWithRefs() {
-    const result = { text: "", refs: [] };
     for (const site of SITE_EXTRACTORS) {
       if (site.test && site.test()) {
         const text = site.extract();
@@ -3268,7 +3324,22 @@
         }
       }
     }
-    return mapParagraphsToText();
+    var result = mapParagraphsToText();
+    if (result && result.text && result.text.trim().length > 50) return result;
+    try {
+      var doc = document.cloneNode(true);
+      var reader = new import_readability.Readability(doc);
+      var article = reader.parse();
+      if (article && article.textContent && article.textContent.trim().length > 50) {
+        return { text: article.textContent.trim(), refs: [] };
+      }
+    } catch (_) {
+    }
+    var body = document.body;
+    if (body && body.innerText && body.innerText.trim().length > 10) {
+      return { text: body.innerText.trim(), refs: [{ el: body, start: 0, end: body.innerText.trim().length }] };
+    }
+    return null;
   }
   function mapParagraphsToText() {
     const result = { text: "", refs: [] };
@@ -3622,6 +3693,18 @@
     window.__tts_zen_last_text = text;
     setStatus(ts("starting"));
     var st = window.__tts_zen_state || {};
+    var langIn = st.langIn || "auto";
+    var langOut = st.langOut || "es";
+    if (langIn !== langOut && langIn !== "auto") {
+      try {
+        setStatus("Traduciendo...");
+        var resp = await browser.runtime.sendMessage({ action: "translate", text, from: langIn, to: langOut });
+        if (resp.success && resp.text) {
+          text = resp.text;
+        }
+      } catch (_) {
+      }
+    }
     if (st.currentEngine === "server") {
       await startServerPlayback(text);
       return;
@@ -3689,7 +3772,7 @@
     var idx = Math.min(sentenceData.length - 1, currentSentenceIdx + 1);
     jumpToSentence(idx);
   }
-  window.__tts_zen_state = { currentVoice: "es-ES-AlvaroNeural", currentRate: 1, currentEngine: "native", serverAvailable: false, lang: "es" };
+  window.__tts_zen_state = { currentVoice: "es-ES-AlvaroNeural", currentRate: 1, currentEngine: "native", serverAvailable: false, lang: "es", langIn: "auto", langOut: "es" };
   function ts(key) {
     var lang = window.__tts_zen_state && window.__tts_zen_state.lang || "es";
     var T2 = {

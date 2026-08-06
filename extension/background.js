@@ -11,6 +11,12 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
         .catch(err => sendResponse({ success: false, error: err.message }));
       return true;
 
+    case 'translate':
+      handleTranslate(message.text, message.from, message.to)
+        .then(sendResponse)
+        .catch(err => sendResponse({ success: false, error: err.message }));
+      return true;
+
     case 'get_voices':
       handleGetVoices()
         .then(sendResponse)
@@ -50,6 +56,16 @@ async function handleHealth() {
   } catch (e) {
     return { success: false, error: e.message };
   }
+}
+
+async function handleTranslate(text, from, to) {
+  const resp = await fetch('http://localhost:8765/translate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, from: from || 'auto', to: to || 'es' })
+  });
+  if (!resp.ok) throw new Error('Translate failed');
+  return await resp.json();
 }
 
 async function handleGetVoices() {

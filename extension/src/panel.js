@@ -69,6 +69,41 @@ const PANEL_HTML = `
         </div>
       </div>
       <div class="setting-row">
+        <label>Idioma entrada</label>
+        <div class="select-wrap">
+          <select id="tts-zen-lang-in">
+            <option value="auto">Auto</option>
+            <option value="es">Español</option>
+            <option value="en">Inglés</option>
+            <option value="fr">Francés</option>
+            <option value="de">Alemán</option>
+            <option value="it">Italiano</option>
+            <option value="pt">Portugués</option>
+            <option value="ja">Japonés</option>
+            <option value="ko">Coreano</option>
+            <option value="zh">Chino</option>
+            <option value="ru">Ruso</option>
+          </select>
+        </div>
+      </div>
+      <div class="setting-row">
+        <label>Idioma salida</label>
+        <div class="select-wrap">
+          <select id="tts-zen-lang-out">
+            <option value="es">Español</option>
+            <option value="en">Inglés</option>
+            <option value="fr">Francés</option>
+            <option value="de">Alemán</option>
+            <option value="it">Italiano</option>
+            <option value="pt">Portugués</option>
+            <option value="ja">Japonés</option>
+            <option value="ko">Coreano</option>
+            <option value="zh">Chino</option>
+            <option value="ru">Ruso</option>
+          </select>
+        </div>
+      </div>
+      <div class="setting-row">
         <label>Velocidad</label>
         <div class="speed-group">
           <input type="range" id="tts-zen-speed" min="50" max="300" value="100" step="10">
@@ -525,24 +560,28 @@ let state = {
   currentVoice: 'es-ES-AlvaroNeural',
   currentRate: 1.0,
   currentEngine: 'native',
-  lang: 'es',
+  langIn: 'auto',
+  langOut: 'es',
+  lang: 'es'
 };
 
 // ---- Storage ----
 
 async function loadSettings() {
   try {
-    const stored = await browser.storage.local.get(['voice', 'rate', 'engine', 'lang']);
+    const stored = await browser.storage.local.get(['voice', 'rate', 'engine', 'lang', 'langIn', 'langOut']);
     if (stored.voice) state.currentVoice = stored.voice;
     if (stored.rate) state.currentRate = stored.rate;
     if (stored.engine) state.currentEngine = stored.engine;
     if (stored.lang) state.lang = stored.lang;
+    if (stored.langIn) state.langIn = stored.langIn;
+    if (stored.langOut) state.langOut = stored.langOut;
   } catch (_) {}
 }
 
 async function saveSettings() {
   try {
-    await browser.storage.local.set({ voice: state.currentVoice, rate: state.currentRate, engine: state.currentEngine, lang: state.lang });
+    await browser.storage.local.set({ voice: state.currentVoice, rate: state.currentRate, engine: state.currentEngine, lang: state.lang, langIn: state.langIn, langOut: state.langOut });
   } catch (_) {}
 }
 
@@ -859,6 +898,11 @@ export async function createPanel(shadow, handlers) {
     saveSettings();
     applyLanguage(shadow);
   });
+
+  var langIn = shadow.getElementById('tts-zen-lang-in');
+  if (langIn) { langIn.value = state.langIn; langIn.addEventListener('change', function() { state.langIn = langIn.value; window.__tts_zen_state.langIn = langIn.value; saveSettings(); }); }
+  var langOut = shadow.getElementById('tts-zen-lang-out');
+  if (langOut) { langOut.value = state.langOut; langOut.addEventListener('change', function() { state.langOut = langOut.value; window.__tts_zen_state.langOut = langOut.value; saveSettings(); }); }
 
   const speedSlider = shadow.getElementById('tts-zen-speed');
   const speedLabel = shadow.getElementById('tts-zen-speed-label');

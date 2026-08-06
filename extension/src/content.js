@@ -42,9 +42,7 @@ async function waitForElement(selector, timeout = 10000) {
 }
 
 function extractTextWithRefs() {
-  const result = { text: '', refs: [] };
-
-  // Try site-specific extractors first — they return text with paragraph breaks
+  // Try site-specific extractors first
   for (const site of SITE_EXTRACTORS) {
     if (site.test && site.test()) {
       const text = site.extract();
@@ -54,8 +52,26 @@ function extractTextWithRefs() {
     }
   }
 
-  // Generic: map visible paragraphs
-  return mapParagraphsToText();
+  // Generic extraction with multiple strategies
+  var result = mapParagraphsToText();
+  if (result && result.text && result.text.trim().length > 50) return result;
+
+  // Fallback: try Readability (handles translated pages better)
+  try {
+    var doc = document.cloneNode(true);
+    var reader = new Readability(doc);
+    var article = reader.parse();
+    if (article && article.textContent && article.textContent.trim().length > 50) {
+      return { text: article.textContent.trim(), refs: [] };
+    }
+  } catch (_) {}
+
+  // Last resort: body text
+  var body = document.body;
+  if (body && body.innerText && body.innerText.trim().length > 10) {
+    return { text: body.innerText.trim(), refs: [{ el: body, start: 0, end: body.innerText.trim().length }] };
+  }
+  return null;
 }
 
 function mapParagraphsToText() {
@@ -475,6 +491,22 @@ async function dispatchReadPage(extractFn) {
   setStatus(ts('starting'));
 
   var st = window.__tts_zen_state || {};
+  var langIn = st.langIn || 'auto';
+  var langOut = st.langOut || 'es';
+
+  // Translate if input != output language
+  if (langIn !== langOut && langIn !== 'auto') {
+    try {
+      setStatus('Traduciendo...');
+      var resp = await browser.runtime.sendMessage({ action: 'translate', text: text, from: langIn, to: langOut });
+      if (resp.success && resp.text) {
+        text = resp.text;
+      }
+    } catch (_) {
+      // Translation failed, continue with original text
+    }
+  }
+
   if (st.currentEngine === 'server') {
     await startServerPlayback(text);
     return;
@@ -552,7 +584,7 @@ function handleNext() {
 // ---- Panel state bridge ----
 
 // State shared with panel via global
-window.__tts_zen_state = { currentVoice: 'es-ES-AlvaroNeural', currentRate: 1.0, currentEngine: 'native', serverAvailable: false, lang: 'es' };
+window.__tts_zen_state = { currentVoice: 'es-ES-AlvaroNeural', currentRate: 1.0, currentEngine: 'native', serverAvailable: false, lang: 'es', langIn: 'auto', langOut: 'es' };
 
 // Translation helper for status messages
 function ts(key) {

@@ -189,3 +189,22 @@ post '/extract' do
     halt 500, { error: e.message }.to_json
   end
 end
+
+post '/translate' do
+  body = JSON.parse(request.body.read) rescue {}
+  text = (body['text'] || '').strip
+  halt 400, { error: 'text required' }.to_json if text.empty?
+
+  from = body['from'] || 'auto'
+  to   = body['to']   || 'es'
+
+  uri = URI("https://translate.googleapis.com/translate_a/single?client=gtx&sl=#{from}&tl=#{to}&dt=t&q=#{URI.encode_www_form_component(text[0..2000])}")
+  resp = Net::HTTP.get(uri)
+  parsed = JSON.parse(resp)
+  translated = parsed[0].map { |s| s[0] }.join
+
+  content_type :json
+  { text: translated, from: from, to: to }.to_json
+rescue => e
+  halt 500, { error: e.message }.to_json
+end
