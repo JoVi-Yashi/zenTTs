@@ -8,6 +8,7 @@ require 'base64'
 require 'open3'
 require 'tempfile'
 require 'fileutils'
+require 'net/http'
 
 set :port, 8765
 set :bind, '127.0.0.1'
