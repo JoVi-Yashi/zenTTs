@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>zenTTS — Text-to-Speech para Zen Browser</title>
 <link rel="icon" type="image/png" href="ZenTTs.png">
 <meta property="og:title" content="zenTTS — Text-to-Speech para Zen Browser">
@@ -205,10 +205,61 @@ footer{text-align:center;padding:40px 20px;color:#4b5563;font-size:13px;border-t
 footer a{color:#6b7280}
 footer p{margin:0}
 
-  @media(max-width:600px){
-    .hero{padding:60px 16px 40px}.hero h1{font-size:36px}.hero .subtitle{font-size:15px}
-    .branch-cards{grid-template-columns:1fr}
+  @media(max-width:768px){
+    body::before{animation:none;opacity:.02}
+    .orb{display:none}
+    .hero{padding:60px 16px 40px}
+    .hero h1{font-size:40px;letter-spacing:-1px}
+    .hero .subtitle{font-size:14px;padding:0 8px}
+    .hero-buttons{flex-direction:column;align-items:center}
+    .btn{width:100%;max-width:280px;justify-content:center}
+    .preview-section{padding:30px 12px 50px}
     .panel-preview{width:100%;max-width:290px}
+    .panel-wrapper{transform:rotateX(3deg) rotateY(-3deg)}
+    .panel-wrapper:hover{transform:rotateX(0deg) rotateY(0deg) translateZ(10px)}
+    .features{padding:40px 16px}
+    .features h2{font-size:24px;margin-bottom:32px}
+    .features-grid{grid-template-columns:1fr;gap:10px}
+    .f-card{padding:20px 18px}
+    .install{padding:40px 16px}
+    .install h2{font-size:24px}
+    .steps{gap:8px}
+    .step{padding:14px}
+    .step-content pre{font-size:11px;padding:10px}
+    .sites-section{padding:0 16px 40px}
+    .sites-section h2{font-size:16px}
+    .sites-grid{gap:8px}
+    .site-badge{padding:8px 14px}
+    .site-badge span{font-size:12px}
+    .branches{padding:40px 16px 60px}
+    .branch-cards{grid-template-columns:1fr}
+    .panel-stage{perspective:600px}
+    .panel-shadow{inset:-10px -10px -20px}
+    .petal{animation-duration:calc(var(--dur) * .7) !important}
+    footer{padding:30px 16px;font-size:12px}
+  }
+
+  @media(max-width:400px){
+    .hero h1{font-size:32px}
+    .hero .subtitle{font-size:13px}
+    .panel-preview{width:100%;max-width:260px;font-size:11px}
+    .panel-header{padding:6px 10px}
+    .panel-logo{font-size:11px}
+    .panel-body{padding:0 10px}
+    .panel-setting{padding:6px 0;gap:6px}
+    .panel-setting label{min-width:50px;font-size:10px}
+    .panel-sel{font-size:10px;padding:4px 20px 4px 6px}
+    .panel-sl span{font-size:10px;min-width:26px}
+    .panel-counter{font-size:10px;padding:8px 10px 2px}
+    .panel-nav{gap:10px;padding:0 10px 4px}
+    .panel-nav button{width:28px;height:24px}
+    .panel-ctrls{padding:0 10px 6px;gap:4px}
+    .panel-btn{padding:6px;font-size:10px}
+    .panel-st{font-size:10px;padding:2px 10px 6px}
+    .panel-ico{width:24px;height:24px}
+    .panel-min{width:10px;height:10px}
+    .sites-sub{font-size:12px}
+    .site-badge img{width:20px;height:20px}
   }
 </style>
 </head>
