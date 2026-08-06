@@ -15,6 +15,9 @@
     "storage",
     "activeTab"
   ],
+  "data_collection_permissions": {
+    "usage": "none"
+  },
   "host_permissions": [
     "http://localhost:8765/*"
   ],
