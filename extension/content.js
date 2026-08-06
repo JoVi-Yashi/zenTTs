@@ -3599,68 +3599,91 @@
   }
   var serverAudio = null;
   var serverSentences = [];
+  function splitText(text, maxLen) {
+    maxLen = maxLen || 3e3;
+    if (text.length <= maxLen) return [text];
+    var parts = [];
+    var sentences = text.match(/[^.!?…\n]+[.!?…]*(\n|$)?/g) || [text];
+    var cur = "";
+    for (var i = 0; i < sentences.length; i++) {
+      if (cur.length + sentences[i].length > maxLen && cur.length > 0) {
+        parts.push(cur.trim());
+        cur = "";
+      }
+      cur += sentences[i];
+    }
+    if (cur.trim()) parts.push(cur.trim());
+    return parts;
+  }
   async function startServerPlayback(text) {
     stopSpeech();
     var st = window.__tts_zen_state || {};
     var voice = st.currentVoice || "es-ES-AlvaroNeural";
     var rate = st.currentRate || 1;
     var rateStr = rate >= 1 ? "+" + Math.round((rate - 1) * 100) + "%" : "-" + Math.round((1 - rate) * 100) + "%";
-    setStatus(ts("connecting"));
+    var chunks = splitText(text, 3e3);
+    var totalChunks = chunks.length;
+    var allSentences = [];
+    isSpeaking = true;
+    setButtonsEnabled({ read: false, pause: true, stop: true, prev: true, next: true });
+    setPauseIcon(true);
     try {
-      var resp = await browser.runtime.sendMessage({ action: "read_page_sync", text, voice, rate: rateStr });
-      if (!resp.success) throw new Error(ts("serverError"));
-      if (!resp.sentences || resp.sentences.length === 0) throw new Error(ts("noTiming"));
-      serverSentences = resp.sentences;
-      window.__tts_zen_sentences = serverSentences;
-      window.__tts_zen_state.serverAvailable = true;
-      sentenceData = serverSentences.map(function(s) {
-        return { text: s.text, start: s.start, end: s.end };
-      });
-      var audioBytes = Uint8Array.from(atob(resp.audio), function(c) {
-        return c.charCodeAt(0);
-      });
-      var blob = new Blob([audioBytes], { type: "audio/mpeg" });
-      var url = URL.createObjectURL(blob);
-      if (serverAudio) {
-        serverAudio.pause();
-        URL.revokeObjectURL(serverAudio.src);
-      }
-      serverAudio = new Audio(url);
-      serverAudio.playbackRate = rate;
-      currentSentenceIdx = 0;
-      isSpeaking = true;
-      setButtonsEnabled({ read: false, pause: true, stop: true, prev: true, next: true });
-      setPauseIcon(true);
-      serverAudio.ontimeupdate = function() {
-        if (!isSpeaking || serverSentences.length === 0) return;
-        var t2 = serverAudio.currentTime;
-        for (var i = currentSentenceIdx; i < serverSentences.length; i++) {
-          if (t2 >= serverSentences[i].start && t2 < serverSentences[i].end) {
-            if (i !== currentSentenceIdx) {
-              currentSentenceIdx = i;
-              updateHighlightServer(i);
-            }
-            break;
-          }
+      for (var ci = 0; ci < totalChunks; ci++) {
+        if (!isSpeaking) break;
+        var progress = totalChunks > 1 ? " [" + (ci + 1) + "/" + totalChunks + "]" : "";
+        setStatus(ts("serverMode") + progress);
+        var resp = await browser.runtime.sendMessage({ action: "read_page_sync", text: chunks[ci], voice, rate: rateStr });
+        if (!resp.success) throw new Error(ts("serverError"));
+        var offset = allSentences.length > 0 ? allSentences[allSentences.length - 1].end : 0;
+        (resp.sentences || []).forEach(function(s) {
+          allSentences.push({ text: s.text, start: s.start + offset, end: s.end + offset });
+        });
+        serverSentences = allSentences;
+        window.__tts_zen_sentences = serverSentences;
+        sentenceData = allSentences;
+        window.__tts_zen_state.serverAvailable = true;
+        var audioBytes = Uint8Array.from(atob(resp.audio), function(c) {
+          return c.charCodeAt(0);
+        });
+        var blob = new Blob([audioBytes], { type: "audio/mpeg" });
+        var url = URL.createObjectURL(blob);
+        if (serverAudio) {
+          serverAudio.pause();
+          URL.revokeObjectURL(serverAudio.src);
         }
-      };
-      serverAudio.onended = function() {
-        isSpeaking = false;
-        setStatus(ts("ready"));
-        setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
-        setPauseIcon(false);
-      };
-      serverAudio.onerror = function() {
-        setStatus(ts("audioError"), true);
-        setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
-        isSpeaking = false;
-      };
-      await serverAudio.play();
-      setStatus(ts("serverMode"));
+        serverAudio = new Audio(url);
+        serverAudio.playbackRate = rate;
+        currentSentenceIdx = ci === 0 ? 0 : allSentences.length - (resp.sentences || []).length;
+        await new Promise(function(resolve, reject) {
+          serverAudio.ontimeupdate = function() {
+            if (!isSpeaking || !serverSentences.length) return;
+            var t2 = serverAudio.currentTime;
+            for (var i = currentSentenceIdx; i < serverSentences.length; i++) {
+              if (t2 >= serverSentences[i].start && t2 < serverSentences[i].end) {
+                if (i !== currentSentenceIdx) {
+                  currentSentenceIdx = i;
+                  updateHighlightServer(i);
+                }
+                break;
+              }
+            }
+          };
+          serverAudio.onended = resolve;
+          serverAudio.onerror = function() {
+            reject(new Error("audio"));
+          };
+          serverAudio.play().catch(reject);
+        });
+      }
+      isSpeaking = false;
+      setStatus(ts("ready"));
+      setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
+      setPauseIcon(false);
     } catch (e) {
       window.__tts_zen_state.serverAvailable = false;
       setStatus(ts("noServer"), true);
       setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
+      isSpeaking = false;
     }
   }
   function updateHighlightServer(idx) {
