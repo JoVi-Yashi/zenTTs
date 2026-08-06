@@ -43,9 +43,8 @@ end
 def action_start
   return if running?
   pid = spawn(
-    { '__BASH' => nil },
-    'uv', 'run', 'uvicorn', 'tts_zen.main:app', '--port', PORT.to_s, '--host', '127.0.0.1',
-    chdir: File.join(PROJECT_DIR, 'server'),
+    'ruby', 'server.rb',
+    chdir: PROJECT_DIR,
     out: LOG_FILE, err: LOG_FILE,
     pgroup: true
   )

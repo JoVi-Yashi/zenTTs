@@ -1,21 +1,16 @@
-.PHONY: install-backend backend test install-extension build-extension extension launcher stop install-desktop
+.PHONY: install build-extension extension launcher stop install-desktop
 
-install-backend:
-	cd server && uv sync --group dev
+install:
+	bundle install
 
 backend:
-	cd server && uv run uvicorn tts_zen.main:app --port 8765
-
-test:
-	cd server && uv run pytest -v
-
-install-extension:
-	cd extension && npm install
+	ruby server.rb
 
 build-extension:
 	cd extension && npx esbuild src/content.js --bundle --outfile=content.js --format=iife --target=es2020 --platform=browser --log-level=info
 
-extension: install-extension build-extension
+extension:
+	cd extension && npm install && npx esbuild src/content.js --bundle --outfile=content.js --format=iife --target=es2020 --platform=browser --log-level=info
 
 # ── Launcher ───────────────────────────────────────────
 
@@ -23,7 +18,7 @@ launcher:
 	ruby launcher.rb
 
 stop:
-	pkill -f "uvicorn tts_zen" 2>/dev/null || true
+	pkill -f "server.rb" 2>/dev/null || true
 
 install-desktop:
 	@mkdir -p "$(HOME)/.local/share/applications"
