@@ -801,7 +801,7 @@ export async function createPanel(shadow, handlers) {
   shadow.appendChild(style);
 
   const container = document.createElement('div');
-  container.innerHTML = PANEL_HTML;
+  container.insertAdjacentHTML('beforeend', PANEL_HTML);
   shadow.appendChild(container);
 
   // Minimize button
@@ -1024,7 +1024,8 @@ var PAUSE_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentC
 export function setPauseIcon(isPlaying) {
   var btn = getEl('tts-zen-pause');
   if (!btn) return;
-  btn.innerHTML = isPlaying ? PAUSE_ICON : PLAY_ICON; /* trusted static SVG */
+  btn.textContent = '';
+  btn.insertAdjacentHTML('beforeend', isPlaying ? PAUSE_ICON : PLAY_ICON);
 }
 
 

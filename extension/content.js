@@ -2889,7 +2889,7 @@
     style.textContent = PANEL_CSS;
     shadow.appendChild(style);
     const container = document.createElement("div");
-    container.innerHTML = PANEL_HTML;
+    container.insertAdjacentHTML("beforeend", PANEL_HTML);
     shadow.appendChild(container);
     const minimizeBtn = shadow.getElementById("tts-zen-minimize");
     minimizeBtn.addEventListener("click", toggleCollapse);
@@ -3076,7 +3076,8 @@
   function setPauseIcon(isPlaying) {
     var btn = getEl("tts-zen-pause");
     if (!btn) return;
-    btn.innerHTML = isPlaying ? PAUSE_ICON : PLAY_ICON;
+    btn.textContent = "";
+    btn.insertAdjacentHTML("beforeend", isPlaying ? PAUSE_ICON : PLAY_ICON);
   }
   var ALL_SITES = [
     { id: "wattpad.com", name: "Wattpad", domain: "wattpad.com" },
