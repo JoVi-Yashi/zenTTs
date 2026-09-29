@@ -96,7 +96,7 @@ Shadow DOM encapsulation. Site CSS never interferes. Appears bottom-right, colla
 Choose between native SpeechSynthesis (no dependencies) or edge-tts with Microsoft neural voices. Switch from ⚙ → Engine without restarting.
 
 ### Synchronized highlighting
-Each sentence highlights on the page DOM (yellow highlighter + auto-scroll) and in a synchronized pop-up with adjustable typography.
+The sentence being read is marked on the page itself and the spoken word is highlighted on top of it, in real time (exact timings with the neural voice, estimated with the local one). The marker sets its own text color, so it reads the same on light and dark sites. The panel's reading view follows along too.
 
 ### Next chapter, automatically
 On AO3, FanFiction.net and Wattpad, when a chapter ends the next one loads in the same page and reading continues. Turn it off in ⚙ → "Continue with the next chapter".

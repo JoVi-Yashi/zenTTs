@@ -64,6 +64,7 @@ modules:
     buildsystem: simple
     build-commands:
       - install -Dm755 server.rb /app/share/zentts/server.rb
+      - install -Dm755 edge_words.py /app/share/zentts/edge_words.py
       - install -Dm755 gui.rb /app/share/zentts/gui.rb
       - install -Dm755 launcher.sh /app/share/zentts/launcher.sh
       - install -Dm644 Gemfile /app/share/zentts/Gemfile
@@ -90,6 +91,7 @@ modules:
         path: .
         only:
           - server.rb
+          - edge_words.py
           - gui.rb
           - launcher.rb
           - launcher.sh

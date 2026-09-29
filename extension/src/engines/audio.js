@@ -10,8 +10,10 @@ export function blobFromBase64(b64, type) {
 export function createAudioPlayer() {
   var audio = null;
   var finish = null;
+  var frame = null;
 
   function release() {
+    if (frame) { cancelAnimationFrame(frame); frame = null; }
     if (!audio) return;
     audio.ontimeupdate = audio.onended = audio.onerror = null;
     audio.pause();
@@ -28,7 +30,15 @@ export function createAudioPlayer() {
         finish = resolve;
         a.playbackRate = rate || 1;
         if (startAt) a.currentTime = startAt;
-        a.ontimeupdate = function() { if (onTime) onTime(a.currentTime); };
+        // timeupdate keeps working in background tabs; animation frames make
+        // word highlighting smooth while the tab is visible
+        a.ontimeupdate = function() { if (onTime) onTime(a.currentTime, a.duration); };
+        function tick() {
+          if (audio !== a) return;
+          if (!a.paused && onTime) onTime(a.currentTime, a.duration);
+          frame = requestAnimationFrame(tick);
+        }
+        frame = requestAnimationFrame(tick);
         a.onended = function() { release(); resolve(); };
         a.onerror = function() { release(); reject(new Error('audio')); };
         a.play().catch(function(e) { release(); reject(e); });

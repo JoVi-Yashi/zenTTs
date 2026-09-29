@@ -26,6 +26,8 @@ end
 
 # ── Edge-TTS CLI path ──
 EDGE_TTS = ENV.fetch('EDGE_TTS_PATH', 'edge-tts').freeze
+PYTHON = ENV.fetch('PYTHON', 'python3').freeze
+EDGE_WORDS = File.join(__dir__, 'edge_words.py').freeze
 TRAFILATURA = ENV.fetch('TRAFILATURA_PATH', 'trafilatura').freeze
 
 # ── Helpers ──
@@ -51,6 +53,26 @@ def run_tts(text, voice: 'es-ES-AlvaroNeural', rate: '+0%')
     tmp_text.close!
     tmp_audio.close!
     tmp_subs.close!
+  end
+end
+
+# Like run_tts, but with a timestamp for every word (via edge_words.py).
+# Returns [audio, words] or nil when the edge_tts Python module is unavailable.
+def run_tts_words(text, voice:, rate:)
+  tmp_text  = Tempfile.new(['tts-text', '.txt'])
+  tmp_audio = Tempfile.new(['tts', '.mp3'])
+  begin
+    tmp_text.write(text)
+    tmp_text.close
+    out, _err, status = Open3.capture3(PYTHON, EDGE_WORDS, voice, rate, tmp_text.path, tmp_audio.path)
+    return nil unless status.success?
+
+    [File.binread(tmp_audio.path), JSON.parse(out)]
+  rescue JSON::ParserError, SystemCallError
+    nil
+  ensure
+    tmp_text.close!
+    tmp_audio.close!
   end
 end
 
@@ -101,7 +123,7 @@ get '/' do
       '/health' => 'GET — health check',
       '/voices?locale=es-' => 'GET — list voices (all when no locale)',
       '/tts' => 'POST {text, voice?, rate?} — MP3 audio',
-      '/tts/sync' => 'POST {text, voice?, rate?} — audio + timing',
+      '/tts/sync' => 'POST {text, voice?, rate?, words?} — audio + sentence or word timing',
       '/extract' => 'POST {url, voice?, rate?} — extract + TTS',
       '/translate' => 'POST {texts[], from?, to?} — translate paragraphs'
     }
@@ -154,15 +176,24 @@ post '/tts/sync' do
   rate  = body['rate']  || '+0%'
 
   begin
-    audio, subs = run_tts(text, voice: voice, rate: rate)
-    sentences = parse_vtt(subs)
+    # Word timings when asked for; falls back to the CLI's sentence subtitles
+    if body['words'] && (result = run_tts_words(text, voice: voice, rate: rate))
+      audio, words = result
+      sentences = []
+    else
+      audio, subs = run_tts(text, voice: voice, rate: rate)
+      sentences = parse_vtt(subs)
+      words = []
+    end
+    last = (sentences.last || words.last)
 
     content_type :json
     {
       audio: Base64.strict_encode64(audio),
       mime: 'audio/mpeg',
       sentences: sentences,
-      total_duration: sentences.any? ? sentences.last[:end] : 0
+      words: words,
+      total_duration: last ? (last[:end] || last['end']) : 0
     }.to_json
   rescue => e
     halt 500, { error: e.message }.to_json
