@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- zenTTS — simplified capital Z for 16–48 px -->
+  <rect x="1" y="1" width="62" height="62" rx="12" fill="#c9973a"/>
+  <rect x="4" y="4" width="56" height="56" rx="10" fill="#7c2716"/>
+  <path fill="#e8b54c" stroke="#2a160c" stroke-width="1.5" stroke-linejoin="round"
+        d="M13 13 L51 13 L51 19 L26 45 L51 45 L51 51 L13 51 L13 45 L38 19 L13 19 Z"/>
+  <path fill="#e8b54c" stroke="#2a160c" stroke-width="1.2" stroke-linejoin="round" d="M23 32 L25 30.5 L39 30.5 L41 32 L39 33.5 L25 33.5 Z"/>
+</svg>

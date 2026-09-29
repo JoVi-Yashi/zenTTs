@@ -7,138 +7,212 @@
 <meta name="description" content="Un panel pequeño que lee en voz alta la página que tienes abierta. Pensado para Wattpad, AO3, FanFiction y Webnovel.">
 <link rel="icon" type="image/png" href="tts.png">
 <meta property="og:title" content="zenTTS — lectura en voz alta para Zen Browser">
-<meta property="og:description" content="Un panel pequeño que lee en voz alta la página que tienes abierta. Voces del navegador o voces neurales con edge-tts.">
+<meta property="og:description" content="Un panel pequeño que lee en voz alta la página que tienes abierta. Voces del navegador, voces neurales o una voz local sin conexión.">
 <meta property="og:image" content="https://jovi-yashi.github.io/zenTTs/tts.png">
 <meta property="og:type" content="website">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&display=swap" rel="stylesheet">
 <style>
   :root {
-    --paper: #f6f1e7;
-    --sheet: #fbf8f1;
-    --ink: #2a2622;
-    --ink-soft: #6d655a;
-    --rule: #ddd4c3;
-    --accent: #9a3b25;
-    --mark: #f3e19a;
-    --serif: "Source Serif 4", "Iowan Old Style", Charter, Georgia, serif;
+    --vellum: #efe3c6;
+    --vellum-deep: #dcc79c;
+    --folio: #f5ecd6;
+    --ink: #2b1d12;
+    --ink-soft: #5e4a36;
+    --rubric: #9b2a1a;
+    --gold: #b8872e;
+    --gold-light: #e3b04b;
+    --lapis: #2f4f7a;
+    --field: #7c2716;
+    --mark: rgba(227, 176, 75, .45);
+    --rule: rgba(43, 29, 18, .28);
+    --display: "IM Fell English", "EB Garamond", Garamond, Georgia, serif;
+    --display-sc: "IM Fell English SC", "IM Fell English", Garamond, Georgia, serif;
+    --text: "EB Garamond", Garamond, "Iowan Old Style", Georgia, serif;
     --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
     --mono: ui-monospace, "JetBrains Mono", "Fira Code", monospace;
+    --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .25 0 0 0 0 .12 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --paper: #1b1916;
-      --sheet: #23201c;
-      --ink: #e9e2d4;
-      --ink-soft: #a39a8b;
-      --rule: #3a352e;
-      --accent: #d9785c;
-      --mark: rgba(217,120,92,.26);
+      --vellum: #17120d;
+      --vellum-deep: #0e0b08;
+      --folio: #211a13;
+      --ink: #ecdfc4;
+      --ink-soft: #b9a88a;
+      --rubric: #e0775b;
+      --gold: #d8ae5c;
+      --gold-light: #e8c374;
+      --lapis: #8fb0dc;
+      --field: #6e2213;
+      --mark: rgba(216, 174, 92, .28);
+      --rule: rgba(236, 223, 196, .22);
     }
   }
 
   *, *::before, *::after { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
   body {
-    margin: 0; background: var(--paper); color: var(--ink);
-    font: 18px/1.65 var(--serif);
-    font-optical-sizing: auto;
+    margin: 0; color: var(--ink);
+    font: 20px/1.6 var(--text);
+    background:
+      var(--grain),
+      radial-gradient(ellipse at 50% 40%, transparent 55%, var(--vellum-deep) 100%),
+      var(--vellum);
+    font-variant-numeric: oldstyle-nums;
   }
-  main, header, footer { max-width: 680px; margin: 0 auto; padding: 0 20px; }
+  a { color: var(--rubric); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  a:hover { color: var(--ink); }
 
-  a { color: inherit; text-decoration-color: var(--accent); text-underline-offset: 3px; }
-  a:hover { color: var(--accent); }
+  /* ---- The folio ---- */
+  .folio {
+    position: relative; max-width: 820px; margin: 40px auto 56px; padding: 72px 88px 64px;
+    background: var(--grain), var(--folio);
+    box-shadow: 0 1px 0 var(--rule), 0 18px 50px rgba(43, 29, 18, .18);
+  }
+  .folio::before, .folio::after {
+    content: ""; position: absolute; pointer-events: none;
+  }
+  .folio::before { inset: 18px; border: 2px solid var(--gold); }
+  .folio::after { inset: 25px; border: 1px solid var(--gold); opacity: .6; }
+  .corner { position: absolute; width: 46px; height: 46px; color: var(--gold); z-index: 1; }
+  .corner.tl { top: 6px; left: 6px; }
+  .corner.tr { top: 6px; right: 6px; transform: scaleX(-1); }
+  .corner.bl { bottom: 6px; left: 6px; transform: scaleY(-1); }
+  .corner.br { bottom: 6px; right: 6px; transform: scale(-1); }
 
-  /* Masthead */
   .top {
     display: flex; justify-content: space-between; align-items: baseline;
-    padding-top: 24px; font: 14px var(--sans); color: var(--ink-soft);
+    font: 16px var(--display-sc); color: var(--ink-soft); letter-spacing: .04em;
   }
   .lang button {
     background: none; border: none; padding: 2px 4px; cursor: pointer;
     font: inherit; color: var(--ink-soft);
   }
-  .lang button[aria-pressed="true"] { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+  .lang button[aria-pressed="true"] { color: var(--rubric); text-decoration: underline; text-underline-offset: 4px; }
 
+  /* ---- Title page ---- */
+  .incipit {
+    text-align: center; margin: 44px 0 6px;
+    font: 18px var(--display-sc); color: var(--rubric); letter-spacing: .2em;
+  }
   h1 {
-    font-size: clamp(48px, 10vw, 76px); font-weight: 600; line-height: 1;
-    letter-spacing: -0.02em; margin: 72px 0 20px;
+    text-align: center; margin: 0; line-height: 1;
+    font: 400 clamp(64px, 12vw, 108px) var(--display); letter-spacing: -.01em;
   }
-  h1 em { font-weight: 400; color: var(--accent); }
-  .lede { font-size: 22px; line-height: 1.5; margin: 0 0 28px; max-width: 34em; }
-  .actions { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; font: 15px var(--sans); }
-  .btn {
-    display: inline-block; padding: 10px 18px; border-radius: 4px;
-    background: var(--ink); color: var(--paper); text-decoration: none; font-weight: 600;
+  h1 em { color: var(--rubric); }
+  .ornament { display: block; margin: 18px auto; width: 220px; height: 22px; color: var(--gold); }
+  .lede { text-align: center; font-size: 23px; line-height: 1.5; margin: 0 auto 30px; max-width: 30em; font-style: italic; }
+  .actions { display: flex; gap: 22px; justify-content: center; align-items: center; flex-wrap: wrap; font: 17px var(--display-sc); letter-spacing: .06em; }
+  .seal {
+    display: inline-block; padding: 10px 22px 11px; text-decoration: none;
+    color: #f7ead0; background: var(--field);
+    border: 2px solid var(--gold); outline: 1px solid var(--field); outline-offset: 2px;
   }
-  .btn:hover { color: var(--paper); opacity: .88; }
+  .seal:hover { color: #fff; background: #8e2e1a; }
 
-  /* Demo */
-  .demo {
-    margin: 64px 0 0; padding: 32px 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
-    display: grid; grid-template-columns: 1fr 232px; gap: 32px; align-items: start;
+  /* ---- Headings, rubrics and dividers ---- */
+  h2 {
+    font: 400 32px var(--display); color: var(--rubric); text-align: center;
+    margin: 64px 0 20px; letter-spacing: .01em;
   }
-  .excerpt p { margin: 0 0 14px; }
-  .excerpt .chapter { font-size: 14px; font-style: italic; color: var(--ink-soft); margin-bottom: 8px; }
+  h2::before, h2::after { content: "❧"; color: var(--gold); font-size: .7em; margin: 0 .5em; position: relative; top: -.1em; }
+  h2::before { display: inline-block; transform: scaleX(-1); }
+
+  /* ---- Illuminated initials ---- */
+  .dropcap {
+    float: left; width: 4.4em; height: 4.4em; margin: .3em .55em 0 0;
+    display: flex; align-items: center; justify-content: center;
+    font: 400 2.9em/1 var(--display); color: var(--gold-light);
+    text-shadow: 0 1px 0 #2a160c, 0 -1px 0 #2a160c, 1px 0 0 #2a160c, -1px 0 0 #2a160c;
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Cpath d='M8 1 L15 8 L8 15 L1 8 Z' fill='none' stroke='%235e1a0e' stroke-width='1'/%3E%3Ccircle cx='8' cy='8' r='1.2' fill='%23a8452c'/%3E%3C/svg%3E"),
+      var(--field);
+    border: 3px solid var(--gold); outline: 1px solid var(--field); outline-offset: 2px;
+    font-size: 1em;
+  }
+  .dropcap span { font-size: 4.2em; margin-top: -.06em; }
+  .dropcap.lapis { background-color: #2f4f7a; }
+
+  /* ---- Demo ---- */
+  .demo { display: grid; grid-template-columns: 1fr 250px; gap: 36px; align-items: start; margin-top: 8px; }
+  .excerpt p { margin: 0 0 14px; hyphens: auto; }
+  .excerpt .chapter { font: 18px var(--display-sc); color: var(--rubric); letter-spacing: .08em; margin-bottom: 12px; text-align: left; }
   .excerpt mark { background: var(--mark); color: inherit; box-shadow: -4px 0 0 var(--mark), 4px 0 0 var(--mark); }
-  figcaption { font: 13px/1.5 var(--sans); color: var(--ink-soft); grid-column: 1 / -1; }
+  .gloss {
+    grid-column: 1 / -1; margin: 0; padding-top: 12px; border-top: 1px solid var(--rule);
+    font: italic 17px var(--text); color: var(--ink-soft); text-align: center;
+  }
+  .gloss::before { content: "☞ "; font-style: normal; color: var(--rubric); }
 
   .panel {
-    background: var(--sheet); border: 1px solid var(--rule); border-radius: 6px;
-    font: 13px/1.4 var(--sans); color: var(--ink);
-    box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 6px 18px rgba(0,0,0,.08);
+    background: #fbf8f1; border: 1px solid #ddd4c3; border-radius: 6px;
+    font: 13px/1.4 var(--sans); color: #2a2622;
+    box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 10px 26px rgba(43,29,18,.18);
+    transform: rotate(1.2deg);
   }
-  .panel-head { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--rule); }
-  .panel-head b { font: 600 15px var(--serif); }
-  .panel-head b i { font-weight: 400; color: var(--accent); }
-  .panel-head span { display: flex; gap: 10px; color: var(--ink-soft); }
-  .panel-folio { text-align: center; padding: 12px 0 8px; font: italic 14px var(--serif); color: var(--ink-soft); }
+  .panel-head { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid #ddd4c3; }
+  .panel-head b { font: 600 15px Georgia, serif; }
+  .panel-head b i { font-weight: 400; color: #9a3b25; }
+  .panel-head span { display: flex; gap: 10px; color: #6d655a; }
+  .panel-folio { text-align: center; padding: 12px 0 8px; font: italic 14px Georgia, serif; color: #6d655a; }
   .panel-ctrls { display: flex; gap: 6px; padding: 0 12px 10px; }
-  .panel-ctrls div { height: 30px; border: 1px solid var(--rule); border-radius: 4px; width: 36px; display: flex; align-items: center; justify-content: center; }
-  .panel-ctrls .play { flex: 1; background: var(--ink); color: var(--sheet); border-color: var(--ink); font-weight: 600; gap: 6px; }
-  .panel-st { text-align: center; padding: 0 12px 10px; font-size: 12px; color: var(--ink-soft); }
+  .panel-ctrls div { height: 30px; border: 1px solid #ddd4c3; border-radius: 4px; width: 36px; display: flex; align-items: center; justify-content: center; }
+  .panel-ctrls .play { flex: 1; background: #2a2622; color: #fbf8f1; border-color: #2a2622; font-weight: 600; gap: 6px; }
+  .panel-st { text-align: center; padding: 0 12px 10px; font-size: 12px; color: #6d655a; }
 
-  /* Sections */
-  h2 { font-size: 26px; font-weight: 600; margin: 64px 0 16px; letter-spacing: -0.01em; }
-  dl { margin: 0; }
-  dt { font-weight: 600; margin-top: 18px; }
-  dd { margin: 2px 0 0; color: var(--ink-soft); }
+  /* ---- Features ---- */
+  .intro::after { content: ""; display: block; clear: both; }
+  .intro p { margin: 0 0 14px; text-align: justify; hyphens: auto; }
+  dl { margin: 18px 0 0; }
+  dt { font: 400 22px var(--display); margin-top: 18px; }
+  dt::before { content: "¶ "; color: var(--rubric); }
+  dd { margin: 2px 0 0 1.1em; color: var(--ink-soft); }
 
-  .sites { display: flex; flex-wrap: wrap; gap: 8px 24px; margin: 0; padding: 0; list-style: none; }
+  .sites { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 30px; margin: 0; padding: 0; list-style: none; font: italic 20px var(--text); }
   .sites li { display: flex; align-items: center; gap: 8px; }
-  .sites img { width: 18px; height: 18px; border-radius: 3px; }
+  .sites img { width: 20px; height: 20px; border-radius: 3px; }
 
-  table { width: 100%; border-collapse: collapse; font-size: 16px; }
-  th, td { text-align: left; vertical-align: top; padding: 12px 12px 12px 0; border-top: 1px solid var(--rule); }
-  th { font-weight: 600; white-space: nowrap; }
+  table { width: 100%; border-collapse: collapse; font-size: 18px; border-top: 2px solid var(--ink); border-bottom: 2px solid var(--ink); }
+  th, td { text-align: left; vertical-align: top; padding: 12px 14px 12px 0; border-top: 1px solid var(--rule); }
+  tr:first-child th, tr:first-child td { border-top: none; }
+  th { font: 400 21px var(--display-sc); color: var(--rubric); white-space: nowrap; letter-spacing: .03em; }
   td { color: var(--ink-soft); }
 
-  ol.steps { padding-left: 1.4em; margin: 0; }
-  ol.steps li { margin-bottom: 28px; padding-left: 4px; }
-  ol.steps li::marker { font-weight: 600; color: var(--accent); }
-  ol.steps strong { display: block; }
+  ol.steps { list-style: upper-roman; padding-left: 2.2em; margin: 0; }
+  ol.steps li { margin-bottom: 28px; padding-left: 6px; }
+  ol.steps li::marker { font: 400 21px var(--display); color: var(--rubric); }
+  ol.steps strong { display: block; font: 400 21px var(--display); }
   ol.steps p { margin: 4px 0; color: var(--ink-soft); }
-  code, pre { font-family: var(--mono); font-size: 14px; }
-  code { background: var(--sheet); border: 1px solid var(--rule); border-radius: 3px; padding: 0 4px; }
+  code, pre { font-family: var(--mono); font-size: 14px; font-variant-numeric: normal; }
+  code { background: rgba(184, 135, 46, .12); border-radius: 3px; padding: 0 4px; }
   pre {
-    background: var(--sheet); border: 1px solid var(--rule); border-radius: 4px;
-    padding: 12px 14px; margin: 10px 0 0; overflow-x: auto; line-height: 1.6;
+    margin: 10px 0 0; padding: 12px 16px; overflow-x: auto; line-height: 1.6;
+    background: rgba(184, 135, 46, .09); border-left: 3px solid var(--gold);
   }
 
-  footer {
-    margin-top: 80px; padding-top: 20px; padding-bottom: 40px;
-    border-top: 1px solid var(--rule); font: 14px var(--sans); color: var(--ink-soft);
-  }
+  /* ---- Colophon ---- */
+  .explicit { text-align: center; margin-top: 70px; }
+  .explicit img { width: 64px; height: 64px; display: block; margin: 0 auto 10px; }
+  .explicit .word { font: 20px var(--display-sc); color: var(--rubric); letter-spacing: .2em; }
+  .explicit p { margin: 4px 0; font-style: italic; color: var(--ink-soft); font-size: 17px; }
 
-  @media (max-width: 640px) {
-    body { font-size: 17px; }
-    h1 { margin-top: 48px; }
-    .lede { font-size: 19px; }
+  @media (max-width: 760px) {
+    body { font-size: 18px; }
+    .folio { margin: 0; padding: 52px 26px 44px; box-shadow: none; }
+    .folio::before { inset: 10px; }
+    .folio::after { inset: 15px; }
+    .corner { width: 32px; height: 32px; }
+    .corner.tl, .corner.tr { top: 0; } .corner.bl, .corner.br { bottom: 0; }
+    .corner.tl, .corner.bl { left: 0; } .corner.tr, .corner.br { right: 0; }
+    .lede { font-size: 20px; }
     .demo { grid-template-columns: 1fr; }
-    .panel { max-width: 260px; }
+    .panel { width: 100%; max-width: 260px; margin: 0 auto; }
+    .excerpt p, .intro p { text-align: left; }
+    h2 { font-size: 27px; margin-top: 52px; }
     th, td { display: block; padding: 0; border: none; }
-    th { padding-top: 12px; border-top: 1px solid var(--rule); }
+    th { padding-top: 12px; }
     td { padding-bottom: 12px; }
     pre { font-size: 13px; }
   }
@@ -146,123 +220,142 @@
 </head>
 <body>
 
-<header>
-  <div class="top">
-    <span>zenTTS</span>
-    <span class="lang" role="group" aria-label="Idioma / Language">
-      <button type="button" data-lang="es" aria-pressed="true">ES</button>·<button type="button" data-lang="en" aria-pressed="false">EN</button>
-    </span>
-  </div>
+<div class="folio">
+  <svg class="corner tl" viewBox="0 0 46 46" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 42 V10 Q4 4 10 4 H42"/><path d="M10 34 C10 18 18 10 34 10"/><circle cx="12" cy="12" r="3.2" fill="currentColor"/><path d="M18 18 c6 -2 10 2 8 8 c-6 2 -10 -2 -8 -8 z" fill="currentColor"/></g></svg>
+  <svg class="corner tr" viewBox="0 0 46 46" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 42 V10 Q4 4 10 4 H42"/><path d="M10 34 C10 18 18 10 34 10"/><circle cx="12" cy="12" r="3.2" fill="currentColor"/><path d="M18 18 c6 -2 10 2 8 8 c-6 2 -10 -2 -8 -8 z" fill="currentColor"/></g></svg>
+  <svg class="corner bl" viewBox="0 0 46 46" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 42 V10 Q4 4 10 4 H42"/><path d="M10 34 C10 18 18 10 34 10"/><circle cx="12" cy="12" r="3.2" fill="currentColor"/><path d="M18 18 c6 -2 10 2 8 8 c-6 2 -10 -2 -8 -8 z" fill="currentColor"/></g></svg>
+  <svg class="corner br" viewBox="0 0 46 46" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 42 V10 Q4 4 10 4 H42"/><path d="M10 34 C10 18 18 10 34 10"/><circle cx="12" cy="12" r="3.2" fill="currentColor"/><path d="M18 18 c6 -2 10 2 8 8 c-6 2 -10 -2 -8 -8 z" fill="currentColor"/></g></svg>
 
-  <h1>zen<em>TTS</em></h1>
-  <p class="lede" data-en="A small panel that reads the page you have open out loud, sentence by sentence, highlighting where it is. Made for reading fanfics in Zen Browser.">Un panel pequeño que lee en voz alta la página que tienes abierta, oración por oración, marcando por dónde va. Hecho para leer fanfics en Zen Browser.</p>
-  <div class="actions">
-    <a class="btn" href="https://github.com/JoVi-Yashi/zenTTs" data-en="Source on GitHub">Código en GitHub</a>
-    <a href="#instalar" data-en="How to install">Cómo instalarlo</a>
-  </div>
-</header>
-
-<main>
-  <figure class="demo">
-    <div class="excerpt" lang="es">
-      <p class="chapter" data-en="Chapter 3 — an example">Capítulo 3 — un ejemplo</p>
-      <p>La lluvia no había parado en tres días. Mara cerró la ventana y se quedó mirando el reflejo de la lámpara en el cristal.</p>
-      <p><mark>—No va a volver —dijo Teo desde la puerta, sin atreverse a entrar.</mark> Ella no respondió; ya lo sabía.</p>
-      <p>Afuera, un tranvía cruzó la avenida vacía, iluminando por un segundo los charcos como si fueran monedas.</p>
+  <header>
+    <div class="top">
+      <span>zenTTS</span>
+      <span class="lang" role="group" aria-label="Idioma / Language">
+        <button type="button" data-lang="es" aria-pressed="true">ES</button>·<button type="button" data-lang="en" aria-pressed="false">EN</button>
+      </span>
     </div>
-    <div class="panel" aria-hidden="true">
-      <div class="panel-head">
-        <b>zen<i>TTS</i></b>
-        <span>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/></svg>
-        </span>
-      </div>
-      <div class="panel-folio">3 / 45</div>
-      <div class="panel-ctrls">
-        <div class="play"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg><span data-en="Read">Leer</span></div>
-        <div><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg></div>
-        <div><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="1"/></svg></div>
-      </div>
-      <div class="panel-st" data-en="Playing…">Reproduciendo…</div>
+
+    <p class="incipit" data-en="Here begins the book of">Aquí comienza el libro de</p>
+    <h1>zen<em>TTS</em></h1>
+    <svg class="ornament" viewBox="0 0 220 22" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 11 H86"/><path d="M134 11 H216"/><path d="M110 3 L118 11 L110 19 L102 11 Z" fill="currentColor"/><path d="M86 11 c6 -8 12 -8 16 0 c-4 8 -10 8 -16 0 z"/><path d="M134 11 c-6 -8 -12 -8 -16 0 c4 8 10 8 16 0 z"/><circle cx="4" cy="11" r="2.4" fill="currentColor"/><circle cx="216" cy="11" r="2.4" fill="currentColor"/></g></svg>
+    <p class="lede" data-en="A small panel that reads the page you have open out loud, sentence by sentence, marking where it is. Made for reading fanfics in Zen Browser.">Un panel pequeño que lee en voz alta la página que tienes abierta, oración por oración, marcando por dónde va. Hecho para leer fanfics en Zen Browser.</p>
+    <div class="actions">
+      <a class="seal" href="https://github.com/JoVi-Yashi/zenTTs" data-en="Source on GitHub">Código en GitHub</a>
+      <a href="#instalar" data-en="How to install">Cómo instalarlo</a>
     </div>
-    <figcaption data-en="The sentence being read is highlighted on the page itself. The panel sits in the bottom corner and folds into a small button.">La oración que se está leyendo se resalta en la propia página. El panel vive en una esquina y se pliega en un botón.</figcaption>
-  </figure>
+  </header>
 
-  <h2 data-en="What it does">Qué hace</h2>
-  <dl>
-    <dt data-en="Reads just the story">Lee solo la historia</dt>
-    <dd data-en="Wattpad, AO3, FanFiction and Webnovel have their own extractors that skip menus, comments and sidebars. On any other site it falls back to Readability.">Wattpad, AO3, FanFiction y Webnovel tienen extractores propios que saltan menús, comentarios y barras laterales. En cualquier otro sitio usa Readability.</dd>
-    <dt data-en="Marks where it is">Marca por dónde va</dt>
-    <dd data-en="The current paragraph is highlighted and scrolled into view, like Edge's Read Aloud.">El párrafo actual se resalta y se desplaza a la vista, como Read Aloud de Edge.</dd>
-    <dt data-en="Reading view">Vista de lectura</dt>
-    <dd data-en="Open the extracted text in a clean page with the current sentence marked. Serif, sans or mono; size and spacing adjustable.">Abre el texto extraído en una página limpia con la oración actual marcada. Serif, sans o mono; tamaño e interlineado ajustables.</dd>
-    <dt data-en="Translation">Traducción</dt>
-    <dd data-en="Optionally translates before reading, so you can listen to a story written in another language.">Opcionalmente traduce antes de leer, para escuchar una historia escrita en otro idioma.</dd>
-    <dt data-en="Per-site switch">Interruptor por sitio</dt>
-    <dd data-en="Turn the panel on or off for each domain. It remembers your choice.">Activa o desactiva el panel en cada dominio. Recuerda tu elección.</dd>
-    <dt data-en="Stays out of the way">No estorba</dt>
-    <dd data-en="It lives in a Shadow DOM, so the site's styles don't touch it and it doesn't touch theirs.">Vive en un Shadow DOM: los estilos del sitio no lo tocan y él no toca los del sitio.</dd>
-  </dl>
+  <main>
+    <h2 data-en="As it reads">Así lee</h2>
+    <figure class="demo">
+      <div class="excerpt" lang="es">
+        <p class="chapter" data-en="Chapter three · an example">Capítulo tercero · un ejemplo</p>
+        <p><span class="dropcap" aria-hidden="true"><span>L</span></span>a lluvia no había parado en tres días. Mara cerró la ventana y se quedó mirando el reflejo de la lámpara en el cristal, como quien espera una carta que ya no vendrá.</p>
+        <p><mark>—No va a volver —dijo Teo desde la puerta, sin atreverse a entrar.</mark> Ella no respondió; ya lo sabía.</p>
+        <p>Afuera, un tranvía cruzó la avenida vacía, iluminando por un segundo los charcos como si fueran monedas.</p>
+      </div>
+      <div class="panel" aria-hidden="true">
+        <div class="panel-head">
+          <b>zen<i>TTS</i></b>
+          <span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/></svg>
+          </span>
+        </div>
+        <div class="panel-folio">5 / 42</div>
+        <div class="panel-ctrls">
+          <div class="play"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg><span data-en="Continue">Continuar</span></div>
+          <div><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg></div>
+          <div><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="1"/></svg></div>
+        </div>
+        <div class="panel-st" data-en="Playing…">Reproduciendo…</div>
+      </div>
+      <figcaption class="gloss" data-en="The sentence being read is marked on the page itself; the panel waits in a corner.">La oración que se está leyendo se marca en la propia página; el panel espera en una esquina.</figcaption>
+    </figure>
 
-  <h2 data-en="Sites with their own extractor">Sitios con extractor propio</h2>
-  <ul class="sites">
-    <li><img src="site-wattpad.svg" alt="">Wattpad</li>
-    <li><img src="site-ao3.svg" alt="">Archive of Our Own</li>
-    <li><img src="site-fanfiction.svg" alt="">FanFiction.net</li>
-    <li><img src="site-webnovel.svg" alt="">Webnovel</li>
-  </ul>
+    <h2 data-en="Of what it does">De lo que hace</h2>
+    <div class="intro">
+      <p><span class="dropcap lapis" aria-hidden="true"><span>E</span></span><span data-en="xtracts only the story from the page, skipping menus, summaries and comments, and reads it with the voice you choose: the browser's own, the Microsoft neural voices, or a voice that lives on your computer and needs no connection at all. When a chapter ends it fetches the next one and keeps going; when you come back, it remembers where you stopped.">xtrae de la página solo la historia, sin menús, resúmenes ni comentarios, y la lee con la voz que elijas: la del propio navegador, las voces neurales de Microsoft o una voz que vive en tu equipo y no necesita conexión. Al terminar un capítulo trae el siguiente y sigue; cuando vuelves, recuerda dónde te quedaste.</span></p>
+    </div>
+    <dl>
+      <dt data-en="The next chapter, unasked">El capítulo siguiente, sin pedirlo</dt>
+      <dd data-en="On AO3, FanFiction.net and Wattpad the next chapter loads in the same page and the reading carries on.">En AO3, FanFiction.net y Wattpad el capítulo siguiente se carga en la misma página y la lectura continúa.</dd>
+      <dt data-en="Where you left off">Donde lo dejaste</dt>
+      <dd data-en="Each chapter keeps its place; the button offers “Continue · 34 / 120”.">Cada capítulo guarda su punto; el botón ofrece «Continuar · 34 / 120».</dd>
+      <dt data-en="A voice that never fails you">Una voz que no te deja a medias</dt>
+      <dd data-en="If the neural voice stops answering, the reading goes on from the same sentence with the local or the browser voice.">Si la voz neural deja de responder, la lectura sigue desde la misma oración con la voz local o la del navegador.</dd>
+      <dt data-en="Dressed in your browser's colors">Vestido con los colores de tu navegador</dt>
+      <dd data-en="Follows light and dark mode and the installed Firefox theme; paste the value of zen.theme.accent-color to match your Zen accent.">Sigue el modo claro u oscuro y el tema de Firefox instalado; pega el valor de zen.theme.accent-color para igualar tu acento de Zen.</dd>
+      <dt data-en="The reading view">La vista de lectura</dt>
+      <dd data-en="The extracted text on a clean page, the current sentence marked, in serif, sans or mono.">El texto extraído en una página limpia, con la oración actual marcada, en serif, sans o mono.</dd>
+      <dt data-en="Translation">Traducción</dt>
+      <dd data-en="Optionally translated paragraph by paragraph, so you can listen to a story written in another tongue.">Opcionalmente traducida párrafo a párrafo, para escuchar una historia escrita en otra lengua.</dd>
+    </dl>
 
-  <h2 data-en="Two voices">Dos motores de voz</h2>
-  <table>
-    <tr>
-      <th data-en="Native">Nativo</th>
-      <td data-en="The voices your browser already has (SpeechSynthesis). Nothing to install; works as soon as the extension loads.">Las voces que ya tiene el navegador (SpeechSynthesis). Nada que instalar; funciona en cuanto cargas la extensión.</td>
-    </tr>
-    <tr>
-      <th>Neural</th>
-      <td data-en="45 Microsoft neural voices through edge-tts, served by a small Ruby server on localhost:8765. Sounds much more natural.">45 voces neurales de Microsoft a través de edge-tts, servidas por un pequeño servidor Ruby en localhost:8765. Suena mucho más natural.</td>
-    </tr>
-  </table>
+    <h2 data-en="The houses it knows">Las casas que conoce</h2>
+    <ul class="sites">
+      <li><img src="site-wattpad.svg" alt="">Wattpad</li>
+      <li><img src="site-ao3.svg" alt="">Archive of Our Own</li>
+      <li><img src="site-fanfiction.svg" alt="">FanFiction.net</li>
+      <li><img src="site-webnovel.svg" alt="">Webnovel</li>
+    </ul>
 
-  <h2 id="instalar" data-en="Installing">Instalación</h2>
-  <ol class="steps">
-    <li>
-      <strong data-en="Linux, with Flatpak (recommended)">Linux, con Flatpak (recomendado)</strong>
-      <p data-en="Ruby, edge-tts and trafilatura come bundled.">Ruby, edge-tts y trafilatura vienen incluidos.</p>
-      <pre>git clone https://github.com/JoVi-Yashi/zenTTs.git
+    <h2 data-en="Of the three voices">De las tres voces</h2>
+    <table>
+      <tr>
+        <th data-en="Native">Nativa</th>
+        <td data-en="The voices your browser already has. Nothing to install.">Las voces que ya tiene tu navegador. Nada que instalar.</td>
+      </tr>
+      <tr>
+        <th>Neural</th>
+        <td data-en="Microsoft neural voices through edge-tts, served by a small Ruby server on localhost:8765. The most natural.">Voces neurales de Microsoft mediante edge-tts, servidas por un pequeño servidor Ruby en localhost:8765. Las más naturales.</td>
+      </tr>
+      <tr>
+        <th>Local</th>
+        <td data-en="Piper running inside the browser. Download a voice once (~60 MB) and it works with no server and no connection.">Piper dentro del navegador. Descargas una voz una vez (~60 MB) y funciona sin servidor ni conexión.</td>
+      </tr>
+    </table>
+
+    <h2 id="instalar" data-en="Of its installation">De cómo instalarlo</h2>
+    <ol class="steps">
+      <li>
+        <strong data-en="Linux, with Flatpak">Linux, con Flatpak</strong>
+        <p data-en="Ruby, edge-tts and trafilatura come bundled.">Ruby, edge-tts y trafilatura vienen incluidos.</p>
+        <pre>git clone https://github.com/JoVi-Yashi/zenTTs.git
 cd zenTTs
 make flatpak</pre>
-      <p data-en="Then look for zenTTS in your applications menu.">Luego busca zenTTS en el menú de aplicaciones.</p>
-    </li>
-    <li>
-      <strong data-en="Manual install — Linux or Windows">Instalación manual — Linux o Windows</strong>
-      <p data-en="Needs Ruby 3.2+, plus edge-tts and trafilatura on your PATH. On Windows, RubyInstaller with MSYS2.">Necesitas Ruby 3.2+, y edge-tts y trafilatura en el PATH. En Windows, RubyInstaller con MSYS2.</p>
-      <pre>git clone https://github.com/JoVi-Yashi/zenTTs.git
+      </li>
+      <li>
+        <strong data-en="By hand — Linux or Windows">A mano — Linux o Windows</strong>
+        <p data-en="Needs Ruby 3.2+, plus edge-tts and trafilatura on your PATH. The build also prepares the local voice engine.">Necesitas Ruby 3.2+, y edge-tts y trafilatura en el PATH. El build prepara también el motor de voz local.</p>
+        <pre>git clone https://github.com/JoVi-Yashi/zenTTs.git
 cd zenTTs
 make install
 cd extension &amp;&amp; npm install &amp;&amp; cd ..
 make build-extension</pre>
-    </li>
-    <li>
-      <strong data-en="Load it in Zen">Cargarla en Zen</strong>
-      <p data-en="Go to &lt;code&gt;about:debugging&lt;/code&gt;, choose “Load Temporary Add-on” and pick &lt;code&gt;extension/manifest.json&lt;/code&gt;.">Ve a <code>about:debugging</code>, elige “Cargar complemento temporal” y selecciona <code>extension/manifest.json</code>.</p>
-      <p data-en="If Zen is installed as a Flatpak, give it access to the folder first:">Si Zen está instalado como Flatpak, primero dale acceso a la carpeta:</p>
-      <pre>flatpak override --user \
+      </li>
+      <li>
+        <strong data-en="Load it in Zen">Cargarla en Zen</strong>
+        <p data-en="Go to &lt;code&gt;about:debugging&lt;/code&gt;, choose “Load Temporary Add-on” and pick &lt;code&gt;extension/manifest.json&lt;/code&gt;.">Ve a <code>about:debugging</code>, elige «Cargar complemento temporal» y selecciona <code>extension/manifest.json</code>.</p>
+        <p data-en="If Zen is a Flatpak, first give it access to the folder:">Si Zen está instalado como Flatpak, primero dale acceso a la carpeta:</p>
+        <pre>flatpak override --user \
   --filesystem=$HOME/Proyectos/zenTTs \
   app.zen_browser.zen</pre>
-    </li>
-    <li>
-      <strong data-en="Desktop app (optional)">App de escritorio (opcional)</strong>
-      <p data-en="A small GTK window to start and stop the neural voice server without a terminal.">Una ventana GTK pequeña para arrancar y detener el servidor de voces neurales sin terminal.</p>
-      <pre>make gui</pre>
-    </li>
-  </ol>
-</main>
+      </li>
+      <li>
+        <strong data-en="The desktop app, if you wish">La app de escritorio, si quieres</strong>
+        <p data-en="A small window to start and stop the neural voice server without a terminal.">Una ventana pequeña para arrancar y detener el servidor de voces neurales sin terminal.</p>
+        <pre>make gui</pre>
+      </li>
+    </ol>
+  </main>
 
-<footer>
-  zenTTS · <a href="https://github.com/JoVi-Yashi/zenTTs">GitHub</a> · <span data-en="MIT license">Licencia MIT</span>
-</footer>
+  <footer class="explicit">
+    <img src="tts.png" alt="">
+    <div class="word">Explicit</div>
+    <p data-en="Here ends zenTTS. Free under the MIT license.">Aquí termina zenTTS. Libre bajo licencia MIT.</p>
+    <p><a href="https://github.com/JoVi-Yashi/zenTTs">GitHub</a></p>
+  </footer>
+</div>
 
 <script>
 (function () {

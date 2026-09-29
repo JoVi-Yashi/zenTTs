@@ -1,6 +1,10 @@
 // zenTTS Panel — Compact UI with voice, speed, counter, navigation
 // Page highlighting happens on the actual DOM, not in this panel
 
+import { applyPanelColors, themeTokens, parseColor, toHex } from './theme.js';
+
+var ACCENT_PRESETS = ['#9a3b25', '#2f5d8a', '#3f7a4a', '#7a3b6e', '#b07a1c'];
+
 const PANEL_HTML = `
 <div id="tts-zen-panel">
   <div id="tts-zen-header">
@@ -113,6 +117,26 @@ const PANEL_HTML = `
         <input type="checkbox" id="tts-zen-autonext">
         <span id="tts-zen-autonext-label">Seguir con el siguiente capítulo</span>
       </label>
+      <div class="setting-row section-header">
+        <span id="tts-zen-look-title">Aspecto</span>
+      </div>
+      <label class="check-row">
+        <input type="checkbox" id="tts-zen-follow-theme">
+        <span id="tts-zen-follow-label">Usar los colores del tema del navegador</span>
+      </label>
+      <div class="setting-row">
+        <label id="tts-zen-accent-label">Acento</label>
+        <div class="accent-group" id="tts-zen-accent-group">
+          <button type="button" class="swatch swatch-auto" data-accent="" title="Auto">A</button>
+          ${ACCENT_PRESETS.map(function(c) { return '<button type="button" class="swatch" data-accent="' + c + '" style="--c:' + c + '" title="' + c + '"></button>'; }).join('')}
+          <span class="swatch swatch-custom" id="tts-zen-accent-custom" title="Otro color">+<input type="color" id="tts-zen-accent-picker"></span>
+        </div>
+      </div>
+      <div class="setting-row">
+        <label></label>
+        <input type="text" id="tts-zen-accent-hex" placeholder="Pegar color de Zen" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="accent-hint" id="tts-zen-accent-hint" title="about:config → zen.theme.accent-color">zen.theme.accent-color</div>
     </div>
 
     <div id="tts-zen-counter">—</div>
@@ -279,7 +303,7 @@ button:focus-visible, select:focus-visible, input:focus-visible {
 #tts-zen-settings {
   padding: 12px 14px; border-bottom: 1px solid var(--rule);
   display: flex; flex-direction: column; gap: 8px;
-  max-height: 400px; overflow: hidden;
+  max-height: 640px; overflow: hidden;
   transition: max-height .15s ease, padding .15s ease;
 }
 #tts-zen-settings.collapsed {
@@ -358,6 +382,30 @@ button:focus-visible, select:focus-visible, input:focus-visible {
 .check-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-soft); cursor: pointer; }
 .check-row input { accent-color: var(--ink); margin: 0; }
 [hidden] { display: none !important; }
+
+.accent-group { flex: 1; display: flex; align-items: center; justify-content: space-between; min-width: 0; }
+.swatch {
+  width: 18px; height: 18px; flex-shrink: 0; padding: 0; border-radius: 50%; cursor: pointer;
+  background: var(--c, transparent); border: 1px solid var(--rule);
+  font: 600 10px var(--sans); color: var(--ink-soft);
+}
+.swatch.active { outline: 2px solid var(--ink); outline-offset: 2px; }
+.swatch-custom {
+  position: relative; display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; max-width: 18px; box-sizing: border-box; overflow: hidden;
+  border: 2px solid transparent; font-size: 12px; line-height: 1; color: var(--ink);
+  background: linear-gradient(var(--sheet), var(--sheet)) padding-box,
+              conic-gradient(#c0392b, #d4a017, #3f7a4a, #2f5d8a, #7a3b6e, #c0392b) border-box;
+}
+#tts-zen-accent-picker { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; border: 0; padding: 0; }
+#tts-zen-accent-hex {
+  flex: 1; min-width: 0; padding: 5px 8px; border-radius: 4px;
+  border: 1px solid var(--rule); background: var(--paper); color: var(--ink);
+  font: 12px var(--mono); outline: none;
+}
+#tts-zen-accent-hex:focus { border-color: var(--ink-soft); }
+#tts-zen-accent-hex.invalid { border-color: var(--accent); }
+.accent-hint { margin: -4px 0 0 74px; font: 10px var(--mono); color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 #tts-zen-resume-row { text-align: center; padding: 0 14px 6px; }
 #tts-zen-restart {
@@ -512,7 +560,9 @@ var T = {
     translateTitle: 'Traducción', engineLocal: 'Local (Piper)',
     continueAt: 'Continuar', restart: 'Desde el inicio', autoNext: 'Seguir con el siguiente capítulo',
     downloadVoice: 'Descargar voz', downloading: 'Descargando…', downloaded: 'descargada',
-    downloadFailed: 'No se pudo descargar'
+    downloadFailed: 'No se pudo descargar',
+    look: 'Aspecto', followTheme: 'Usar los colores del tema del navegador', accent: 'Acento',
+    pasteZen: 'Pegar color de Zen', otherColor: 'Otro color'
   },
   en: {
     minimize: 'Minimize', preview: 'View extracted text', sites: 'Manage sites',
@@ -529,7 +579,9 @@ var T = {
     translateTitle: 'Translation', engineLocal: 'Local (Piper)',
     continueAt: 'Continue', restart: 'From the beginning', autoNext: 'Continue with the next chapter',
     downloadVoice: 'Download voice', downloading: 'Downloading…', downloaded: 'downloaded',
-    downloadFailed: 'Download failed'
+    downloadFailed: 'Download failed',
+    look: 'Appearance', followTheme: 'Use the browser theme colors', accent: 'Accent',
+    pasteZen: 'Paste Zen color', otherColor: 'Other color'
   }
 };
 
@@ -544,6 +596,8 @@ let state = {
   currentEngine: 'native',
   localVoice: 'es_ES-davefx-medium',
   autoNext: true,
+  accent: '',
+  followTheme: true,
   langIn: 'auto',
   langOut: 'es',
   lang: 'es'
@@ -553,7 +607,9 @@ let state = {
 
 async function loadSettings() {
   try {
-    const stored = await browser.storage.local.get(['voice', 'rate', 'engine', 'lang', 'langIn', 'langOut', 'localVoice', 'autoNext']);
+    const stored = await browser.storage.local.get(['voice', 'rate', 'engine', 'lang', 'langIn', 'langOut', 'localVoice', 'autoNext', 'accent', 'followTheme']);
+    if (typeof stored.accent === 'string') state.accent = stored.accent;
+    if (typeof stored.followTheme === 'boolean') state.followTheme = stored.followTheme;
     if (stored.localVoice) state.localVoice = stored.localVoice;
     if (typeof stored.autoNext === 'boolean') state.autoNext = stored.autoNext;
     if (stored.voice) state.currentVoice = stored.voice;
@@ -582,7 +638,7 @@ function syncShared() {
 
 async function saveSettings() {
   try {
-    await browser.storage.local.set({ voice: state.currentVoice, rate: state.currentRate, engine: state.currentEngine, lang: state.lang, langIn: state.langIn, langOut: state.langOut, localVoice: state.localVoice, autoNext: state.autoNext });
+    await browser.storage.local.set({ voice: state.currentVoice, rate: state.currentRate, engine: state.currentEngine, lang: state.lang, langIn: state.langIn, langOut: state.langOut, localVoice: state.localVoice, autoNext: state.autoNext, accent: state.accent, followTheme: state.followTheme });
   } catch (_) {}
 }
 
@@ -759,12 +815,17 @@ function applyLanguage(shadow) {
   // Update settings label texts
   [['tts-zen-voice-label', 'voice'], ['tts-zen-engine-label', 'engine'], ['tts-zen-lang-label', 'langLabel'],
    ['tts-zen-translate-title', 'translateTitle'], ['tts-zen-speed-text', 'speed'],
-   ['tts-zen-autonext-label', 'autoNext'], ['tts-zen-restart', 'restart']].forEach(function(pair) {
+   ['tts-zen-autonext-label', 'autoNext'], ['tts-zen-restart', 'restart'],
+   ['tts-zen-look-title', 'look'], ['tts-zen-follow-label', 'followTheme'], ['tts-zen-accent-label', 'accent']].forEach(function(pair) {
     var el = shadow.getElementById(pair[0]);
     if (el) el.textContent = T[lang][pair[1]];
   });
   renderReadLabel();
   updateLocalRow();
+  var hex = shadow.getElementById('tts-zen-accent-hex');
+  if (hex) hex.placeholder = T[lang].pasteZen;
+  var custom = shadow.getElementById('tts-zen-accent-custom');
+  if (custom) custom.title = T[lang].otherColor;
   var previewBtn = shadow.getElementById('tts-zen-preview-btn');
   if (previewBtn) previewBtn.title = T[lang].preview;
   var sitesBtn = shadow.getElementById('tts-zen-sites-btn');
@@ -857,6 +918,76 @@ export function setButtonsEnabled(btns) {
   }
 }
 
+// ---- Colors: browser theme + accent ----
+
+var browserTheme = null;
+
+function applyColors() {
+  var host = document.getElementById('tts-zen-host');
+  applyPanelColors(host, state.followTheme ? themeTokens(browserTheme) : null, state.accent);
+  var group = getEl('tts-zen-accent-group');
+  if (group) {
+    group.querySelectorAll('.swatch').forEach(function(b) {
+      var custom = !b.hasAttribute('data-accent');
+      var isPreset = state.accent === '' || ACCENT_PRESETS.includes(state.accent);
+      b.classList.toggle('active', custom ? !isPreset : b.dataset.accent === state.accent);
+    });
+  }
+  var picker = getEl('tts-zen-accent-picker');
+  var parsed = parseColor(state.accent || ACCENT_PRESETS[0]);
+  if (picker && parsed) picker.value = toHex(parsed);
+}
+
+function setAccent(value) {
+  state.accent = value;
+  saveSettings();
+  applyColors();
+}
+
+async function loadBrowserTheme() {
+  try {
+    var resp = await browser.runtime.sendMessage({ action: 'get_theme' });
+    browserTheme = resp && resp.success ? resp.theme : null;
+  } catch (_) { browserTheme = null; }
+  applyColors();
+}
+
+function setupColors(shadow) {
+  var follow = shadow.getElementById('tts-zen-follow-theme');
+  follow.checked = state.followTheme;
+  follow.addEventListener('change', function() { state.followTheme = follow.checked; saveSettings(); applyColors(); });
+
+  shadow.getElementById('tts-zen-accent-group').addEventListener('click', function(e) {
+    var sw = e.target.closest('.swatch[data-accent]');
+    if (sw) setAccent(sw.dataset.accent);
+  });
+  var picker = shadow.getElementById('tts-zen-accent-picker');
+  picker.addEventListener('input', function() { setAccent(picker.value); });
+
+  var hex = shadow.getElementById('tts-zen-accent-hex');
+  function commitHex() {
+    var v = hex.value.trim();
+    if (!v) { hex.classList.remove('invalid'); return; }
+    var rgb = parseColor(/^[0-9a-f]{3,8}$/i.test(v) ? '#' + v : v);
+    hex.classList.toggle('invalid', !rgb);
+    if (rgb) { setAccent(toHex(rgb)); hex.value = ''; }
+  }
+  hex.addEventListener('change', commitHex);
+  hex.addEventListener('keydown', function(e) { if (e.key === 'Enter') commitHex(); });
+
+  try {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyColors);
+  } catch (_) {}
+  loadBrowserTheme();
+}
+
+// The background page tells every tab when the Firefox theme changes
+if (typeof browser !== 'undefined' && browser.runtime && browser.runtime.onMessage) {
+  browser.runtime.onMessage.addListener(function(msg) {
+    if (msg && msg.action === 'theme_changed') { browserTheme = msg.theme; applyColors(); }
+  });
+}
+
 var resumeInfo = null;
 
 function renderReadLabel() {
@@ -939,6 +1070,7 @@ export async function createPanel(shadow, handlers) {
     saveSettings();
   });
   shadow.getElementById('tts-zen-local-dl').addEventListener('click', downloadLocalVoice);
+  setupColors(shadow);
 
   var autoNext = shadow.getElementById('tts-zen-autonext');
   autoNext.checked = state.autoNext;

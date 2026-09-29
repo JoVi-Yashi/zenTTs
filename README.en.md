@@ -101,6 +101,9 @@ Each sentence highlights on the page DOM (yellow highlighter + auto-scroll) and 
 ### Next chapter, automatically
 On AO3, FanFiction.net and Wattpad, when a chapter ends the next one loads in the same page and reading continues. Turn it off in ⚙ → "Continue with the next chapter".
 
+### Browser colors
+The panel follows light and dark mode and, if a Firefox theme is installed, takes its colors. Zen does not let extensions read its accent color, so in ⚙ → Appearance you can pick one or paste the value of `zen.theme.accent-color` (from `about:config`) to match.
+
 ### Pick up where you left off
 zenTTS remembers the sentence you were on in each chapter. When you come back, the button says **Continue · 34 / 120**; "From the beginning" starts over.
 

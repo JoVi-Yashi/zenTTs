@@ -42,6 +42,12 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
         .catch(err => sendResponse({ success: false, error: err.message }));
       return true;
 
+    case 'get_theme':
+      browser.theme.getCurrent(sender.tab && sender.tab.windowId)
+        .then(theme => sendResponse({ success: true, theme }))
+        .catch(err => sendResponse({ success: false, error: err.message }));
+      return true;
+
     case 'local_voices':
       handleLocalVoices()
         .then(sendResponse)
@@ -273,3 +279,15 @@ function handleLocalSpeak(text, voiceId) {
   queue = job.catch(() => {});
   return job;
 }
+
+// ---- Browser theme → panel ----
+// Zen keeps its own accent and workspace gradient inside the browser UI, out of
+// reach of extensions; a Firefox theme installed from AMO is readable, so tabs
+// are told whenever it changes.
+
+browser.theme.onUpdated.addListener(async ({ theme, windowId }) => {
+  const tabs = await browser.tabs.query(windowId ? { windowId } : {});
+  for (const tab of tabs) {
+    browser.tabs.sendMessage(tab.id, { action: 'theme_changed', theme }).catch(() => {});
+  }
+});
