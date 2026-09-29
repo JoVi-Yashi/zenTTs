@@ -1,10 +1,10 @@
-# Privacy Policy for TTS-zen
+# Privacy Policy for zenTTS
 
 **Last updated: August 2026**
 
 ## Data Collection
 
-TTS-zen **does not collect, store, or transmit any personal data** to external servers.
+zenTTS **does not collect, store, or transmit any personal data** to external servers.
 
 ### What happens locally
 
@@ -45,13 +45,13 @@ GitHub: [github.com/JoVi-Yashi/zenTTs](https://github.com/JoVi-Yashi/zenTTs)
 
 ---
 
-## Política de Privacidad de TTS-zen
+## Política de Privacidad de zenTTS
 
 **Última actualización: agosto 2026**
 
 ### Recopilación de datos
 
-TTS-zen **no recopila, almacena ni transmite datos personales** a servidores externos.
+zenTTS **no recopila, almacena ni transmite datos personales** a servidores externos.
 
 ### Qué sucede localmente
 

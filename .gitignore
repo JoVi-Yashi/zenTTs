@@ -8,3 +8,4 @@ extension/package-lock.json
 build-dir/
 tts-original.png
 extension/*.zip
+tts-zen-source.zip

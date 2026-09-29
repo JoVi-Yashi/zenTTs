@@ -1,7 +1,7 @@
 # AMO Store Listing
 
 ## Name
-TTS-zen
+zenTTS
 
 ## Summary (250 chars)
 Read any page aloud with a floating TTS panel. Dual engine: native SpeechSynthesis or Microsoft edge-tts neural voices. Highlights text in real time. Wattpad & AO3 support.
@@ -11,7 +11,7 @@ Lee cualquier página en voz alta con un panel TTS flotante. Dos motores: Speech
 
 ## Description (English)
 
-TTS-zen injects a floating text-to-speech panel into any webpage using Shadow DOM. Click "Read" and it extracts the main content, reads it aloud, and highlights each sentence in real time — both on the page and in a synchronized pop-up.
+zenTTS injects a floating text-to-speech panel into any webpage using Shadow DOM. Click "Read" and it extracts the main content, reads it aloud, and highlights each sentence in real time — both on the page and in a synchronized pop-up.
 
 **Dual engine — pick your voice quality:**
 - **Native**: Browser SpeechSynthesis. Zero setup. Works offline.
@@ -34,7 +34,7 @@ TTS-zen injects a floating text-to-speech panel into any webpage using Shadow DO
 
 ## Description (Spanish)
 
-TTS-zen inyecta un panel flotante de texto a voz en cualquier página web usando Shadow DOM. Haz clic en "Leer", extrae el contenido principal, lo lee en voz alta y resalta cada oración en tiempo real — tanto en la página como en un pop-up sincronizado.
+zenTTS inyecta un panel flotante de texto a voz en cualquier página web usando Shadow DOM. Haz clic en "Leer", extrae el contenido principal, lo lee en voz alta y resalta cada oración en tiempo real — tanto en la página como en un pop-up sincronizado.
 
 **Dos motores — elige la calidad de voz:**
 - **Nativo**: SpeechSynthesis del navegador. Sin configuración. Funciona sin conexión.

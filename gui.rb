@@ -1,12 +1,12 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
-# TTS-zen — Cross-platform server manager (Linux / Windows)
+# zenTTS — Cross-platform server manager (Linux / Windows)
 
 require 'gtk3'
 require 'fileutils'
 require 'net/http'
 
-# Identify as TTS-zen in taskbars, docks, and alt-tab
+# Identify as zenTTS in taskbars, docks, and alt-tab
 GLib.set_prgname('tts-zen')
 
 PORT = 8765
@@ -127,32 +127,32 @@ end
 
 L = {
   es: {
-    status_header: 'ESTADO DEL SERVIDOR',
+    status_header: 'Servidor de voces neurales',
     stopped: 'Detenido',
     not_started: 'sin iniciar',
     running: 'En ejecución',
     healthy: 'saludable',
     no_response: 'Sin respuesta',
     not_responding: 'sin responder',
-    actions: 'ACCIONES',
+    actions: 'Acciones',
     start: 'Iniciar servidor',
     stop: 'Detener',
     open_zen: 'Abrir Zen Browser',
-    version: 'TTS-zen v0.4'
+    version: 'zenTTS 0.4'
   },
   en: {
-    status_header: 'SERVER STATUS',
+    status_header: 'Neural voice server',
     stopped: 'Stopped',
     not_started: 'not started',
     running: 'Running',
     healthy: 'healthy',
     no_response: 'No response',
     not_responding: 'not responding',
-    actions: 'ACTIONS',
+    actions: 'Actions',
     start: 'Start server',
     stop: 'Stop',
     open_zen: 'Open Zen Browser',
-    version: 'TTS-zen v0.4'
+    version: 'zenTTS 0.4'
   }
 }
 
@@ -165,121 +165,77 @@ end
 # ══════════════════════════════════════════════
 
 CSS = <<~CSS
-  * { border-color: transparent; }
-
   window {
-    background: #0a0a1c;
-    border: none;
+    background: #1b1916;
+    color: #e9e2d4;
   }
-  decoration {
-    border: none;
-    box-shadow: none;
-    border-color: transparent;
-  }
+  decoration { box-shadow: 0 2px 10px rgba(0,0,0,0.4); }
 
   headerbar {
-    background: #0d0d1f;
+    background: #1b1916;
     border: none;
-    border-bottom: 1px solid rgba(167,139,250,0.1);
-    min-height: 38px;
+    border-bottom: 1px solid #3a352e;
     box-shadow: none;
+    min-height: 40px;
   }
-  headerbar decoration,
-  headerbar * {
-    border-color: transparent;
+  headerbar button { color: #a39a8b; border-color: transparent; }
+  headerbar button:hover { color: #e9e2d4; background: rgba(233,226,212,0.07); }
+
+  .app-title {
+    font-family: "Iowan Old Style", "Charter", "Source Serif 4", Georgia, serif;
+    font-size: 16px; font-weight: 600; color: #e9e2d4;
   }
-  headerbar .title {
-    font-size: 13px; font-weight: 600; color: #c4b5fd;
+  .app-title-accent {
+    font-family: "Iowan Old Style", "Charter", "Source Serif 4", Georgia, serif;
+    font-size: 16px; font-style: italic; color: #d9785c;
   }
 
-  .body { padding: 24px; }
+  .body { padding: 22px 24px 18px; }
 
   .status-card {
-    background: #111128;
-    border: 1px solid rgba(167,139,250,0.08);
-    border-radius: 14px; padding: 20px 22px; margin-bottom: 20px;
+    padding: 0 0 18px; margin-bottom: 18px;
+    border-bottom: 1px solid #3a352e;
   }
-  .status-header {
-    font-size: 10px; font-weight: 600; color: #5b6370;
-    letter-spacing: 0.6px; margin-bottom: 12px;
+  .status-header, .section-label {
+    font-size: 12px; color: #a39a8b; margin-bottom: 8px;
   }
-  .status-row { margin: 6px 0; }
-  .indicator {
-    min-width: 10px; min-height: 10px; border-radius: 50%; margin-right: 10px;
-    border: none;
-  }
-  .dot-on  { background: #34d399; }
-  .dot-off { background: #f87171; }
-  .dot-warn { background: #fbbf24; }
+  .indicator { min-width: 8px; min-height: 8px; border-radius: 50%; margin-right: 8px; }
+  .dot-on   { background: #8fb573; }
+  .dot-off  { background: #6d655a; }
+  .dot-warn { background: #d9a441; }
 
-  .status-text { font-size: 14px; font-weight: 600; }
-  .text-on   { color: #34d399; }
-  .text-off  { color: #f87171; }
-  .text-warn { color: #fbbf24; }
+  .status-text {
+    font-family: "Iowan Old Style", "Charter", "Source Serif 4", Georgia, serif;
+    font-size: 20px; color: #e9e2d4;
+  }
+  .text-on, .text-off, .text-warn { color: #e9e2d4; }
   .detail {
-    font-size: 10px; color: #4b5563; margin-top: 6px; font-family: monospace;
-  }
-
-  .section-label {
-    font-size: 10px; font-weight: 600; color: #5b6370;
-    letter-spacing: 0.6px; margin-top: 4px; margin-bottom: 10px;
+    font-family: monospace; font-size: 11px; color: #a39a8b; margin-top: 4px;
   }
 
   button {
-    font-size: 12px; font-weight: 600; padding: 10px 18px;
-    border-radius: 10px;
-    border: 1px solid transparent;
-    outline: none;
-    background: rgba(255,255,255,0.05);
-    color: #9ca3af;
-    box-shadow: none;
+    font-size: 13px; padding: 8px 16px; border-radius: 4px;
+    border: 1px solid #3a352e; background: transparent; background-image: none;
+    color: #e9e2d4; box-shadow: none; text-shadow: none; outline: none;
   }
-  button:disabled { opacity: 0.3; }
-  button:hover {
-    background: rgba(167,139,250,0.1);
-    border-color: rgba(167,139,250,0.2);
-    color: #c4b5fd;
-  }
+  button:hover { background: rgba(233,226,212,0.07); }
+  button:disabled { opacity: 0.35; }
 
-  .btn-primary {
-    background: #7c3aed; color: #fff;
-    border: none;
-  }
-  .btn-primary:hover {
-    background: #8b5cf6;
-  }
+  .btn-primary { background: #e9e2d4; color: #1b1916; border-color: #e9e2d4; font-weight: 600; }
+  .btn-primary:hover { background: #d8d0c1; }
+  .btn-primary label { color: #1b1916; }
 
-  .btn-danger {
-    background: rgba(248,113,113,0.1); color: #f87171;
-    border: 1px solid rgba(248,113,113,0.15);
-  }
-  .btn-danger:hover {
-    background: rgba(248,113,113,0.18);
-  }
+  .btn-danger { color: #d9785c; }
+  .btn-danger label { color: #d9785c; }
 
-  .btn-zen {
-    background: transparent; color: #7e8aa0;
-    border: 1px solid rgba(255,255,255,0.06);
-  }
-  .btn-zen:hover {
-    background: rgba(167,139,250,0.08);
-    border-color: rgba(167,139,250,0.18); color: #a78bfa;
-  }
+  .btn-zen { border-color: transparent; color: #a39a8b; }
+  .btn-zen label { color: #a39a8b; }
+  .btn-zen:hover label { color: #e9e2d4; }
 
-  .lang-toggle {
-    font-size: 10px; font-weight: 600; padding: 4px 12px;
-    border-radius: 6px; border: 1px solid rgba(167,139,250,0.15);
-    background: rgba(167,139,250,0.06); color: #7e8aa0;
-  }
-  .lang-toggle:hover {
-    background: rgba(167,139,250,0.14); color: #a78bfa;
-  }
+  .lang-toggle { font-size: 12px; padding: 2px 8px; border-color: transparent; color: #a39a8b; }
+  .lang-toggle label { color: #a39a8b; }
 
-  .footer {
-    font-size: 10px; color: #3a3f50;
-    padding-top: 16px; margin-top: 8px;
-    border-top: 1px solid rgba(255,255,255,0.03);
-  }
+  .footer { font-size: 11px; color: #6d655a; margin-top: 10px; }
 CSS
 
 # ══════════════════════════════════════════════
@@ -296,7 +252,7 @@ class TTSZenApp
 
   def build_ui
     @window = Gtk::Window.new
-    @window.title = 'TTS-zen'
+    @window.title = 'zenTTS'
     @window.set_size_request(360, 340)
     @window.resizable = false
     @window.window_position = :center
@@ -321,8 +277,8 @@ class TTSZenApp
     settings = Gtk::Settings.default
     settings.gtk_application_prefer_dark_theme = true
 
-    # Proper WM_CLASS so taskbars/docks show "TTS-zen"
-    @window.set_wmclass('tts-zen', 'TTS-zen')
+    # Proper WM_CLASS so taskbars/docks show "zenTTS"
+    @window.set_wmclass('tts-zen', 'zenTTS')
     @window.signal_connect('destroy') { Gtk.main_quit }
 
     provider = Gtk::CssProvider.new
@@ -352,11 +308,17 @@ class TTSZenApp
     row = Gtk::Box.new(:horizontal, 8)
     row.style_context.add_class('status-row')
     @dot = Gtk::DrawingArea.new
-    @dot.set_size_request(10, 10)
+    @dot.set_size_request(8, 8)
+    @dot.valign = :center
     @dot.style_context.add_class('indicator')
+    @dot.signal_connect('draw') do |w, cr|
+      Gtk.render_background(w.style_context, cr, 0, 0, w.allocated_width, w.allocated_height)
+      false
+    end
     row.pack_start(@dot, expand: false, fill: false, padding: 0)
 
     @status_label = Gtk::Label.new(l(:stopped))
+    @status_label.style_context.add_class('status-text')
     row.pack_start(@status_label, expand: false, fill: false, padding: 0)
     card.pack_start(row, expand: false, fill: false, padding: 0)
 
@@ -401,7 +363,7 @@ class TTSZenApp
     lang_row.pack_start(@lang_btn, expand: false, fill: false, padding: 0)
     body.pack_start(lang_row, expand: false, fill: false, padding: 0)
 
-    footer = Gtk::Label.new("TTS-zen v0.4  ·  Ruby #{RUBY_VERSION}")
+    footer = Gtk::Label.new("#{l(:version)}  ·  Ruby #{RUBY_VERSION}")
     footer.style_context.add_class('footer'); footer.halign = :center
     body.pack_start(footer, expand: false, fill: false, padding: 0)
 
@@ -410,21 +372,13 @@ class TTSZenApp
   end
 
   def title_widget
-    box = Gtk::Box.new(:horizontal, 7)
-    da = Gtk::DrawingArea.new
-    da.set_size_request(16, 16)
-    da.signal_connect('draw') do |_, cr|
-      cr.set_source_rgba(0.655, 0.545, 0.980, 1.0)
-      cr.set_line_width(1.5)
-      cr.move_to(5, 4); cr.line_to(2, 7);  cr.line_to(2, 10)
-      cr.line_to(5, 13); cr.line_to(8, 13); cr.line_to(8, 4)
-      cr.close_path; cr.fill_preserve; cr.stroke
-      cr.set_line_width(1.2)
-      cr.move_to(10.5, 6); cr.curve_to(12, 7, 12, 10, 10.5, 11); cr.stroke
-      cr.move_to(12.5, 4.5); cr.curve_to(14, 6, 14, 11, 12.5, 12.5); cr.stroke
-      false
-    end
-    box.pack_start(da, expand: false, fill: false, padding: 0)
+    box = Gtk::Box.new(:horizontal, 0)
+    zen = Gtk::Label.new('zen')
+    zen.style_context.add_class('app-title')
+    tts = Gtk::Label.new('TTS')
+    tts.style_context.add_class('app-title-accent')
+    box.pack_start(zen, expand: false, fill: false, padding: 0)
+    box.pack_start(tts, expand: false, fill: false, padding: 0)
     box.show_all
     box
   end
@@ -477,6 +431,7 @@ class TTSZenApp
   def set_dot(cls)
     %w[dot-on dot-off dot-warn].each { |c| @dot.style_context.remove_class(c) }
     @dot.style_context.add_class(cls)
+    @dot.queue_draw
   end
 
   def swap_class(widget, remove, add)
