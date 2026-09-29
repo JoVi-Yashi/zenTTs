@@ -1,13 +1,7 @@
 <h1 align="center"><img alt="zenTTS" src="tts.png" width="140"></h1>
 <p align="center">Text-to-speech flotante para Zen Browser. Elige el motor que quieras.</p>
 <p align="center">
-    <a href="README.md">🇪🇸 Español</a> &nbsp;·&nbsp;
-    <a href="README.en.md">🇬🇧 English</a>
-</p>
-<p align="center">
-    <a href="https://github.com/JoVi-Yashi/zenTTs/blob/main/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
-    <a href="https://github.com/JoVi-Yashi/zenTTs"><img alt="GitHub stars" src="https://img.shields.io/github/stars/JoVi-Yashi/zenTTs?style=social"></a>
-    <img alt="Platform" src="https://img.shields.io/badge/platform-Linux%20%7C%20Windows-purple">
+    <a href="README.md">Español</a> · <a href="README.en.md">English</a>
 </p>
 
 Un panel TTS que se inyecta en cualquier página con Shadow DOM. Extrae el texto, lo lee con **SpeechSynthesis nativo** o con **edge-tts** (45 voces neurales de Microsoft), y resalta cada oración en tiempo real. Incluye una **app de escritorio** para gestionar el servidor sin tocar la terminal.
@@ -16,6 +10,8 @@ Diseñado para lectores de Wattpad, AO3 y FanFiction. Construido sobre la [Web S
 
 > [!WARNING]
 > La extensión se carga como complemento temporal en `about:debugging`. No está publicada en addons.mozilla.org.
+
+<p align="center"><img alt="zenTTS panel" src="docs/screenshot.png" width="640"></p>
 
 ---
 
@@ -32,7 +28,7 @@ Cambias de modo con un click desde el panel de ajustes. La extensión detecta si
 
 ## App de escritorio
 
-TTS-zen incluye una app visual con GTK3 para gestionar el servidor. **Cero terminal.**
+zenTTS incluye una app visual con GTK3 para gestionar el servidor.
 
 <p align="center"><i>Ventana oscura con header bar nativa. Indicador verde/rojo, botones Iniciar/Detener, y acceso directo a Zen Browser.</i></p>
 
@@ -55,7 +51,7 @@ cd zenTTs
 make flatpak
 ```
 
-Un solo comando. Ruby, edge-tts, trafilatura, GTK3 — todo incluido. Busca **TTS-zen** en el menú de apps.
+Un solo comando. Ruby, edge-tts, trafilatura, GTK3 — todo incluido. Busca **zenTTS** en el menú de apps.
 
 ### Linux — Manual
 
@@ -99,7 +95,7 @@ Shadow DOM encapsulado. El CSS del sitio jamás interfiere. Aparece abajo a la d
 Elige entre SpeechSynthesis nativo (sin dependencias) o edge-tts con voces neurales de Microsoft. Cambias desde ⚙ → Motor sin reiniciar.
 
 ### Highlighting sincronizado
-Cada oración se resalta en el DOM del sitio (outline violeta + scroll) y en un pop-up sincronizado con tipografía ajustable.
+Cada oración se resalta en el DOM del sitio (marcador amarillo + scroll) y en un pop-up sincronizado con tipografía ajustable.
 
 ### Extractores por plataforma
 Wattpad, AO3, FanFiction y Webnovel tienen extractores optimizados con selectores específicos. Ignoran headers, navs y sidebars.
@@ -108,7 +104,7 @@ Wattpad, AO3, FanFiction y Webnovel tienen extractores optimizados con selectore
 Activa o desactiva la herramienta por dominio con toggle switches. Favicons reales. Persiste entre sesiones.
 
 ### App de escritorio
-GUI nativa con GTK3. Compatible Linux y Windows. Tema oscuro, header bar del sistema, estado en tiempo real.
+GUI nativa con GTK3. Compatible Linux y Windows. Tema oscuro cálido, header bar del sistema, estado en tiempo real.
 
 ---
 

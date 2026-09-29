@@ -181,8 +181,7 @@ function highlightOnPage(refs, charOffset, charLength) {
   if (currentHighlight) {
     for (const el of currentHighlight) {
       el.style.removeProperty('background');
-      el.style.removeProperty('outline');
-      el.style.removeProperty('border-radius');
+      el.style.removeProperty('box-shadow');
     }
     currentHighlight = null;
   }
@@ -198,10 +197,9 @@ function highlightOnPage(refs, charOffset, charLength) {
 
   if (matched.length > 0) {
     for (const el of matched) {
-      el.style.background = 'rgba(167, 139, 250, 0.15)';
-      el.style.outline = '2px solid rgba(167, 139, 250, 0.4)';
-      el.style.borderRadius = '4px';
-      el.style.transition = 'background 0.3s ease, outline 0.3s ease';
+      el.style.background = 'rgba(243, 225, 154, 0.55)';
+      el.style.boxShadow = '-6px 0 0 rgba(243, 225, 154, 0.55), 6px 0 0 rgba(243, 225, 154, 0.55)';
+      el.style.transition = 'background 0.15s ease';
     }
     matched[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
     currentHighlight = matched;
@@ -212,8 +210,7 @@ function clearHighlight() {
   if (currentHighlight) {
     for (const el of currentHighlight) {
       el.style.removeProperty('background');
-      el.style.removeProperty('outline');
-      el.style.removeProperty('border-radius');
+      el.style.removeProperty('box-shadow');
     }
     currentHighlight = null;
   }
@@ -327,12 +324,12 @@ function appendToPreview(text) {
   if (!content) return;
 
   var chunkLabel = document.createElement('div');
-  chunkLabel.style.cssText = 'font-size:9px;color:#5b6370;margin-top:12px;margin-bottom:2px;letter-spacing:0.5px;';
-  chunkLabel.textContent = '— chunk ' + (chunkCount) + ' —';
+  chunkLabel.className = 'chunk-label';
+  chunkLabel.textContent = '— ' + (chunkCount) + ' —';
   content.appendChild(chunkLabel);
 
   var p = document.createElement('p');
-  p.style.cssText = 'margin:0 0 6px 0;line-height:1.6;opacity:0.7;font-size:11px;border-left:2px solid rgba(167,139,250,0.25);padding-left:8px;color:#8b94a5;';
+  p.className = 'chunk-pending';
   p.textContent = text.substring(0, 400);
   if (text.length > 400) p.textContent += '…';
   content.appendChild(p);

@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "TTS-zen",
+  "name": "zenTTS",
   "version": "0.4.0",
   "description": "Floating TTS panel — read any page aloud. Native SpeechSynthesis or edge-tts neural voices. Wattpad, AO3, FanFiction support.",
   "author": "JoVi-Yashi",
@@ -33,13 +33,19 @@
     "scripts": ["background.js"]
   },
   "action": {
-    "default_title": "TTS-zen",
+    "default_title": "zenTTS",
     "default_icon": {
       "16": "icons/icon-16.png",
       "32": "icons/icon-32.png",
       "48": "icons/icon-48.png"
     }
   },
+  "web_accessible_resources": [
+    {
+      "resources": ["icons/sites/*.svg"],
+      "matches": ["<all_urls>"]
+    }
+  ],
   "content_scripts": [
     {
       "matches": ["<all_urls>"],

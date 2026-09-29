@@ -1,6 +1,6 @@
 [Desktop Entry]
-Name=TTS-zen
-Name[es]=TTS-zen
+Name=zenTTS
+Name[es]=zenTTS
 Comment=Text-to-speech server manager for Zen Browser
 Comment[es]=Gestor de servidor texto-a-voz para Zen Browser
 Exec=ruby /home/johao/Proyectos/TTS-zen/gui.rb

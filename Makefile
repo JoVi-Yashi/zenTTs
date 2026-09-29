@@ -29,7 +29,7 @@ install-desktop:
 	@cp tts-zen.desktop "$(HOME)/.local/share/applications/"
 	@cp tts.png "$(HOME)/.local/share/icons/hicolor/scalable/apps/tts.png"
 	@update-desktop-database "$(HOME)/.local/share/applications/" 2>/dev/null || true
-	@echo "✅ TTS-zen instalado en el menú de aplicaciones"
+	@echo "✅ zenTTS instalado en el menú de aplicaciones"
 
 # ── Flatpak ────────────────────────────────────────────
 

@@ -1,13 +1,7 @@
 <h1 align="center"><img alt="zenTTS" src="tts.png" width="140"></h1>
 <p align="center">Floating text-to-speech for Zen Browser. Pick your engine.</p>
 <p align="center">
-    <a href="README.md">🇪🇸 Español</a> &nbsp;·&nbsp;
-    <a href="README.en.md">🇬🇧 English</a>
-</p>
-<p align="center">
-    <a href="https://github.com/JoVi-Yashi/zenTTs/blob/main/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
-    <a href="https://github.com/JoVi-Yashi/zenTTs"><img alt="GitHub stars" src="https://img.shields.io/github/stars/JoVi-Yashi/zenTTs?style=social"></a>
-    <img alt="Platform" src="https://img.shields.io/badge/platform-Linux%20%7C%20Windows-purple">
+    <a href="README.md">Español</a> · <a href="README.en.md">English</a>
 </p>
 
 A TTS panel injected into any page via Shadow DOM. Extracts text, reads it with **native SpeechSynthesis** or **edge-tts** (45 Microsoft neural voices), and highlights each sentence in real time. Includes a **desktop app** to manage the server without touching a terminal.
@@ -16,6 +10,8 @@ Built for Wattpad, AO3, and FanFiction readers. Powered by the [Web Speech API](
 
 > [!WARNING]
 > The extension is loaded as a temporary add-on via `about:debugging`. It is not published on addons.mozilla.org.
+
+<p align="center"><img alt="zenTTS panel" src="docs/screenshot.png" width="640"></p>
 
 ---
 
@@ -32,7 +28,7 @@ Switch engines with one click from the settings panel. The extension detects whe
 
 ## Desktop app
 
-TTS-zen includes a visual GTK3 app to manage the server. **Zero terminal.**
+zenTTS includes a visual GTK3 app to manage the server.
 
 <p align="center"><i>Dark window with native header bar. Green/red indicator, Start/Stop buttons, and direct Zen Browser launcher.</i></p>
 
@@ -55,7 +51,7 @@ cd zenTTs
 make flatpak
 ```
 
-One command. Ruby, edge-tts, trafilatura, GTK3 — everything included. Look for **TTS-zen** in your app menu.
+One command. Ruby, edge-tts, trafilatura, GTK3 — everything included. Look for **zenTTS** in your app menu.
 
 ### Linux — Manual
 
@@ -99,7 +95,7 @@ Shadow DOM encapsulation. Site CSS never interferes. Appears bottom-right, colla
 Choose between native SpeechSynthesis (no dependencies) or edge-tts with Microsoft neural voices. Switch from ⚙ → Engine without restarting.
 
 ### Synchronized highlighting
-Each sentence highlights on the page DOM (purple outline + auto-scroll) and in a synchronized pop-up with adjustable typography.
+Each sentence highlights on the page DOM (yellow highlighter + auto-scroll) and in a synchronized pop-up with adjustable typography.
 
 ### Platform extractors
 Wattpad, AO3, FanFiction, and Webnovel have optimized extractors with platform-specific selectors. Ignores headers, navs, and sidebars.
@@ -108,7 +104,7 @@ Wattpad, AO3, FanFiction, and Webnovel have optimized extractors with platform-s
 Enable or disable the tool per domain with toggle switches. Real favicons. Persists across sessions.
 
 ### Desktop app
-Native GTK3 GUI. Linux and Windows compatible. Dark theme, system header bar, real-time status.
+Native GTK3 GUI. Linux and Windows compatible. Warm dark theme, system header bar, real-time status.
 
 ---
 
