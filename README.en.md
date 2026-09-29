@@ -20,9 +20,10 @@ Built for Wattpad, AO3, and FanFiction readers. Powered by the [Web Speech API](
 | Engine | Backend | How to enable |
 |---|---|---|
 | **Native** | Browser SpeechSynthesis | Panel → ⚙ → Engine: Native |
-| **Neural** | edge-tts · 45 Microsoft voices | `ruby server.rb` + Panel → ⚙ → Engine: Neural |
+| **Neural** | edge-tts · Microsoft neural voices | `ruby server.rb` + Panel → ⚙ → Engine: Neural |
+| **Local** | Piper in the browser (WASM), works offline | Panel → ⚙ → Engine: Local → Download voice (~60 MB, once) |
 
-Switch engines with one click from the settings panel. The extension detects whether the server is running. If you pick Neural without a server, it tells you.
+If the Neural engine fails mid-reading (edge-tts relies on a Microsoft service that sometimes stops answering), zenTTS carries on from the same sentence with the Local voice if you have one downloaded, or with the browser voice, and says so in the panel.
 
 ---
 
@@ -97,6 +98,12 @@ Choose between native SpeechSynthesis (no dependencies) or edge-tts with Microso
 ### Synchronized highlighting
 Each sentence highlights on the page DOM (yellow highlighter + auto-scroll) and in a synchronized pop-up with adjustable typography.
 
+### Next chapter, automatically
+On AO3, FanFiction.net and Wattpad, when a chapter ends the next one loads in the same page and reading continues. Turn it off in ⚙ → "Continue with the next chapter".
+
+### Pick up where you left off
+zenTTS remembers the sentence you were on in each chapter. When you come back, the button says **Continue · 34 / 120**; "From the beginning" starts over.
+
 ### Platform extractors
 Wattpad, AO3, FanFiction, and Webnovel have optimized extractors with platform-specific selectors. Ignores headers, navs, and sidebars.
 
@@ -114,9 +121,15 @@ Native GTK3 GUI. Linux and Windows compatible. Warm dark theme, system header ba
 zenTTs/
 ├── extension/              # Firefox MV3 WebExtension
 │   ├── manifest.json
-│   ├── content.js          # esbuild bundle
-│   ├── background.js       # edge-tts proxy
-│   ├── src/content.js      # Injection, extractors, TTS
+│   ├── content.js          # esbuild bundle (generated)
+│   ├── background.js       # esbuild bundle (generated)
+│   ├── vendor/             # Piper/onnxruntime WASM (copied by the build)
+│   ├── src/content.js      # Injection, highlighting, next chapter
+│   ├── src/sites.js        # Per-site extractors
+│   ├── src/player.js       # Player and engine fallback
+│   ├── src/engines/        # Native, Neural (edge-tts), Local (Piper)
+│   ├── src/progress.js     # Remembers your place per chapter
+│   ├── src/background.js   # Server proxy + Piper
 │   ├── src/panel.js        # Panel UI, settings, sites
 │   └── icons/
 ├── server.rb               # REST API Ruby/Sinatra

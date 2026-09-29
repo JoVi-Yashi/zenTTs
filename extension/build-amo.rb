@@ -1,5 +1,5 @@
 #!/usr/bin/env ruby
-# Build AMO submission zip for TTS-zen
+# Build AMO submission zip for zenTTS
 # Run: ruby extension/build-amo.rb
 
 require 'fileutils'
@@ -9,7 +9,7 @@ OUTPUT = File.join(EXT_DIR, 'tts-zen-amo.zip')
 
 # Build extension first
 Dir.chdir(EXT_DIR) do
-  system('npx esbuild src/content.js --bundle --outfile=content.js --format=iife --target=es2020 --platform=browser --log-level=info')
+  system('node build.js') or abort('build failed')
 end
 
 # Files to include in the zip
@@ -27,6 +27,10 @@ FILES = %w[
   icons/sites/fanfiction.svg
   icons/sites/wattpad.svg
   icons/sites/webnovel.svg
+  vendor/ort/ort-wasm-simd-threaded.wasm
+  vendor/ort/ort-wasm-simd-threaded.mjs
+  vendor/piper/piper_phonemize.wasm
+  vendor/piper/piper_phonemize.data
 ]
 
 # Files NOT included (source only):

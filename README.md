@@ -20,9 +20,10 @@ Diseñado para lectores de Wattpad, AO3 y FanFiction. Construido sobre la [Web S
 | Modo | Motor | Cómo activar |
 |---|---|---|
 | **Nativo** | SpeechSynthesis del navegador | Panel → ⚙ → Motor: Nativo |
-| **Neural** | edge-tts · 45 voces Microsoft | `ruby server.rb` + Panel → ⚙ → Motor: Neural |
+| **Neural** | edge-tts · voces neurales de Microsoft | `ruby server.rb` + Panel → ⚙ → Motor: Neural |
+| **Local** | Piper en el navegador (WASM), sin conexión | Panel → ⚙ → Motor: Local → Descargar voz (~60 MB, una vez) |
 
-Cambias de modo con un click desde el panel de ajustes. La extensión detecta si el servidor está corriendo. Si eliges Neural sin servidor, te avisa.
+Si el motor Neural falla a mitad de lectura (edge-tts depende de un servicio de Microsoft que a veces no responde), zenTTS sigue desde la misma oración con la voz Local si tienes una descargada, o con la del navegador, y te lo indica en el panel.
 
 ---
 
@@ -98,7 +99,13 @@ Elige entre SpeechSynthesis nativo (sin dependencias) o edge-tts con voces neura
 Cada oración se resalta en el DOM del sitio (marcador amarillo + scroll) y en un pop-up sincronizado con tipografía ajustable.
 
 ### Extractores por plataforma
-Wattpad, AO3, FanFiction y Webnovel tienen extractores optimizados con selectores específicos. Ignoran headers, navs y sidebars.
+Wattpad, AO3, FanFiction y Webnovel tienen extractores optimizados con selectores específicos. Ignoran headers, navs, resúmenes y comentarios.
+
+### Siguiente capítulo automático
+En AO3, FanFiction.net y Wattpad, al terminar un capítulo se carga el siguiente en la misma página y la lectura sigue sola. Se desactiva en ⚙ → "Seguir con el siguiente capítulo".
+
+### Continuar donde lo dejaste
+zenTTS recuerda la oración por la que ibas en cada capítulo. Al volver, el botón dice **Continuar · 34 / 120**; "Desde el inicio" empieza de nuevo.
 
 ### Site Manager
 Activa o desactiva la herramienta por dominio con toggle switches. Favicons reales. Persiste entre sesiones.
@@ -114,9 +121,15 @@ GUI nativa con GTK3. Compatible Linux y Windows. Tema oscuro cálido, header bar
 zenTTs/
 ├── extension/              # Firefox MV3 WebExtension
 │   ├── manifest.json
-│   ├── content.js          # Bundle esbuild
-│   ├── background.js       # Proxy edge-tts
-│   ├── src/content.js      # Inyección, extractores, TTS
+│   ├── content.js          # Bundle esbuild (generado)
+│   ├── background.js       # Bundle esbuild (generado)
+│   ├── vendor/             # WASM de Piper/onnxruntime (lo copia el build)
+│   ├── src/content.js      # Inyección, resaltado, capítulo siguiente
+│   ├── src/sites.js        # Extractores por sitio
+│   ├── src/player.js       # Reproductor y respaldo entre motores
+│   ├── src/engines/        # Nativo, Neural (edge-tts), Local (Piper)
+│   ├── src/progress.js     # Recordar la posición por capítulo
+│   ├── src/background.js   # Proxy al servidor + Piper
 │   ├── src/panel.js        # UI del panel, settings, sitios
 │   └── icons/
 ├── server.rb               # API REST Ruby/Sinatra

@@ -10,10 +10,10 @@ backend:
 	ruby server.rb
 
 build-extension:
-	cd extension && npx esbuild src/content.js --bundle --outfile=content.js --format=iife --target=es2020 --platform=browser --log-level=info
+	cd extension && node build.js
 
 extension:
-	cd extension && npm install && npx esbuild src/content.js --bundle --outfile=content.js --format=iife --target=es2020 --platform=browser --log-level=info
+	cd extension && npm install && node build.js
 
 # ── Launcher ───────────────────────────────────────────
 

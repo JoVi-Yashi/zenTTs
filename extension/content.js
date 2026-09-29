@@ -1985,9 +1985,9 @@
           this.log("Grabbed: " + articleContent.innerHTML);
           this._postProcessContent(articleContent);
           if (!metadata.excerpt) {
-            var paragraphs = articleContent.getElementsByTagName("p");
-            if (paragraphs.length) {
-              metadata.excerpt = paragraphs[0].textContent.trim();
+            var paragraphs2 = articleContent.getElementsByTagName("p");
+            if (paragraphs2.length) {
+              metadata.excerpt = paragraphs2[0].textContent.trim();
             }
           }
           var textContent = articleContent.textContent;
@@ -2125,18 +2125,26 @@
   <div id="tts-zen-body">
     <div id="tts-zen-settings" class="collapsed">
       <div class="setting-row">
-        <label>Voz</label>
+        <label id="tts-zen-voice-label">Voz</label>
         <div class="select-wrap">
           <select id="tts-zen-voice"></select>
         </div>
       </div>
       <div class="setting-row">
-        <label>Motor</label>
+        <label id="tts-zen-engine-label">Motor</label>
         <div class="select-wrap">
           <select id="tts-zen-engine">
             <option value="native">Nativo (Browser)</option>
             <option value="server">Neural (edge-tts)</option>
+            <option value="local">Local (Piper)</option>
           </select>
+        </div>
+      </div>
+      <div class="setting-row" id="tts-zen-local-row" hidden>
+        <label></label>
+        <div class="local-dl">
+          <button id="tts-zen-local-dl" type="button">Descargar voz</button>
+          <span id="tts-zen-local-progress"></span>
         </div>
       </div>
       <div class="setting-row">
@@ -2149,7 +2157,7 @@
         </div>
       </div>
       <div class="setting-row section-header">
-        <span>Traducci\xF3n</span>
+        <span id="tts-zen-translate-title">Traducci\xF3n</span>
       </div>
       <div class="translate-row">
         <select id="tts-zen-lang-in">
@@ -2182,12 +2190,16 @@
         </select>
       </div>
       <div class="setting-row">
-        <label>Velocidad</label>
+        <label id="tts-zen-speed-text">Velocidad</label>
         <div class="speed-group">
           <input type="range" id="tts-zen-speed" min="50" max="300" value="100" step="10">
           <span id="tts-zen-speed-label">1.0x</span>
         </div>
       </div>
+      <label class="check-row">
+        <input type="checkbox" id="tts-zen-autonext">
+        <span id="tts-zen-autonext-label">Seguir con el siguiente cap\xEDtulo</span>
+      </label>
     </div>
 
     <div id="tts-zen-counter">\u2014</div>
@@ -2210,7 +2222,7 @@
         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
           <polygon points="5,3 19,12 5,21"></polygon>
         </svg>
-        Leer
+        <span id="tts-zen-read-label">Leer</span>
       </button>
       <button id="tts-zen-pause" disabled>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
@@ -2223,6 +2235,10 @@
           <rect x="4" y="4" width="16" height="16" rx="2"></rect>
         </svg>
       </button>
+    </div>
+
+    <div id="tts-zen-resume-row" hidden>
+      <button id="tts-zen-restart" type="button">Desde el inicio</button>
     </div>
 
     <div id="tts-zen-status">Listo</div>
@@ -2417,6 +2433,26 @@ button:focus-visible, select:focus-visible, input:focus-visible {
 }
 #tts-zen-controls button.primary:hover:not(:disabled) { background: var(--ink); opacity: 0.88; }
 
+.local-dl { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; }
+#tts-zen-local-dl {
+  white-space: nowrap; padding: 4px 10px; border-radius: 4px; border: 1px solid var(--ink);
+  background: transparent; color: var(--ink); font: 12px var(--sans); cursor: pointer;
+}
+#tts-zen-local-dl:hover:not(:disabled) { background: var(--hover); }
+#tts-zen-local-dl:disabled { opacity: 0.5; cursor: default; }
+#tts-zen-local-progress { font-size: 12px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.check-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-soft); cursor: pointer; }
+.check-row input { accent-color: var(--ink); margin: 0; }
+[hidden] { display: none !important; }
+
+#tts-zen-resume-row { text-align: center; padding: 0 14px 6px; }
+#tts-zen-restart {
+  background: none; border: none; padding: 0; cursor: pointer;
+  font: 12px var(--sans); color: var(--ink-soft);
+  text-decoration: underline; text-underline-offset: 3px;
+}
+#tts-zen-restart:hover { color: var(--ink); }
+
 #tts-zen-status {
   padding: 0 14px 10px; font-size: 12px; color: var(--ink-soft); text-align: center;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -2581,7 +2617,15 @@ button:focus-visible, select:focus-visible, input:focus-visible {
       serif: "Serif",
       sans: "Sans",
       mono: "Mono",
-      translateTitle: "Traducci\xF3n"
+      translateTitle: "Traducci\xF3n",
+      engineLocal: "Local (Piper)",
+      continueAt: "Continuar",
+      restart: "Desde el inicio",
+      autoNext: "Seguir con el siguiente cap\xEDtulo",
+      downloadVoice: "Descargar voz",
+      downloading: "Descargando\u2026",
+      downloaded: "descargada",
+      downloadFailed: "No se pudo descargar"
     },
     en: {
       minimize: "Minimize",
@@ -2619,7 +2663,15 @@ button:focus-visible, select:focus-visible, input:focus-visible {
       serif: "Serif",
       sans: "Sans",
       mono: "Mono",
-      translateTitle: "Translation"
+      translateTitle: "Translation",
+      engineLocal: "Local (Piper)",
+      continueAt: "Continue",
+      restart: "From the beginning",
+      autoNext: "Continue with the next chapter",
+      downloadVoice: "Download voice",
+      downloading: "Downloading\u2026",
+      downloaded: "downloaded",
+      downloadFailed: "Download failed"
     }
   };
   function t(key) {
@@ -2630,13 +2682,17 @@ button:focus-visible, select:focus-visible, input:focus-visible {
     currentVoice: "es-ES-AlvaroNeural",
     currentRate: 1,
     currentEngine: "native",
+    localVoice: "es_ES-davefx-medium",
+    autoNext: true,
     langIn: "auto",
     langOut: "es",
     lang: "es"
   };
   async function loadSettings() {
     try {
-      const stored = await browser.storage.local.get(["voice", "rate", "engine", "lang", "langIn", "langOut"]);
+      const stored = await browser.storage.local.get(["voice", "rate", "engine", "lang", "langIn", "langOut", "localVoice", "autoNext"]);
+      if (stored.localVoice) state.localVoice = stored.localVoice;
+      if (typeof stored.autoNext === "boolean") state.autoNext = stored.autoNext;
       if (stored.voice) state.currentVoice = stored.voice;
       if (stored.rate) state.currentRate = stored.rate;
       if (stored.engine) state.currentEngine = stored.engine;
@@ -2645,126 +2701,194 @@ button:focus-visible, select:focus-visible, input:focus-visible {
       if (stored.langOut) state.langOut = stored.langOut;
     } catch (_) {
     }
+    syncShared();
+  }
+  function syncShared() {
+    var shared = window.__tts_zen_state;
+    if (!shared) return;
+    shared.currentVoice = state.currentVoice;
+    shared.localVoice = state.localVoice;
+    shared.currentRate = state.currentRate;
+    shared.currentEngine = state.currentEngine;
+    shared.lang = state.lang;
+    shared.langIn = state.langIn;
+    shared.langOut = state.langOut;
+    shared.autoNext = state.autoNext;
   }
   async function saveSettings() {
     try {
-      await browser.storage.local.set({ voice: state.currentVoice, rate: state.currentRate, engine: state.currentEngine, lang: state.lang, langIn: state.langIn, langOut: state.langOut });
+      await browser.storage.local.set({ voice: state.currentVoice, rate: state.currentRate, engine: state.currentEngine, lang: state.lang, langIn: state.langIn, langOut: state.langOut, localVoice: state.localVoice, autoNext: state.autoNext });
     } catch (_) {
     }
   }
+  function outLang() {
+    return state.langOut && state.langOut !== "auto" ? state.langOut : state.lang;
+  }
   async function loadVoices() {
-    if (state.currentEngine === "server") {
-      await loadServerVoices();
-      return;
-    }
+    var localRow = getEl("tts-zen-local-row");
+    if (localRow) localRow.hidden = state.currentEngine !== "local";
+    if (state.currentEngine === "server") return loadServerVoices();
+    if (state.currentEngine === "local") return loadLocalVoices();
     var voices = speechSynthesis.getVoices();
-    if (voices.length > 0) {
-      state.voices = voices.map(function(v) {
-        return { name: v.name, lang: v.lang, voiceURI: v.voiceURI, default: v.default };
-      });
-      populateVoiceDropdown();
+    if (voices.length === 0) {
+      speechSynthesis.onvoiceschanged = function() {
+        if (state.currentEngine === "native") loadVoices();
+      };
       return;
     }
-    speechSynthesis.onvoiceschanged = function() {
-      if (state.currentEngine !== "native") return;
-      var v = speechSynthesis.getVoices();
-      state.voices = v.map(function(x) {
-        return { name: x.name, lang: x.lang, voiceURI: x.voiceURI, default: x.default };
-      });
-      populateVoiceDropdown();
-    };
+    state.voices = voices.map(function(v) {
+      return { name: v.name, lang: v.lang, default: v.default };
+    });
+    populateVoiceDropdown("currentVoice");
   }
-  async function loadServerVoices() {
-    var select = getEl("tts-zen-voice");
-    if (select) {
-      while (select.options.length > 0) select.remove(0);
-      var opt = document.createElement("option");
-      opt.value = "";
-      opt.textContent = t("loadingEdgeVoices");
-      select.appendChild(opt);
-      select.disabled = true;
-    }
-    try {
-      console.log("[TTS-zen] loadServerVoices: sending get_voices...");
-      var resp = await browser.runtime.sendMessage({ action: "get_voices" });
-      console.log("[TTS-zen] loadServerVoices: got resp", resp);
-      if (resp.success && resp.voices && resp.voices.length > 0) {
-        state.voices = resp.voices.map(function(v) {
-          return { name: v.name, lang: v.locale, voiceURI: v.name, default: false };
-        });
-        populateVoiceDropdown();
-        window.__tts_zen_state.serverAvailable = true;
-        console.log("[TTS-zen] loadServerVoices: OK " + resp.voices.length + " voices");
-      } else {
-        state.voices = [];
-        populateVoiceDropdown();
-        window.__tts_zen_state.serverAvailable = false;
-        console.error("[TTS-zen] loadServerVoices: FAIL success=" + resp.success + " voices=" + (resp.voices ? resp.voices.length : 0));
-        if (select) {
-          while (select.options.length > 0) select.remove(0);
-          var opt2 = document.createElement("option");
-          opt2.value = "";
-          opt2.textContent = t("serverUnavailable");
-          select.appendChild(opt2);
-          select.disabled = true;
-        }
-      }
-    } catch (e) {
-      state.voices = [];
-      populateVoiceDropdown();
-      window.__tts_zen_state.serverAvailable = false;
-      console.error("[TTS-zen] loadServerVoices: ERROR", e.message || e);
-      if (select) {
-        while (select.options.length > 0) select.remove(0);
-        var opt3 = document.createElement("option");
-        opt3.value = "";
-        opt3.textContent = t("serverUnavailable");
-        select.appendChild(opt3);
-        select.disabled = true;
-      }
-    }
-  }
-  function populateVoiceDropdown() {
+  function setVoicePlaceholder(text) {
     var select = getEl("tts-zen-voice");
     if (!select) return;
-    while (select.options.length > 0) select.remove(0);
+    select.replaceChildren();
+    var opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = text;
+    select.appendChild(opt);
+    select.disabled = true;
+  }
+  async function loadServerVoices() {
+    setVoicePlaceholder(t("loadingEdgeVoices"));
+    try {
+      var lang = state.langOut === "auto" ? "" : outLang() + "-";
+      var resp = await browser.runtime.sendMessage({ action: "get_voices", locale: lang });
+      if (state.currentEngine !== "server") return;
+      if (resp && resp.success && resp.voices && resp.voices.length > 0) {
+        state.voices = resp.voices.map(function(v) {
+          return { name: v.name, lang: v.locale };
+        });
+        populateVoiceDropdown("currentVoice");
+        window.__tts_zen_state.serverAvailable = true;
+        return;
+      }
+    } catch (e) {
+      console.error("[zenTTS] voices:", e.message || e);
+    }
+    window.__tts_zen_state.serverAvailable = false;
+    setVoicePlaceholder(t("serverUnavailable"));
+  }
+  var localStored = [];
+  async function loadLocalVoices() {
+    setVoicePlaceholder(t("loadingVoices"));
+    var resp;
+    try {
+      resp = await browser.runtime.sendMessage({ action: "local_voices" });
+    } catch (_) {
+    }
+    if (state.currentEngine !== "local") return;
+    localStored = resp && resp.stored || [];
+    var prefix = outLang().toLowerCase() + "_";
+    var catalog = (resp && resp.catalog || []).filter(function(v) {
+      return v.key.toLowerCase().startsWith(prefix) || localStored.includes(v.key);
+    });
+    if (!catalog.length) catalog = resp && resp.catalog || [];
+    state.voices = catalog.map(function(v) {
+      var have = localStored.includes(v.key) ? " \xB7 " + t("downloaded") : "";
+      return { name: v.key, label: v.name + " (" + v.quality + ")" + have, lang: v.language, size: v.size };
+    });
+    if (!state.voices.some(function(v) {
+      return v.name === state.localVoice;
+    })) {
+      var firstStored = state.voices.find(function(v) {
+        return localStored.includes(v.name);
+      });
+      if (firstStored) state.localVoice = firstStored.name;
+      else if (state.voices.length) state.localVoice = state.voices[0].name;
+    }
+    populateVoiceDropdown("localVoice");
+    updateLocalRow();
+  }
+  function updateLocalRow() {
+    var btn = getEl("tts-zen-local-dl");
+    var progress = getEl("tts-zen-local-progress");
+    if (!btn || !progress) return;
+    var have = localStored.includes(state.localVoice);
+    var voice = (state.voices || []).find(function(v) {
+      return v.name === state.localVoice;
+    });
+    var mb = voice && voice.size ? " \xB7 " + Math.round(voice.size / 1048576) + " MB" : "";
+    btn.hidden = have;
+    btn.disabled = false;
+    btn.textContent = t("downloadVoice") + mb;
+    progress.textContent = "";
+  }
+  async function downloadLocalVoice() {
+    var btn = getEl("tts-zen-local-dl");
+    var progress = getEl("tts-zen-local-progress");
+    var voiceId = state.localVoice;
+    if (btn) btn.disabled = true;
+    if (progress) progress.textContent = t("downloading");
+    try {
+      var resp = await browser.runtime.sendMessage({ action: "local_download", voiceId });
+      if (!resp || !resp.success) throw new Error(resp && resp.error || "download");
+      await loadLocalVoices();
+    } catch (e) {
+      console.error("[zenTTS] download voice:", e.message || e);
+      if (btn) btn.disabled = false;
+      if (progress) progress.textContent = t("downloadFailed");
+    }
+  }
+  if (typeof browser !== "undefined" && browser.runtime && browser.runtime.onMessage) {
+    browser.runtime.onMessage.addListener(function(msg) {
+      if (!msg || msg.action !== "local_progress" || msg.voiceId !== state.localVoice) return;
+      var progress = getEl("tts-zen-local-progress");
+      if (progress && msg.total) progress.textContent = Math.round(msg.loaded * 100 / msg.total) + " %";
+    });
+  }
+  var LANG_NAMES = {
+    es: "Espa\xF1ol",
+    en: "English",
+    fr: "Fran\xE7ais",
+    de: "Deutsch",
+    it: "Italiano",
+    pt: "Portugu\xEAs",
+    ja: "\u65E5\u672C\u8A9E",
+    ko: "\uD55C\uAD6D\uC5B4",
+    zh: "\u4E2D\u6587",
+    ru: "\u0420\u0443\u0441\u0441\u043A\u0438\u0439"
+  };
+  function langLabel(lang) {
+    var parts = (lang || "").split(/[-_]/);
+    var name = LANG_NAMES[parts[0]] || parts[0] || t("unknown");
+    return parts[1] ? name + " (" + parts[1] + ")" : name;
+  }
+  function populateVoiceDropdown(key) {
+    var select = getEl("tts-zen-voice");
+    if (!select) return;
+    select.replaceChildren();
     select.disabled = false;
     if (!state.voices || state.voices.length === 0) return;
+    var names = state.voices.map(function(v) {
+      return v.name;
+    });
+    if (!names.includes(state[key])) {
+      var prefix = outLang().toLowerCase();
+      var match = state.voices.find(function(v) {
+        return (v.lang || "").toLowerCase().startsWith(prefix);
+      });
+      var def = state.voices.find(function(v) {
+        return v.default;
+      });
+      state[key] = (match || def || state.voices[0]).name;
+      syncShared();
+    }
     var groups = {};
     state.voices.forEach(function(v) {
-      var lang = v.lang || "desconocido";
-      if (!groups[lang]) groups[lang] = [];
-      groups[lang].push(v);
+      var lang = v.lang || "";
+      (groups[lang] = groups[lang] || []).push(v);
     });
-    var langNames = {
-      "es-ES": "Espa\xF1ol",
-      "es-MX": "Espa\xF1ol (MX)",
-      "es-US": "Espa\xF1ol (US)",
-      "es": "Espa\xF1ol",
-      "en-US": "English",
-      "en-GB": "English (UK)",
-      "en": "English",
-      "fr-FR": "Fran\xE7ais",
-      "de-DE": "Deutsch",
-      "it-IT": "Italiano",
-      "pt-BR": "Portugu\xEAs"
-    };
-    function langLabel(lang) {
-      if (langNames[lang]) return langNames[lang];
-      if (lang.startsWith("es-")) return "Espa\xF1ol (" + lang.split("-")[1] + ")";
-      if (lang.startsWith("en-")) return "English (" + lang.split("-")[1] + ")";
-      return lang;
-    }
     Object.keys(groups).sort().forEach(function(lang) {
-      var voices = groups[lang];
-      var label = langLabel(lang);
       var optgroup = document.createElement("optgroup");
-      optgroup.label = label;
-      voices.forEach(function(v) {
+      optgroup.label = langLabel(lang);
+      groups[lang].forEach(function(v) {
         var opt = document.createElement("option");
         opt.value = v.name;
-        opt.textContent = v.name + (v.default ? " (default)" : "");
-        if (v.name === state.currentVoice || v.default) opt.selected = true;
+        opt.textContent = v.label || v.name;
+        opt.selected = v.name === state[key];
         optgroup.appendChild(opt);
       });
       select.appendChild(optgroup);
@@ -2772,22 +2896,20 @@ button:focus-visible, select:focus-visible, input:focus-visible {
   }
   function applyLanguage(shadow) {
     var lang = state.lang;
-    var voiceRow = shadow.querySelector(".setting-row:nth-child(1) label");
-    if (voiceRow) voiceRow.textContent = T[lang].voice;
-    var engineRow = shadow.querySelector(".setting-row:nth-child(2) label");
-    if (engineRow) engineRow.textContent = T[lang].engine;
-    var langRow = shadow.querySelector(".setting-row:nth-child(3) label");
-    if (langRow) langRow.textContent = T[lang].langLabel;
-    var translateHeader = shadow.querySelector(".section-header span:last-child");
-    if (translateHeader) translateHeader.textContent = T[lang].translateTitle;
-    var allSettingRows = shadow.querySelectorAll("#tts-zen-settings .setting-row");
-    if (allSettingRows.length >= 4) {
-      var speedRow = allSettingRows[allSettingRows.length - 1];
-      var speedLabel = speedRow.querySelector("label");
-      if (speedLabel) speedLabel.textContent = T[lang].speed;
-    }
-    var readBtn = shadow.getElementById("tts-zen-read");
-    if (readBtn) readBtn.childNodes[readBtn.childNodes.length - 1].textContent = " " + T[lang].read;
+    [
+      ["tts-zen-voice-label", "voice"],
+      ["tts-zen-engine-label", "engine"],
+      ["tts-zen-lang-label", "langLabel"],
+      ["tts-zen-translate-title", "translateTitle"],
+      ["tts-zen-speed-text", "speed"],
+      ["tts-zen-autonext-label", "autoNext"],
+      ["tts-zen-restart", "restart"]
+    ].forEach(function(pair) {
+      var el = shadow.getElementById(pair[0]);
+      if (el) el.textContent = T[lang][pair[1]];
+    });
+    renderReadLabel();
+    updateLocalRow();
     var previewBtn = shadow.getElementById("tts-zen-preview-btn");
     if (previewBtn) previewBtn.title = T[lang].preview;
     var sitesBtn = shadow.getElementById("tts-zen-sites-btn");
@@ -2801,9 +2923,10 @@ button:focus-visible, select:focus-visible, input:focus-visible {
     var nextBtn = shadow.getElementById("tts-zen-next");
     if (nextBtn) nextBtn.title = T[lang].next;
     var engineSelect = shadow.getElementById("tts-zen-engine");
-    if (engineSelect && engineSelect.options.length >= 2) {
+    if (engineSelect && engineSelect.options.length >= 3) {
       engineSelect.options[0].textContent = T[lang].engineNative;
       engineSelect.options[1].textContent = T[lang].engineNeural;
+      engineSelect.options[2].textContent = T[lang].engineLocal;
     }
     var statusEl = shadow.getElementById("tts-zen-status");
     if (statusEl && (statusEl.textContent === T["es"].ready || statusEl.textContent === T["en"].ready)) {
@@ -2859,6 +2982,17 @@ button:focus-visible, select:focus-visible, input:focus-visible {
       if (btn) btn.disabled = enabled === false;
     }
   }
+  var resumeInfo = null;
+  function renderReadLabel() {
+    var label = getEl("tts-zen-read-label");
+    if (label) label.textContent = resumeInfo ? t("continueAt") + " \xB7 " + (resumeInfo.index + 1) + " / " + resumeInfo.total : t("read");
+    var row = getEl("tts-zen-resume-row");
+    if (row) row.hidden = !resumeInfo;
+  }
+  function setResume(info) {
+    resumeInfo = info;
+    renderReadLabel();
+  }
   async function createPanel(shadow, handlers) {
     await loadSettings();
     await loadCollapsedState();
@@ -2905,8 +3039,19 @@ button:focus-visible, select:focus-visible, input:focus-visible {
     });
     const voiceSelect = shadow.getElementById("tts-zen-voice");
     voiceSelect.addEventListener("change", function() {
-      state.currentVoice = voiceSelect.value;
-      window.__tts_zen_state.currentVoice = voiceSelect.value;
+      if (state.currentEngine === "local") {
+        state.localVoice = voiceSelect.value;
+        updateLocalRow();
+      } else state.currentVoice = voiceSelect.value;
+      syncShared();
+      saveSettings();
+    });
+    shadow.getElementById("tts-zen-local-dl").addEventListener("click", downloadLocalVoice);
+    var autoNext = shadow.getElementById("tts-zen-autonext");
+    autoNext.checked = state.autoNext;
+    autoNext.addEventListener("change", function() {
+      state.autoNext = autoNext.checked;
+      syncShared();
       saveSettings();
     });
     const engineSelect = shadow.getElementById("tts-zen-engine");
@@ -2945,6 +3090,7 @@ button:focus-visible, select:focus-visible, input:focus-visible {
         state.langOut = langOut.value;
         window.__tts_zen_state.langOut = langOut.value;
         saveSettings();
+        loadVoices();
       });
     }
     const speedSlider = shadow.getElementById("tts-zen-speed");
@@ -2953,6 +3099,7 @@ button:focus-visible, select:focus-visible, input:focus-visible {
       state.currentRate = speedSlider.value / 100;
       window.__tts_zen_state.currentRate = state.currentRate;
       speedLabel.textContent = state.currentRate.toFixed(1) + "x";
+      if (handlers.onRate) handlers.onRate(state.currentRate);
       saveSettings();
     });
     var readBtn = shadow.getElementById("tts-zen-read");
@@ -2965,6 +3112,7 @@ button:focus-visible, select:focus-visible, input:focus-visible {
     stopBtn.addEventListener("click", handlers.onStop);
     prevBtn.addEventListener("click", handlers.onPrev);
     nextBtn.addEventListener("click", handlers.onNext);
+    shadow.getElementById("tts-zen-restart").addEventListener("click", handlers.onRestart);
     speedSlider.value = Math.round(state.currentRate * 100);
     speedLabel.textContent = state.currentRate.toFixed(1) + "x";
     loadVoices();
@@ -3019,30 +3167,36 @@ button:focus-visible, select:focus-visible, input:focus-visible {
     overlay.classList.remove("hidden");
   }
   function renderPreviewContent(content) {
-    var sentences = window.__tts_zen_sentences || [];
+    var sentences2 = window.__tts_zen_sentences || [];
     content.replaceChildren();
-    if (sentences.length > 0) {
-      for (var i = 0; i < sentences.length; i++) {
+    if (sentences2.length > 0) {
+      for (var i = 0; i < sentences2.length; i++) {
         var p = document.createElement("p");
         p.style.cssText = "margin:0 0 6px 0;line-height:inherit;";
         var span = document.createElement("span");
         span.className = "sentence";
         span.id = "tts-zen-preview-s-" + i;
-        span.textContent = sentences[i].text;
+        span.textContent = sentences2[i].text;
         p.appendChild(span);
         content.appendChild(p);
       }
     } else {
-      var paragraphs = (lastExtractedText || "Sin texto \u2014 click en Leer primero.").split(/\n\n+/).filter(function(l) {
+      var paragraphs2 = (lastExtractedText || "Sin texto \u2014 click en Leer primero.").split(/\n\n+/).filter(function(l) {
         return l.trim();
       });
-      for (var j = 0; j < paragraphs.length; j++) {
+      for (var j = 0; j < paragraphs2.length; j++) {
         var p2 = document.createElement("p");
         p2.style.cssText = "margin:0 0 10px 0;line-height:inherit;";
-        p2.textContent = paragraphs[j].trim();
+        p2.textContent = paragraphs2[j].trim();
         content.appendChild(p2);
       }
     }
+  }
+  function updatePreviewSentences() {
+    var overlay = getEl("tts-zen-preview-overlay");
+    if (!overlay || overlay.classList.contains("hidden")) return;
+    var content = getEl("tts-zen-preview-content");
+    if (content) renderPreviewContent(content);
   }
   function hidePreview() {
     var overlay = getEl("tts-zen-preview-overlay");
@@ -3112,7 +3266,13 @@ button:focus-visible, select:focus-visible, input:focus-visible {
     return "https://www.google.com/s2/favicons?domain=" + domain + "&sz=32";
   }
   function faviconFallback(domain) {
-    return fallbackIcons[domain] || "";
+    var path = fallbackIcons[domain];
+    if (!path) return "";
+    try {
+      return browser.runtime.getURL(path);
+    } catch (_) {
+      return "";
+    }
   }
   var enabledSites = {};
   async function loadSiteSettings() {
@@ -3157,13 +3317,13 @@ button:focus-visible, select:focus-visible, input:focus-visible {
     var list = getEl("tts-zen-sites-list");
     if (!list) return;
     list.replaceChildren();
-    ALL_SITES.forEach(function(site) {
-      var enabled = enabledSites[site.id] !== false;
+    ALL_SITES.forEach(function(site2) {
+      var enabled = enabledSites[site2.id] !== false;
       var row = document.createElement("div");
       row.className = "site-row";
       var left = document.createElement("div");
       left.className = "site-row-left";
-      if (site.id === "generic") {
+      if (site2.id === "generic") {
         var iconDiv = document.createElement("div");
         iconDiv.className = "site-row-icon";
         iconDiv.textContent = "+";
@@ -3171,11 +3331,11 @@ button:focus-visible, select:focus-visible, input:focus-visible {
       } else {
         var iconImg = document.createElement("img");
         iconImg.className = "site-row-icon";
-        iconImg.src = faviconUrl(site.domain);
+        iconImg.src = faviconUrl(site2.domain);
         iconImg.width = 20;
         iconImg.height = 20;
         iconImg.onerror = function() {
-          var fb = faviconFallback(site.id);
+          var fb = faviconFallback(site2.id);
           if (fb) this.src = fb;
         };
         left.appendChild(iconImg);
@@ -3184,17 +3344,17 @@ button:focus-visible, select:focus-visible, input:focus-visible {
       info.className = "site-row-info";
       var nameEl = document.createElement("div");
       nameEl.className = "site-row-name";
-      nameEl.textContent = site.name;
+      nameEl.textContent = site2.name;
       var domainEl = document.createElement("div");
       domainEl.className = "site-row-domain";
-      domainEl.textContent = site.domain;
+      domainEl.textContent = site2.domain;
       info.appendChild(nameEl);
       info.appendChild(domainEl);
       left.appendChild(info);
       row.appendChild(left);
       var toggle = document.createElement("button");
       toggle.className = "site-toggle" + (enabled ? " on" : "");
-      toggle.dataset.site = site.id;
+      toggle.dataset.site = site2.id;
       row.appendChild(toggle);
       toggle.addEventListener("click", function() {
         var siteId = this.dataset.site;
@@ -3258,6 +3418,655 @@ button:focus-visible, select:focus-visible, input:focus-visible {
     return sites["generic"] !== false;
   }
 
+  // src/sites.js
+  function visibleText(el) {
+    return (el.textContent || "").replace(/\s+/g, " ").trim();
+  }
+  function paragraphsIn(container, selector) {
+    var out = [];
+    var nodes = container.querySelectorAll(selector);
+    for (var i = 0; i < nodes.length; i++) {
+      var el = nodes[i];
+      if (el.parentElement && el.parentElement.closest(selector) && container.contains(el.parentElement.closest(selector))) continue;
+      if (visibleText(el).length >= 2) out.push(el);
+    }
+    if (out.length === 0 && visibleText(container).length > 0) out.push(container);
+    return out;
+  }
+  function absolute(href, base) {
+    try {
+      return new URL(href, base).href;
+    } catch (_) {
+      return null;
+    }
+  }
+  function relNext(doc, url) {
+    var link = doc.querySelector('link[rel="next"][href], a[rel="next"][href]');
+    return link ? absolute(link.getAttribute("href"), url) : null;
+  }
+  var BLOCKS = "p, h1, h2, h3, h4, h5, h6, li, blockquote, pre";
+  var SITES = [
+    {
+      id: "ao3",
+      test: function(host) {
+        return host.includes("archiveofourown.org");
+      },
+      container: function(doc) {
+        return doc.querySelector("#chapters .userstuff");
+      },
+      paragraphs: function(c) {
+        return paragraphsIn(c, BLOCKS).filter(function(el) {
+          return !el.classList.contains("landmark");
+        });
+      },
+      chapterKey: function(url) {
+        var m = url.pathname.match(/\/works\/(\d+)(?:\/chapters\/(\d+))?/);
+        return m ? "ao3:" + m[1] + ":" + (m[2] || "1") : null;
+      },
+      nextUrl: function(doc, url) {
+        var a = doc.querySelector("li.chapter.next a[href], .chapter.next a[href]");
+        return a ? absolute(a.getAttribute("href"), url) : null;
+      }
+    },
+    {
+      id: "ffn",
+      test: function(host) {
+        return host.includes("fanfiction.net") || host.includes("fictionpress.com");
+      },
+      container: function(doc) {
+        return doc.querySelector("#storytext, .storytext");
+      },
+      paragraphs: function(c) {
+        return paragraphsIn(c, "p");
+      },
+      chapterKey: function(url) {
+        var m = url.pathname.match(/\/s\/(\d+)(?:\/(\d+))?/);
+        return m ? "ffn:" + m[1] + ":" + (m[2] || "1") : null;
+      },
+      nextUrl: function(doc, url) {
+        var m = url.pathname.match(/\/s\/(\d+)(?:\/(\d+))?(\/.*)?/);
+        if (!m) return null;
+        var n = parseInt(m[2] || "1", 10) + 1;
+        var sel = doc.querySelector("#chap_select");
+        if (!sel || !sel.querySelector('option[value="' + n + '"]')) return null;
+        return absolute("/s/" + m[1] + "/" + n + (m[3] || "/"), url);
+      }
+    },
+    {
+      id: "wattpad",
+      test: function(host) {
+        return host.includes("wattpad.com");
+      },
+      // The header panel (.text-center) holds metadata, not the story
+      container: function(doc) {
+        return doc.querySelector(".panel.panel-reading:not(.text-center) pre") || doc.querySelector(".panel.panel-reading:not(.text-center)");
+      },
+      paragraphs: function(c) {
+        var ps = c.querySelectorAll("p[data-p-id]");
+        return ps.length ? Array.prototype.filter.call(ps, function(el) {
+          return visibleText(el).length >= 2;
+        }) : paragraphsIn(c, "p");
+      },
+      chapterKey: function(url) {
+        var m = url.pathname.match(/^\/(\d+)/);
+        return m ? "wattpad:" + m[1] : null;
+      },
+      nextUrl: function(doc, url) {
+        var a = doc.querySelector("a.next-part-link[href], .next-part a[href]");
+        return a ? absolute(a.getAttribute("href"), url) : relNext(doc, url);
+      }
+    },
+    {
+      id: "webnovel",
+      test: function(host) {
+        return host.includes("webnovel.com");
+      },
+      container: function(doc) {
+        return doc.querySelector('.cha-words, .cha-content, .chapter-content, .read-content, [class*="cha-words"], [class*="cha-content"]');
+      },
+      paragraphs: function(c) {
+        return paragraphsIn(c, "p");
+      },
+      chapterKey: function(url) {
+        return "webnovel:" + url.pathname;
+      },
+      // Webnovel already loads chapters by infinite scroll (see the content observer)
+      nextUrl: function() {
+        return null;
+      }
+    }
+  ];
+  var GENERIC = {
+    id: "generic",
+    test: function() {
+      return true;
+    },
+    container: function(doc) {
+      return doc.querySelector('article, main, [role="main"]') || doc.body;
+    },
+    paragraphs: function(c) {
+      return paragraphsIn(c, BLOCKS + ", td, th");
+    },
+    chapterKey: function(url) {
+      return "page:" + url.origin + url.pathname;
+    },
+    nextUrl: relNext
+  };
+  function siteFor(host) {
+    for (var i = 0; i < SITES.length; i++) {
+      if (SITES[i].test(host)) return SITES[i];
+    }
+    return GENERIC;
+  }
+
+  // src/engines/native.js
+  var voicesCache = [];
+  function refreshVoices() {
+    voicesCache = speechSynthesis.getVoices();
+    return voicesCache;
+  }
+  if (typeof speechSynthesis !== "undefined") {
+    refreshVoices();
+    speechSynthesis.addEventListener("voiceschanged", refreshVoices);
+  }
+  function nativeVoices() {
+    return voicesCache.length ? voicesCache : refreshVoices();
+  }
+  function pickNativeVoice(name, lang) {
+    var voices = nativeVoices();
+    var byName = voices.find(function(v) {
+      return v.name === name || v.voiceURI === name;
+    });
+    if (byName) return byName;
+    var prefix = (lang || "").slice(0, 2).toLowerCase();
+    return voices.find(function(v) {
+      return v.lang.toLowerCase().startsWith(prefix);
+    }) || null;
+  }
+  function createNativeEngine() {
+    var running = null;
+    function speak(text, opts) {
+      return new Promise(function(resolve, reject) {
+        var u = new SpeechSynthesisUtterance(text);
+        var voice = pickNativeVoice(opts.voice, opts.lang);
+        if (voice) {
+          u.voice = voice;
+          u.lang = voice.lang;
+        } else if (opts.lang) {
+          u.lang = opts.lang;
+        }
+        u.rate = opts.rate();
+        u.onend = function() {
+          resolve();
+        };
+        u.onerror = function(e) {
+          if (e.error === "canceled" || e.error === "interrupted") resolve();
+          else reject(new Error("speech: " + e.error));
+        };
+        speechSynthesis.speak(u);
+      });
+    }
+    return {
+      name: "native",
+      available: function() {
+        return Promise.resolve(typeof speechSynthesis !== "undefined");
+      },
+      // Speaks sentences[start..]; calls ctx.onSentence(i) as each begins.
+      play: async function(start, ctx) {
+        var run = { cancelled: false };
+        running = run;
+        for (var i = start; i < ctx.sentences.length; i++) {
+          if (run.cancelled) return;
+          ctx.onSentence(i);
+          await speak(ctx.sentences[i].text, ctx);
+        }
+      },
+      pause: function() {
+        speechSynthesis.pause();
+      },
+      resume: function() {
+        speechSynthesis.resume();
+      },
+      stop: function() {
+        if (running) running.cancelled = true;
+        speechSynthesis.cancel();
+      }
+    };
+  }
+
+  // src/engines/audio.js
+  function blobFromBase64(b64, type) {
+    var bytes = Uint8Array.from(atob(b64), function(c) {
+      return c.charCodeAt(0);
+    });
+    return new Blob([bytes], { type });
+  }
+  function createAudioPlayer() {
+    var audio = null;
+    var finish = null;
+    function release() {
+      if (!audio) return;
+      audio.ontimeupdate = audio.onended = audio.onerror = null;
+      audio.pause();
+      URL.revokeObjectURL(audio.src);
+      audio = null;
+    }
+    return {
+      play: function(blob, rate, onTime, startAt) {
+        release();
+        return new Promise(function(resolve, reject) {
+          var a = new Audio(URL.createObjectURL(blob));
+          audio = a;
+          finish = resolve;
+          a.playbackRate = rate || 1;
+          if (startAt) a.currentTime = startAt;
+          a.ontimeupdate = function() {
+            if (onTime) onTime(a.currentTime);
+          };
+          a.onended = function() {
+            release();
+            resolve();
+          };
+          a.onerror = function() {
+            release();
+            reject(new Error("audio"));
+          };
+          a.play().catch(function(e) {
+            release();
+            reject(e);
+          });
+        });
+      },
+      pause: function() {
+        if (audio) audio.pause();
+      },
+      resume: function() {
+        if (audio) audio.play();
+      },
+      setRate: function(rate) {
+        if (audio) audio.playbackRate = rate;
+      },
+      stop: function() {
+        var done = finish;
+        finish = null;
+        release();
+        if (done) done();
+      }
+    };
+  }
+
+  // src/engines/server.js
+  var MAX_SEGMENT = 2500;
+  function segmentFrom(sentences2, start) {
+    var end = start;
+    var len = 0;
+    while (end < sentences2.length && sentences2[end].refIdx === sentences2[start].refIdx) {
+      if (len > 0 && len + sentences2[end].text.length > MAX_SEGMENT) break;
+      len += sentences2[end].text.length + 1;
+      end++;
+    }
+    return { start, end };
+  }
+  function norm(s) {
+    return s.replace(/\s+/g, " ").trim();
+  }
+  function sentenceTimes(ourSentences, cues) {
+    var cueStarts = [];
+    var pos = 0;
+    cues.forEach(function(c) {
+      cueStarts.push({ at: pos, start: c.start, end: c.end, len: norm(c.text).length });
+      pos += norm(c.text).length + 1;
+    });
+    var total = pos || 1;
+    var ourTotal = ourSentences.reduce(function(n, s) {
+      return n + norm(s.text).length + 1;
+    }, 0) || 1;
+    var times = [];
+    var at = 0;
+    ourSentences.forEach(function(s) {
+      var target = at * total / ourTotal;
+      var cue = cueStarts[0];
+      for (var i = 0; i < cueStarts.length; i++) {
+        if (cueStarts[i].at <= target) cue = cueStarts[i];
+        else break;
+      }
+      var t2 = 0;
+      if (cue) {
+        var within = cue.len ? Math.min(1, (target - cue.at) / cue.len) : 0;
+        t2 = cue.start + within * (cue.end - cue.start);
+      }
+      times.push(t2);
+      at += norm(s.text).length + 1;
+    });
+    return times;
+  }
+  function createServerEngine() {
+    var player2 = createAudioPlayer();
+    var running = null;
+    async function synth(ctx, seg) {
+      var text = ctx.sentences.slice(seg.start, seg.end).map(function(s) {
+        return s.text;
+      }).join(" ");
+      var resp = await browser.runtime.sendMessage({ action: "read_page_sync", text, voice: ctx.voice, rate: "+0%" });
+      if (!resp || !resp.success || !resp.audio) throw new Error(resp && resp.error || "edge-tts");
+      return {
+        blob: blobFromBase64(resp.audio, "audio/mpeg"),
+        times: sentenceTimes(ctx.sentences.slice(seg.start, seg.end), resp.sentences || [])
+      };
+    }
+    return {
+      name: "server",
+      available: async function() {
+        try {
+          var r = await browser.runtime.sendMessage({ action: "health" });
+          return !!(r && r.success);
+        } catch (_) {
+          return false;
+        }
+      },
+      play: async function(start, ctx) {
+        var run = { cancelled: false };
+        running = run;
+        var seg = segmentFrom(ctx.sentences, start);
+        var pending2 = synth(ctx, seg);
+        while (seg.start < ctx.sentences.length) {
+          var audio;
+          try {
+            audio = await pending2;
+          } catch (e) {
+            e.at = seg.start;
+            throw e;
+          }
+          if (run.cancelled) return;
+          var next = seg.end < ctx.sentences.length ? segmentFrom(ctx.sentences, seg.end) : null;
+          if (next) {
+            pending2 = synth(ctx, next);
+            pending2.catch(function() {
+            });
+          }
+          var current = seg.start;
+          ctx.onSentence(current);
+          var s = seg;
+          await player2.play(audio.blob, ctx.rate(), function(t2) {
+            for (var k = audio.times.length - 1; k >= 0; k--) {
+              if (t2 >= audio.times[k]) {
+                if (s.start + k !== current) {
+                  current = s.start + k;
+                  ctx.onSentence(current);
+                }
+                break;
+              }
+            }
+          });
+          if (run.cancelled || !next) return;
+          seg = next;
+        }
+      },
+      pause: function() {
+        player2.pause();
+      },
+      resume: function() {
+        player2.resume();
+      },
+      setRate: function(r) {
+        player2.setRate(r);
+      },
+      stop: function() {
+        if (running) running.cancelled = true;
+        player2.stop();
+      }
+    };
+  }
+
+  // src/engines/local.js
+  var AHEAD = 2;
+  function createLocalEngine() {
+    var player2 = createAudioPlayer();
+    var running = null;
+    function synth(ctx, i) {
+      return browser.runtime.sendMessage({ action: "local_speak", text: ctx.sentences[i].text, voiceId: ctx.localVoice }).then(function(resp) {
+        if (!resp || !resp.success) throw new Error(resp && resp.error || "piper");
+        return new Blob([resp.audio], { type: "audio/wav" });
+      });
+    }
+    return {
+      name: "local",
+      // Usable only when a voice has been downloaded
+      available: async function(ctx) {
+        try {
+          var r = await browser.runtime.sendMessage({ action: "local_voices" });
+          var stored = r && r.stored || [];
+          if (stored.length === 0) return false;
+          if (ctx && !stored.includes(ctx.localVoice)) ctx.localVoice = stored[0];
+          return true;
+        } catch (_) {
+          return false;
+        }
+      },
+      play: async function(start, ctx) {
+        var run = { cancelled: false };
+        running = run;
+        var queue = {};
+        function want(i2) {
+          if (i2 < ctx.sentences.length && !queue[i2]) {
+            queue[i2] = synth(ctx, i2);
+            queue[i2].catch(function() {
+            });
+          }
+        }
+        for (var i = start; i < ctx.sentences.length; i++) {
+          for (var k = 0; k <= AHEAD; k++) want(i + k);
+          var blob;
+          try {
+            blob = await queue[i];
+          } catch (e) {
+            e.at = i;
+            throw e;
+          }
+          delete queue[i];
+          if (run.cancelled) return;
+          ctx.onSentence(i);
+          await player2.play(blob, ctx.rate());
+          if (run.cancelled) return;
+        }
+      },
+      pause: function() {
+        player2.pause();
+      },
+      resume: function() {
+        player2.resume();
+      },
+      setRate: function(r) {
+        player2.setRate(r);
+      },
+      stop: function() {
+        if (running) running.cancelled = true;
+        player2.stop();
+      }
+    };
+  }
+
+  // src/player.js
+  var FALLBACK = { server: ["local", "native"], local: ["native"], native: [] };
+  function createPlayer(hooks) {
+    var engines = {
+      native: createNativeEngine(),
+      server: createServerEngine(),
+      local: createLocalEngine()
+    };
+    var sentences2 = [];
+    var current = -1;
+    var engine = null;
+    var runId = 0;
+    var state2 = "idle";
+    function setState(s) {
+      state2 = s;
+      hooks.onState(s);
+    }
+    function context(run2) {
+      var opts = hooks.options();
+      return {
+        sentences: sentences2,
+        voice: opts.voice,
+        localVoice: opts.localVoice,
+        lang: opts.lang,
+        rate: function() {
+          return hooks.options().rate;
+        },
+        onSentence: function(i) {
+          if (run2 !== runId) return;
+          current = i;
+          hooks.onSentence(i);
+        }
+      };
+    }
+    async function run(start, name) {
+      var id = ++runId;
+      engine = engines[name];
+      setState("playing");
+      var ctx = context(id);
+      try {
+        await engine.play(start, ctx);
+        if (id !== runId) return;
+        setState("idle");
+        hooks.onEnd();
+      } catch (err) {
+        if (id !== runId) return;
+        var from = typeof err.at === "number" ? err.at : Math.max(start, current);
+        for (var i = 0; i < FALLBACK[name].length; i++) {
+          var alt = FALLBACK[name][i];
+          if (await engines[alt].available(ctx)) {
+            hooks.onFallback(name, alt, err);
+            return run(from, alt);
+          }
+        }
+        setState("idle");
+        hooks.onError(name, err);
+      }
+    }
+    function halt() {
+      runId++;
+      if (engine) engine.stop();
+    }
+    return {
+      engines,
+      get state() {
+        return state2;
+      },
+      get index() {
+        return current;
+      },
+      get count() {
+        return sentences2.length;
+      },
+      load: function(list) {
+        halt();
+        sentences2 = list;
+        current = -1;
+        setState("idle");
+      },
+      // Appends sentences (e.g. translated chunks of an infinite-scroll page)
+      append: function(list) {
+        sentences2.push.apply(sentences2, list);
+      },
+      start: function(index, name) {
+        halt();
+        if (!sentences2.length) return;
+        current = Math.max(0, Math.min(index || 0, sentences2.length - 1));
+        run(current, name);
+      },
+      jump: function(index) {
+        if (!engine || !sentences2.length) return;
+        var name = engine.name;
+        halt();
+        current = Math.max(0, Math.min(index, sentences2.length - 1));
+        run(current, name);
+      },
+      pause: function() {
+        if (state2 !== "playing" || !engine) return;
+        engine.pause();
+        setState("paused");
+      },
+      resume: function() {
+        if (state2 !== "paused" || !engine) return;
+        engine.resume();
+        setState("playing");
+      },
+      setRate: function(r) {
+        if (engine && engine.setRate) engine.setRate(r);
+      },
+      stop: function() {
+        halt();
+        current = -1;
+        setState("idle");
+      }
+    };
+  }
+
+  // src/progress.js
+  var PREFIX = "progress:";
+  var MAX_ENTRIES = 300;
+  var WRITE_EVERY_MS = 3e3;
+  var pending = null;
+  var timer = null;
+  function textHash(text) {
+    var s = text.slice(0, 300);
+    var h = 5381;
+    for (var i = 0; i < s.length; i++) h = (h << 5) + h + s.charCodeAt(i) | 0;
+    return (h >>> 0).toString(36);
+  }
+  async function loadProgress(key) {
+    if (!key) return null;
+    try {
+      var got = await browser.storage.local.get(PREFIX + key);
+      return got[PREFIX + key] || null;
+    } catch (_) {
+      return null;
+    }
+  }
+  function flush() {
+    timer = null;
+    if (!pending) return;
+    var item = {};
+    item[PREFIX + pending.key] = pending.data;
+    pending = null;
+    browser.storage.local.set(item).catch(function() {
+    });
+  }
+  function saveProgress(key, data) {
+    if (!key) return;
+    pending = { key, data: Object.assign({ updatedAt: Date.now() }, data) };
+    if (!timer) timer = setTimeout(flush, WRITE_EVERY_MS);
+  }
+  function flushProgress() {
+    if (timer) {
+      clearTimeout(timer);
+      flush();
+    }
+  }
+  async function clearProgress(key) {
+    if (!key) return;
+    if (pending && pending.key === key) pending = null;
+    try {
+      await browser.storage.local.remove(PREFIX + key);
+    } catch (_) {
+    }
+  }
+  async function pruneProgress() {
+    try {
+      var all = await browser.storage.local.get(null);
+      var keys = Object.keys(all).filter(function(k) {
+        return k.startsWith(PREFIX);
+      });
+      if (keys.length <= MAX_ENTRIES) return;
+      keys.sort(function(a, b) {
+        return (all[b].updatedAt || 0) - (all[a].updatedAt || 0);
+      });
+      await browser.storage.local.remove(keys.slice(MAX_ENTRIES));
+    } catch (_) {
+    }
+  }
+
   // src/content.js
   var RESTRICTED_PROTOCOLS = ["edge:", "about:", "file:", "chrome:", "moz-extension:"];
   function shouldInject() {
@@ -3267,667 +4076,428 @@ button:focus-visible, select:focus-visible, input:focus-visible {
     var host = window.location.hostname;
     for (var siteId in sites) {
       if (siteId === "generic") continue;
-      if (host.includes(siteId)) {
-        return sites[siteId] !== false;
-      }
+      if (host.includes(siteId)) return sites[siteId] !== false;
     }
     return sites["generic"] !== false;
   }
-  function extractTextWithRefs() {
-    for (const site of SITE_EXTRACTORS) {
-      if (site.test && site.test()) {
-        const text = site.extract();
-        if (text && text.trim().length > 50) {
-          return { text, refs: [] };
-        }
+  window.__tts_zen_state = {
+    currentVoice: "es-ES-AlvaroNeural",
+    localVoice: "es_ES-davefx-medium",
+    currentRate: 1,
+    currentEngine: "native",
+    serverAvailable: false,
+    lang: "es",
+    langIn: "auto",
+    langOut: "es",
+    autoNext: true
+  };
+  function st() {
+    return window.__tts_zen_state;
+  }
+  function ts(key, arg) {
+    var T2 = {
+      es: {
+        ready: "Listo",
+        playing: "Reproduciendo\u2026",
+        paused: "Pausado",
+        stopped: "Detenido",
+        starting: "Preparando lectura\u2026",
+        translating: "Traduciendo\u2026",
+        noTextFound: "No se encontr\xF3 texto en esta p\xE1gina",
+        voiceError: "No se pudo leer con ninguna voz",
+        fallback_local: "edge-tts no respondi\xF3 \u2014 usando voz local",
+        fallback_native: "Sin voz neural \u2014 usando la voz del navegador",
+        nextLoading: "Cargando el cap\xEDtulo siguiente\u2026",
+        nextFailed: "No se pudo cargar el cap\xEDtulo siguiente",
+        chapterDone: "Cap\xEDtulo terminado",
+        pressRead: "Pulsa Leer para continuar"
+      },
+      en: {
+        ready: "Ready",
+        playing: "Playing\u2026",
+        paused: "Paused",
+        stopped: "Stopped",
+        starting: "Getting ready\u2026",
+        translating: "Translating\u2026",
+        noTextFound: "No text found on this page",
+        voiceError: "Could not read with any voice",
+        fallback_local: "edge-tts did not answer \u2014 using the local voice",
+        fallback_native: "No neural voice \u2014 using the browser voice",
+        nextLoading: "Loading the next chapter\u2026",
+        nextFailed: "Could not load the next chapter",
+        chapterDone: "Chapter finished",
+        pressRead: "Press Read to continue"
       }
+    };
+    var s = (T2[st().lang] || T2.es)[key] || key;
+    return arg !== void 0 ? s.replace("%s", arg) : s;
+  }
+  var site = siteFor(window.location.hostname);
+  var chapterDoc = document;
+  var chapterUrl = new URL(window.location.href);
+  function isHidden(el) {
+    if (el.ownerDocument !== document) return false;
+    var cs = window.getComputedStyle(el);
+    return cs.display === "none" || cs.visibility === "hidden";
+  }
+  function cleanText(text) {
+    return text.replace(/[\t ]+/g, " ").replace(/\.{3,}/g, "\u2026").replace(/\s+([.,!?])/g, "$1").replace(/\.([A-ZÁÉÍÓÚÑ])/g, ". $1").replace(/ {2,}/g, " ").trim();
+  }
+  function extractParagraphs() {
+    var container = site.container(document);
+    if (container) {
+      var paras = site.paragraphs(container).filter(function(el) {
+        return !isHidden(el);
+      }).map(function(el) {
+        return { el, text: cleanText(el.innerText || el.textContent || "") };
+      }).filter(function(p) {
+        return p.text.length >= 2;
+      });
+      var total = paras.reduce(function(n, p) {
+        return n + p.text.length;
+      }, 0);
+      if (total > 50) return paras;
     }
-    var result = mapParagraphsToText();
-    if (result && result.text && result.text.trim().length > 50) return result;
     try {
-      var doc = document.cloneNode(true);
-      var reader = new import_readability.Readability(doc);
-      var article = reader.parse();
+      var article = new import_readability.Readability(document.cloneNode(true)).parse();
       if (article && article.textContent && article.textContent.trim().length > 50) {
-        return { text: article.textContent.trim(), refs: [] };
+        return article.textContent.split(/\n\s*\n/).map(function(t2) {
+          return { el: null, text: cleanText(t2) };
+        }).filter(function(p) {
+          return p.text.length >= 2;
+        });
       }
     } catch (_) {
     }
-    var body = document.body;
-    if (body && body.innerText && body.innerText.trim().length > 10) {
-      return { text: body.innerText.trim(), refs: [{ el: body, start: 0, end: body.innerText.trim().length }] };
-    }
-    return null;
+    return [];
   }
-  function mapParagraphsToText() {
-    const result = { text: "", refs: [] };
-    const candidates = document.querySelectorAll(
-      "p, pre, h1, h2, h3, h4, h5, h6, li, td, th, blockquote, div.story-text p, .userstuff p, .chapter-content p"
-    );
-    if (candidates.length === 0) {
-      const body = document.body;
-      if (body && body.innerText) {
-        result.text = body.innerText;
-        result.refs.push({ el: body, start: 0, end: body.innerText.length });
-        return result;
-      }
-      return null;
-    }
-    let offset = 0;
-    for (const el of candidates) {
-      const style = window.getComputedStyle(el);
-      if (style.display === "none" || style.visibility === "hidden") continue;
-      const txt = el.textContent.trim();
-      if (txt.length < 2) continue;
-      result.text += txt + "\n\n";
-      const start = offset;
-      const end = start + txt.length;
-      result.refs.push({ el, start, end });
-      offset = end + 2;
-    }
-    if (!result.text.trim()) return null;
-    result.text = result.text.trim();
-    return result;
-  }
-  var SITE_EXTRACTORS = [
-    {
-      test: () => window.location.hostname.includes("wattpad.com"),
-      extract: () => {
-        const paragraphs = document.querySelectorAll(
-          ".panel.panel-reading:not(.text-center) pre p[data-p-id]"
-        );
-        if (paragraphs.length === 0) return null;
-        const parts = [];
-        for (const p of paragraphs) {
-          const txt = p.textContent.trim();
-          if (txt.length > 20) parts.push(txt);
-        }
-        return parts.length > 0 ? parts.join("\n\n") : null;
-      }
-    },
-    {
-      test: () => window.location.hostname.includes("archiveofourown.org"),
-      extract: () => {
-        const chapter = document.querySelector("#chapters .userstuff");
-        return chapter?.textContent || null;
-      }
-    },
-    {
-      test: () => window.location.hostname.includes("fanfiction.net"),
-      extract: () => {
-        const story = document.querySelector(".storytext, #storytext");
-        return story?.textContent || null;
-      }
-    },
-    {
-      test: () => window.location.hostname.includes("webnovel.com"),
-      extract: () => {
-        var content = document.querySelector('.cha-words, .cha-content, .chapter-content, .read-content, [class*="cha-words"], [class*="cha-content"], .reader-content, .reader-main, [class*="reader"]');
-        if (!content) {
-          var divs = document.querySelectorAll("div");
-          var best = null;
-          var maxLen = 0;
-          for (var i = 0; i < divs.length; i++) {
-            var txt = divs[i].textContent.trim();
-            if (txt.length > maxLen && txt.length > 500) {
-              maxLen = txt.length;
-              best = divs[i];
-            }
-          }
-          if (best) return best.textContent;
-          return null;
-        }
-        return content.textContent;
-      }
-    }
-  ];
-  var currentHighlight = null;
-  function highlightOnPage(refs, charOffset, charLength) {
-    if (currentHighlight) {
-      for (const el of currentHighlight) {
-        el.style.removeProperty("background");
-        el.style.removeProperty("box-shadow");
-      }
-      currentHighlight = null;
-    }
-    const endOffset = charOffset + charLength;
-    const matched = [];
-    for (const ref of refs) {
-      if (ref.start <= endOffset && ref.end >= charOffset) {
-        matched.push(ref.el);
-      }
-    }
-    if (matched.length > 0) {
-      for (const el of matched) {
-        el.style.background = "rgba(243, 225, 154, 0.55)";
-        el.style.boxShadow = "-6px 0 0 rgba(243, 225, 154, 0.55), 6px 0 0 rgba(243, 225, 154, 0.55)";
-        el.style.transition = "background 0.15s ease";
-      }
-      matched[0].scrollIntoView({ behavior: "smooth", block: "center" });
-      currentHighlight = matched;
-    }
-  }
-  function clearHighlight() {
-    if (currentHighlight) {
-      for (const el of currentHighlight) {
-        el.style.removeProperty("background");
-        el.style.removeProperty("box-shadow");
-      }
-      currentHighlight = null;
-    }
-  }
-  function cleanText(text) {
-    return text.replace(/[\t ]+/g, " ").replace(/\n{3,}/g, "\n\n").replace(/([^.!?…\n])\n([a-záéíóúñ])/gi, "$1 $2").replace(/\.{3,}/g, "\u2026").replace(/\s+\./g, ".").replace(/\s+,/g, ",").replace(/\s+!/g, "!").replace(/\s+\?/g, "?").replace(/\.([A-ZÁÉÍÓÚÑ])/g, ". $1").split("\n").map(function(l) {
-      return l.trim();
-    }).join("\n").replace(/^\n+/, "").replace(/\n+$/, "").replace(/ {2,}/g, " ").trim();
-  }
-  var contentObserver = null;
-  var scrollCheckInterval = null;
-  var lastKnownText = "";
-  var chunkCount = 0;
-  function startContentObserver() {
-    stopContentObserver();
-    lastKnownText = window.__tts_zen_last_text || "";
-    chunkCount = 0;
-    var target = document.querySelector('article, main, [role="main"], .cha-content, .chapter-content, .read-content, #chapters, .userstuff, .storytext, .panel-reading');
-    if (!target) target = document.body;
-    contentObserver = new MutationObserver(function() {
-      checkForNewContent(target);
-    });
-    contentObserver.observe(target, { childList: true, subtree: true, characterData: true });
-    scrollCheckInterval = setInterval(function() {
-      checkForNewContent(target);
-    }, 2e3);
-  }
-  function stopContentObserver() {
-    if (contentObserver) {
-      contentObserver.disconnect();
-      contentObserver = null;
-    }
-    if (scrollCheckInterval) {
-      clearInterval(scrollCheckInterval);
-      scrollCheckInterval = null;
-    }
-  }
-  function checkForNewContent(target) {
-    var currentText = target.innerText || target.textContent || "";
-    currentText = currentText.replace(/\s+/g, " ").trim();
-    if (currentText.length <= lastKnownText.length) return;
-    var newPortion = currentText.substring(lastKnownText.length).trim();
-    if (newPortion.length < 20) return;
-    var chunk = newPortion;
-    if (newPortion.length > 2e3) {
-      chunk = newPortion.substring(newPortion.length - 2e3);
-    }
-    lastKnownText = currentText;
-    chunkCount++;
-    console.log("[TTS-zen] Chunk #" + chunkCount + " detected, " + chunk.length + " chars");
-    onNewContent(chunk);
-  }
-  async function onNewContent(newText) {
-    newText = cleanText(newText);
-    window.__tts_zen_last_text = (window.__tts_zen_last_text || "") + "\n\n" + newText;
-    var st = window.__tts_zen_state || {};
-    var langOut = st.langOut || "es";
-    if (langOut && langOut !== "auto") {
-      try {
-        var resp = await browser.runtime.sendMessage({ action: "translate", text: newText, from: "auto", to: langOut });
-        if (resp && resp.text && resp.text !== newText) {
-          newText = resp.text;
-        }
-      } catch (_) {
-      }
-    }
-    appendToPreview(newText);
-  }
-  function appendToPreview(text) {
-    var host = document.getElementById("tts-zen-host");
-    if (!host || !host.shadowRoot) return;
-    var overlay = host.shadowRoot.getElementById("tts-zen-preview-overlay");
-    if (!overlay || overlay.classList.contains("hidden")) return;
-    var content = host.shadowRoot.getElementById("tts-zen-preview-content");
-    if (!content) return;
-    var chunkLabel = document.createElement("div");
-    chunkLabel.className = "chunk-label";
-    chunkLabel.textContent = "\u2014 " + chunkCount + " \u2014";
-    content.appendChild(chunkLabel);
-    var p = document.createElement("p");
-    p.className = "chunk-pending";
-    p.textContent = text.substring(0, 400);
-    if (text.length > 400) p.textContent += "\u2026";
-    content.appendChild(p);
-    content.scrollTop = content.scrollHeight;
-  }
-  var serverAudio = null;
-  var serverSentences = [];
-  function splitText(text, maxLen) {
-    maxLen = maxLen || 3e3;
-    if (text.length <= maxLen) return [text];
-    var parts = [];
-    var sentences = text.match(/[^.!?…\n]+[.!?…]*(\n|$)?/g) || [text];
-    var cur = "";
-    for (var i = 0; i < sentences.length; i++) {
-      if (cur.length + sentences[i].length > maxLen && cur.length > 0) {
-        parts.push(cur.trim());
-        cur = "";
-      }
-      cur += sentences[i];
-    }
-    if (cur.trim()) parts.push(cur.trim());
-    return parts;
-  }
-  async function startServerPlayback(text) {
-    stopSpeech();
-    var st = window.__tts_zen_state || {};
-    var voice = st.currentVoice || "es-ES-AlvaroNeural";
-    var rate = st.currentRate || 1;
-    var rateStr = rate >= 1 ? "+" + Math.round((rate - 1) * 100) + "%" : "-" + Math.round((1 - rate) * 100) + "%";
-    var chunks = splitText(text, 3e3);
-    var totalChunks = chunks.length;
-    var allSentences = [];
-    isSpeaking = true;
-    setButtonsEnabled({ read: false, pause: true, stop: true, prev: true, next: true });
-    setPauseIcon(true);
-    try {
-      for (var ci = 0; ci < totalChunks; ci++) {
-        if (!isSpeaking) {
-          console.log("[TTS-zen] Chunk loop stopped: isSpeaking=false");
-          break;
-        }
-        var progress = totalChunks > 1 ? " [" + (ci + 1) + "/" + totalChunks + "]" : "";
-        setStatus(ts("serverMode") + progress);
-        console.log("[TTS-zen] Chunk " + (ci + 1) + "/" + totalChunks + ": sending " + chunks[ci].length + " chars");
-        var resp = await browser.runtime.sendMessage({ action: "read_page_sync", text: chunks[ci], voice, rate: rateStr });
-        console.log("[TTS-zen] Chunk " + (ci + 1) + ": resp success=" + resp.success);
-        if (!resp.success) throw new Error(ts("serverError"));
-        var offset = allSentences.length > 0 ? allSentences[allSentences.length - 1].end : 0;
-        (resp.sentences || []).forEach(function(s) {
-          allSentences.push({ text: s.text, start: s.start + offset, end: s.end + offset });
-        });
-        serverSentences = allSentences;
-        window.__tts_zen_sentences = serverSentences;
-        sentenceData = allSentences;
-        window.__tts_zen_state.serverAvailable = true;
-        var audioBytes = Uint8Array.from(atob(resp.audio), function(c) {
-          return c.charCodeAt(0);
-        });
-        var blob = new Blob([audioBytes], { type: "audio/mpeg" });
-        var url = URL.createObjectURL(blob);
-        if (serverAudio) {
-          serverAudio.pause();
-          URL.revokeObjectURL(serverAudio.src);
-        }
-        serverAudio = new Audio(url);
-        serverAudio.playbackRate = rate;
-        currentSentenceIdx = ci === 0 ? 0 : allSentences.length - (resp.sentences || []).length;
-        await new Promise(function(resolve, reject) {
-          serverAudio.ontimeupdate = function() {
-            if (!isSpeaking || !serverSentences.length) return;
-            var t2 = serverAudio.currentTime;
-            for (var i = currentSentenceIdx; i < serverSentences.length; i++) {
-              if (t2 >= serverSentences[i].start && t2 < serverSentences[i].end) {
-                if (i !== currentSentenceIdx) {
-                  currentSentenceIdx = i;
-                  updateHighlightServer(i);
-                }
-                break;
-              }
-            }
-          };
-          serverAudio.onended = function() {
-            console.log("[TTS-zen] Chunk " + (ci + 1) + ": audio ended");
-            resolve();
-          };
-          serverAudio.onerror = function(e) {
-            console.error("[TTS-zen] Chunk " + (ci + 1) + ": audio error");
-            reject(new Error("audio"));
-          };
-          serverAudio.play().catch(function(e) {
-            console.error("[TTS-zen] Chunk " + (ci + 1) + ": play() failed", e.message);
-            reject(e);
-          });
-        });
-        console.log("[TTS-zen] Chunk " + (ci + 1) + ": done");
-      }
-      isSpeaking = false;
-      setStatus(ts("ready"));
-      setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
-      setPauseIcon(false);
-    } catch (e) {
-      window.__tts_zen_state.serverAvailable = false;
-      setStatus(ts("noServer"), true);
-      setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
-      isSpeaking = false;
-    }
-  }
-  function updateHighlightServer(idx) {
-    if (idx < 0 || idx >= serverSentences.length) return;
-    setCounter(idx + 1, serverSentences.length);
-    var host = document.getElementById("tts-zen-host");
-    if (host && host.shadowRoot) {
-      var overlay = host.shadowRoot.getElementById("tts-zen-preview-overlay");
-      if (overlay && !overlay.classList.contains("hidden")) {
-        refreshPreviewContent(host.shadowRoot);
-        var prevActive = host.shadowRoot.querySelector("#tts-zen-preview-content .sentence.active");
-        if (prevActive) {
-          prevActive.classList.remove("active");
-          prevActive.classList.add("played");
-        }
-        var prevEl = host.shadowRoot.getElementById("tts-zen-preview-s-" + idx);
-        if (prevEl) {
-          prevEl.classList.add("active");
-          prevEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
-        }
-      }
-    }
-    var s = serverSentences[idx];
-    for (var i = 0; i < extractedRefs.length; i++) {
-      var ref = extractedRefs[i];
-      var refText = ref.el.textContent.trim();
-      var pos = refText.indexOf(s.text);
-      if (pos !== -1) {
-        highlightOnPage([ref], pos, s.text.length);
-        return;
-      }
-    }
-  }
-  var sentenceData = [];
-  var currentSentenceIdx = -1;
-  var extractedRefs = [];
-  var isSpeaking = false;
-  var isPaused = false;
   function splitIntoSentences(text) {
-    var parts = text.match(/[^.!?…\n]+[.!?…]*(\n|$)?/g) || [text];
+    var parts = text.match(/[^.!?…\n]+[.!?…]*["'»”’)]*\s*/g) || [text];
     return parts.map(function(p) {
       return p.trim();
     }).filter(function(p) {
       return p.length > 0;
     });
   }
-  function stopSpeech() {
-    speechSynthesis.cancel();
-    if (serverAudio) {
-      serverAudio.pause();
-      URL.revokeObjectURL(serverAudio.src);
-      serverAudio = null;
-    }
-    isSpeaking = false;
-    isPaused = false;
-    currentSentenceIdx = -1;
-    clearHighlight();
-    window.__tts_zen_sentences = [];
-  }
-  function speakSentence(idx) {
-    if (idx >= sentenceData.length) {
-      setStatus(ts("ready"));
-      setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
-      setPauseIcon(false);
-      isSpeaking = false;
-      return;
-    }
-    currentSentenceIdx = idx;
-    var text = sentenceData[idx].text;
-    var st = window.__tts_zen_state || {};
-    var rate = st.currentRate || 1;
-    var utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = rate;
-    utterance.lang = "es-ES";
-    var selectedVoice = st.currentVoice || "";
-    if (selectedVoice && _nativeVoices.length > 0) {
-      var match = _nativeVoices.find(function(v) {
-        return v.name === selectedVoice || v.voiceURI === selectedVoice;
+  function buildSentences(paras) {
+    var list = [];
+    paras.forEach(function(p, i) {
+      splitIntoSentences(p.text).forEach(function(s) {
+        list.push({ text: s, refIdx: i });
       });
-      if (match) utterance.voice = match;
-    }
-    utterance.onstart = function() {
-      updateHighlight(idx);
-      setCounter(idx + 1, sentenceData.length);
-      setStatus(ts("playing"));
-    };
-    utterance.onend = function() {
-      if (!isSpeaking) return;
-      if (isPaused) {
-        isSpeaking = false;
-        return;
-      }
-      speakSentence(idx + 1);
-    };
-    utterance.onerror = function(e) {
-      if (e.error === "canceled" || e.error === "interrupted") return;
-      setStatus(ts("voiceError") + ": " + e.error, true);
-      setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
-      isSpeaking = false;
-    };
-    speechSynthesis.speak(utterance);
-  }
-  function startSpeechPlayback(text) {
-    stopSpeech();
-    var rawSentences = splitIntoSentences(text);
-    sentenceData = rawSentences.map(function(s, i) {
-      return { text: s, start: i, end: i + 1 };
     });
-    window.__tts_zen_sentences = sentenceData;
-    isSpeaking = true;
-    setButtonsEnabled({ read: false, pause: true, stop: true, prev: true, next: true });
-    setPauseIcon(true);
-    speakSentence(0);
+    return list;
   }
-  function jumpToSentence(idx) {
-    if (idx < 0 || idx >= sentenceData.length) return;
-    speechSynthesis.cancel();
-    isSpeaking = true;
-    setButtonsEnabled({ read: false, pause: true, stop: true, prev: true, next: true });
-    setPauseIcon(true);
-    speakSentence(idx);
-  }
-  function updateHighlight(idx) {
-    if (idx < 0 || idx >= sentenceData.length) return;
-    var s = sentenceData[idx];
-    var host = document.getElementById("tts-zen-host");
-    if (host && host.shadowRoot) {
-      var overlay = host.shadowRoot.getElementById("tts-zen-preview-overlay");
-      if (overlay && !overlay.classList.contains("hidden")) {
-        refreshPreviewContent(host.shadowRoot);
-        var prevActive = host.shadowRoot.querySelector("#tts-zen-preview-content .sentence.active");
-        if (prevActive) {
-          prevActive.classList.remove("active");
-          prevActive.classList.add("played");
-        }
-        var prevEl = host.shadowRoot.getElementById("tts-zen-preview-s-" + idx);
-        if (prevEl) {
-          prevEl.classList.add("active");
-          prevEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
-        }
-      }
-    }
-    for (var i = 0; i < extractedRefs.length; i++) {
-      var ref = extractedRefs[i];
-      var refText = ref.el.textContent.trim();
-      var pos = refText.indexOf(s.text);
-      if (pos !== -1) {
-        highlightOnPage([ref], pos, s.text.length);
-        setCounter(idx + 1, sentenceData.length);
-        return;
-      }
-    }
-    setCounter(idx + 1, sentenceData.length);
-  }
-  function refreshPreviewContent(shadow) {
-    var content = shadow.getElementById("tts-zen-preview-content");
-    if (!content) return;
-    var sentences = window.__tts_zen_sentences || [];
-    if (sentences.length === 0) return;
-    content.replaceChildren();
-    for (var i = 0; i < sentences.length; i++) {
-      var p = document.createElement("p");
-      p.style.cssText = "margin:0 0 6px 0;line-height:inherit;";
-      var span = document.createElement("span");
-      span.className = "sentence";
-      span.id = "tts-zen-preview-s-" + i;
-      span.textContent = sentences[i].text;
-      p.appendChild(span);
-      content.appendChild(p);
-    }
-  }
-  async function dispatchReadPage(extractFn) {
-    stopContentObserver();
-    if (window.location.hostname.includes("webnovel.com") || window.location.hostname.includes("wattpad.com")) {
-      await new Promise(function(r) {
-        setTimeout(r, 1500);
+  async function translateParagraphs(paras) {
+    var to = st().langOut;
+    if (!to || to === "auto") return paras;
+    setStatus(ts("translating"));
+    try {
+      var resp = await browser.runtime.sendMessage({
+        action: "translate",
+        texts: paras.map(function(p) {
+          return p.text;
+        }),
+        from: st().langIn || "auto",
+        to
       });
+      if (resp && Array.isArray(resp.texts) && resp.texts.length === paras.length) {
+        return paras.map(function(p, i) {
+          return { el: p.el, text: cleanText(resp.texts[i] || p.text) };
+        });
+      }
+    } catch (e) {
+      console.error("[zenTTS] translate:", e.message || e);
     }
-    var result = extractFn();
-    if (!result || !result.text || result.text.trim().length < 20) {
+    return paras;
+  }
+  var highlighted = null;
+  var MARK = "rgba(243, 225, 154, 0.55)";
+  function clearHighlight() {
+    if (!highlighted) return;
+    highlighted.style.removeProperty("background");
+    highlighted.style.removeProperty("box-shadow");
+    highlighted = null;
+  }
+  function highlightParagraph(el) {
+    if (el === highlighted) return;
+    clearHighlight();
+    if (!el || !el.isConnected) return;
+    el.style.background = MARK;
+    el.style.boxShadow = "-6px 0 0 " + MARK + ", 6px 0 0 " + MARK;
+    el.style.transition = "background 0.15s ease";
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    highlighted = el;
+  }
+  function highlightPreview(i) {
+    var host = document.getElementById("tts-zen-host");
+    if (!host || !host.shadowRoot) return;
+    var root = host.shadowRoot;
+    var overlay = root.getElementById("tts-zen-preview-overlay");
+    if (!overlay || overlay.classList.contains("hidden")) return;
+    if (!root.getElementById("tts-zen-preview-s-" + (sentences.length - 1))) updatePreviewSentences();
+    var prev = root.querySelector("#tts-zen-preview-content .sentence.active");
+    if (prev) {
+      prev.classList.remove("active");
+      prev.classList.add("played");
+    }
+    var el = root.getElementById("tts-zen-preview-s-" + i);
+    if (el) {
+      el.classList.add("active");
+      el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }
+  var paragraphs = [];
+  var sentences = [];
+  var chapterKey = null;
+  var chapterHash = null;
+  var resumeAt = null;
+  var prepared = false;
+  var nextChapter = null;
+  var engineNote = null;
+  var player = createPlayer({
+    options: function() {
+      var s = st();
+      var lang = s.langOut && s.langOut !== "auto" ? s.langOut : document.documentElement.lang || "es";
+      return { voice: s.currentVoice, localVoice: s.localVoice, rate: s.currentRate || 1, lang };
+    },
+    onSentence: function(i) {
+      var s = sentences[i];
+      setCounter(i + 1, sentences.length);
+      highlightParagraph(s && paragraphs[s.refIdx] ? paragraphs[s.refIdx].el : null);
+      highlightPreview(i);
+      saveProgress(chapterKey, { index: i, total: sentences.length, hash: chapterHash, title: document.title });
+      if (i >= sentences.length * 0.8) prefetchNextChapter();
+    },
+    onState: function(state2) {
+      var playing = state2 === "playing";
+      var active = state2 !== "idle";
+      setButtonsEnabled({ read: !active, pause: active, stop: active, prev: active, next: active });
+      setPauseIcon(playing);
+      if (state2 === "playing") setStatus(engineNote || ts("playing"));
+      if (state2 === "paused") setStatus(ts("paused"));
+    },
+    onEnd: function() {
+      clearHighlight();
+      clearProgress(chapterKey);
+      resumeAt = null;
+      setResume(null);
+      if (st().autoNext) goToNextChapter();
+      else setStatus(ts("chapterDone"));
+    },
+    onFallback: function(from, to) {
+      engineNote = ts("fallback_" + to);
+      setStatus(engineNote);
+      st().serverAvailable = from === "server" ? false : st().serverAvailable;
+    },
+    onError: function(name, err) {
+      console.error("[zenTTS] " + name + ":", err && (err.message || err));
+      setStatus(ts("voiceError"), true);
+    }
+  });
+  async function prepareChapter() {
+    var paras = extractParagraphs();
+    if (!paras.length) {
       await new Promise(function(r) {
         setTimeout(r, 2e3);
       });
-      result = extractFn();
+      paras = extractParagraphs();
     }
-    if (!result || !result.text || result.text.trim().length < 20) {
-      setStatus("No se encontr\xF3 texto en esta p\xE1gina", true);
-      return;
-    }
-    extractedRefs = result.refs || [];
-    var text = cleanText(result.text);
-    window.__tts_zen_last_text = text;
-    console.log("[TTS-zen] Texto extraido: " + text.length + " chars, ~" + text.split(/[.!?…]/).length + " oraciones");
+    if (!paras.length) return false;
+    chapterKey = site.chapterKey(chapterUrl);
+    chapterHash = textHash(paras.map(function(p) {
+      return p.text;
+    }).join("\n"));
+    paragraphs = await translateParagraphs(paras);
+    sentences = buildSentences(paragraphs);
+    window.__tts_zen_sentences = sentences;
+    window.__tts_zen_last_text = paragraphs.map(function(p) {
+      return p.text;
+    }).join("\n\n");
+    player.load(sentences);
+    prepared = true;
+    return true;
+  }
+  async function startReading(fromIndex) {
     setStatus(ts("starting"));
-    startContentObserver();
-    var st = window.__tts_zen_state || {};
-    var langIn = st.langIn || "auto";
-    var langOut = st.langOut || "es";
-    if (langOut && langOut !== "auto") {
-      try {
-        setStatus("Traduciendo...");
-        console.log("[TTS-zen] Translating from=" + langIn + " to=" + langOut + " text=" + text.substring(0, 50) + "...");
-        var resp = await browser.runtime.sendMessage({ action: "translate", text, from: langIn, to: langOut });
-        console.log("[TTS-zen] Translate resp:", resp);
-        if (resp && resp.text && resp.text !== text) {
-          text = resp.text;
-          console.log("[TTS-zen] Translated OK, first 50 chars:", text.substring(0, 50));
-        }
-      } catch (e) {
-        console.error("[TTS-zen] Translate error:", e.message || e);
-      }
-    }
-    if (st.currentEngine === "server") {
-      await startServerPlayback(text);
+    if (!prepared && !await prepareChapter()) {
+      setStatus(ts("noTextFound"), true);
       return;
     }
-    startSpeechPlayback(text);
+    startContentObserver();
+    engineNote = null;
+    player.start(fromIndex || 0, st().currentEngine || "native");
+  }
+  async function offerResume() {
+    var key = site.chapterKey(chapterUrl);
+    var saved = await loadProgress(key);
+    resumeAt = saved && saved.index > 0 ? saved : null;
+    setResume(resumeAt ? { index: resumeAt.index, total: resumeAt.total } : null);
+  }
+  async function handleRead() {
+    if (player.state === "paused") {
+      player.resume();
+      return;
+    }
+    var from = 0;
+    if (resumeAt) {
+      if (!prepared && !await prepareChapter()) {
+        setStatus(ts("noTextFound"), true);
+        return;
+      }
+      if (resumeAt.hash === chapterHash && resumeAt.index < sentences.length) from = resumeAt.index;
+    }
+    resumeAt = null;
+    setResume(null);
+    startReading(from);
+  }
+  function handleRestart() {
+    clearProgress(chapterKey || site.chapterKey(chapterUrl));
+    resumeAt = null;
+    setResume(null);
+    startReading(0);
+  }
+  async function fetchChapter(url) {
+    var resp = await fetch(url, { credentials: "include" });
+    if (!resp.ok) {
+      var err = new Error("HTTP " + resp.status);
+      err.status = resp.status;
+      throw err;
+    }
+    var doc = new DOMParser().parseFromString(await resp.text(), "text/html");
+    var container = site.container(doc);
+    if (!container) throw new Error("no chapter content");
+    return { url, doc, container };
+  }
+  function prefetchNextChapter() {
+    if (nextChapter || !st().autoNext) return;
+    var url = site.nextUrl(chapterDoc, chapterUrl);
+    if (!url) return;
+    nextChapter = { url, promise: fetchChapter(url) };
+    nextChapter.promise.catch(function() {
+    });
+  }
+  async function goToNextChapter() {
+    prefetchNextChapter();
+    if (!nextChapter) {
+      setStatus(ts("chapterDone"));
+      return;
+    }
+    var target = nextChapter;
+    nextChapter = null;
+    setStatus(ts("nextLoading"));
+    stopContentObserver();
+    var loaded;
+    try {
+      loaded = await target.promise;
+    } catch (e) {
+      console.error("[zenTTS] next chapter:", e.message || e);
+      if (e.status === 404 || e.status === 410) {
+        setStatus(ts("nextFailed"), true);
+        return;
+      }
+      try {
+        await browser.storage.local.set({ pendingAutoplay: { url: target.url, ts: Date.now() } });
+      } catch (_) {
+      }
+      window.location.href = target.url;
+      return;
+    }
+    var live = site.container(document);
+    if (!live) {
+      window.location.href = target.url;
+      return;
+    }
+    var fresh = document.importNode(loaded.container, true);
+    live.replaceWith(fresh);
+    history.pushState(null, "", loaded.url);
+    if (loaded.doc.title) document.title = loaded.doc.title;
+    chapterDoc = loaded.doc;
+    chapterUrl = new URL(loaded.url);
+    prepared = false;
+    highlighted = null;
+    fresh.scrollIntoView({ behavior: "smooth", block: "start" });
+    startReading(0);
+  }
+  async function checkPendingAutoplay() {
+    try {
+      var got = await browser.storage.local.get("pendingAutoplay");
+      var p = got.pendingAutoplay;
+      if (!p) return;
+      await browser.storage.local.remove("pendingAutoplay");
+      if (p.url !== window.location.href || Date.now() - p.ts > 12e4) return;
+      setStatus(ts("pressRead"));
+      startReading(0);
+    } catch (_) {
+    }
+  }
+  var contentObserver = null;
+  var observedLength = 0;
+  function startContentObserver() {
+    stopContentObserver();
+    if (site.id !== "webnovel" && site.id !== "generic") return;
+    var target = site.container(document) || document.body;
+    var root = target.parentElement || document.body;
+    observedLength = paragraphs.length;
+    contentObserver = new MutationObserver(function() {
+      checkForNewParagraphs(root);
+    });
+    contentObserver.observe(root, { childList: true, subtree: true });
+  }
+  function stopContentObserver() {
+    if (contentObserver) {
+      contentObserver.disconnect();
+      contentObserver = null;
+    }
+  }
+  var checking = false;
+  async function checkForNewParagraphs(root) {
+    if (checking) return;
+    checking = true;
+    try {
+      var known = new Set(paragraphs.map(function(p) {
+        return p.el;
+      }));
+      var fresh = [];
+      root.querySelectorAll("p").forEach(function(el) {
+        if (known.has(el) || isHidden(el)) return;
+        var text = cleanText(el.innerText || el.textContent || "");
+        if (text.length >= 20) fresh.push({ el, text });
+      });
+      if (!fresh.length) return;
+      fresh = await translateParagraphs(fresh);
+      var base = paragraphs.length;
+      paragraphs.push.apply(paragraphs, fresh);
+      var more = [];
+      fresh.forEach(function(p, i) {
+        splitIntoSentences(p.text).forEach(function(s) {
+          more.push({ text: s, refIdx: base + i });
+        });
+      });
+      player.append(more);
+      updatePreviewSentences();
+    } finally {
+      checking = false;
+    }
   }
   function handlePause() {
-    if (!isSpeaking) return;
-    var st = window.__tts_zen_state || {};
-    if (st.currentEngine === "server" && serverAudio) {
-      if (isPaused) {
-        serverAudio.play();
-        isPaused = false;
-        setStatus(ts("serverMode"));
-        setPauseIcon(true);
-      } else {
-        serverAudio.pause();
-        isPaused = true;
-        setStatus(ts("paused"));
-        setPauseIcon(false);
-      }
-      return;
-    }
-    if (isPaused) {
-      speechSynthesis.resume();
-      isPaused = false;
-      setStatus(ts("playing"));
-      setPauseIcon(true);
-    } else {
-      speechSynthesis.pause();
-      isPaused = true;
-      setStatus(ts("paused"));
-      setPauseIcon(false);
-    }
+    if (player.state === "playing") player.pause();
+    else if (player.state === "paused") player.resume();
   }
   function handleStop() {
     stopContentObserver();
-    stopSpeech();
+    player.stop();
+    clearHighlight();
+    flushProgress();
     setStatus(ts("stopped"));
-    setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
-    setPauseIcon(false);
+    offerResume();
   }
   function handlePrev() {
-    if (!sentenceData.length) return;
-    var st = window.__tts_zen_state || {};
-    if (st.currentEngine === "server" && serverAudio) {
-      var idx = Math.max(0, currentSentenceIdx - 2);
-      serverAudio.currentTime = serverSentences[idx].start;
-      currentSentenceIdx = idx;
-      updateHighlightServer(idx);
-      return;
-    }
-    var idx = Math.max(0, currentSentenceIdx - 2);
-    jumpToSentence(idx);
+    if (player.index >= 0) player.jump(player.index - 1);
   }
   function handleNext() {
-    if (!sentenceData.length) return;
-    var st = window.__tts_zen_state || {};
-    if (st.currentEngine === "server" && serverAudio) {
-      var idx = Math.min(sentenceData.length - 1, currentSentenceIdx + 1);
-      serverAudio.currentTime = serverSentences[idx].start;
-      currentSentenceIdx = idx;
-      updateHighlightServer(idx);
-      return;
-    }
-    var idx = Math.min(sentenceData.length - 1, currentSentenceIdx + 1);
-    jumpToSentence(idx);
+    if (player.index >= 0) player.jump(player.index + 1);
   }
-  window.__tts_zen_state = { currentVoice: "es-ES-AlvaroNeural", currentRate: 1, currentEngine: "native", serverAvailable: false, lang: "es", langIn: "auto", langOut: "es" };
-  function ts(key) {
-    var lang = window.__tts_zen_state && window.__tts_zen_state.lang || "es";
-    var T2 = {
-      es: {
-        ready: "Listo",
-        playing: "Reproduciendo...",
-        connecting: "Conectando al servidor...",
-        serverError: "Error del servidor",
-        noTiming: "Sin datos de timing",
-        audioError: "Error de audio",
-        serverMode: "Reproduciendo (edge-tts)...",
-        noServer: "Servidor no disponible \u2014 usa modo Nativo",
-        noTextFound: "No se encontr\xF3 texto en esta p\xE1gina",
-        starting: "Iniciando lectura...",
-        paused: "Pausado",
-        stopped: "Detenido",
-        voiceError: "Error de voz"
-      },
-      en: {
-        ready: "Ready",
-        playing: "Playing...",
-        connecting: "Connecting to server...",
-        serverError: "Server error",
-        noTiming: "No timing data",
-        audioError: "Audio error",
-        serverMode: "Playing (edge-tts)...",
-        noServer: "Server unavailable \u2014 switch to Native mode",
-        noTextFound: "No text found on this page",
-        starting: "Starting playback...",
-        paused: "Paused",
-        stopped: "Stopped",
-        voiceError: "Voice error"
-      }
-    };
-    return (T2[lang] || T2["es"])[key] || key;
-  }
-  var _nativeVoices = [];
-  function ensureVoices() {
-    _nativeVoices = speechSynthesis.getVoices();
-    if (_nativeVoices.length === 0) {
-      speechSynthesis.onvoiceschanged = function() {
-        _nativeVoices = speechSynthesis.getVoices();
-      };
-      var dummy = new SpeechSynthesisUtterance("");
-      dummy.volume = 0;
-      speechSynthesis.speak(dummy);
-    }
-  }
-  ensureVoices();
   window.__tts_zen_enabled_sites = { "wattpad.com": true, "archiveofourown.org": true, "fanfiction.net": true, "webnovel.com": true, "generic": true };
   function injectPanel() {
     const host = document.createElement("div");
@@ -3936,21 +4506,28 @@ button:focus-visible, select:focus-visible, input:focus-visible {
     document.body.appendChild(host);
     const shadow = host.attachShadow({ mode: "open" });
     createPanel(shadow, {
-      onRead: () => dispatchReadPage(extractTextWithRefs),
+      onRead: handleRead,
+      onRestart: handleRestart,
       onPause: handlePause,
       onStop: handleStop,
       onPrev: handlePrev,
-      onNext: handleNext
+      onNext: handleNext,
+      onRate: function(r) {
+        player.setRate(r);
+      }
+    }).then(function() {
+      offerResume();
+      checkPendingAutoplay();
+      pruneProgress();
+    });
+    window.addEventListener("pagehide", flushProgress);
+    window.addEventListener("popstate", function() {
+      if (chapterUrl.href !== window.location.href) window.location.reload();
     });
   }
   function tryInject() {
-    if (document.body) {
-      injectPanel();
-    } else {
-      requestAnimationFrame(tryInject);
-    }
+    if (document.body) injectPanel();
+    else requestAnimationFrame(tryInject);
   }
-  if (shouldInject()) {
-    tryInject();
-  }
+  if (shouldInject()) tryInject();
 })();
