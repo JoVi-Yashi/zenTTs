@@ -1,7 +1,12 @@
-// TTS-zen Content Script
-// Injects floating panel, extracts text with DOM references for page highlighting
+// zenTTS content script
+// Extracts the story with a reference to each paragraph on the page, feeds the
+// sentences to the player, highlights along, remembers where you were and
+// continues with the next chapter in the same page.
 import { Readability } from '@mozilla/readability';
-import { createPanel, setStatus, setButtonsEnabled, setCounter, setPauseIcon } from './panel.js';
+import { createPanel, setStatus, setButtonsEnabled, setCounter, setPauseIcon, setResume, updatePreviewSentences } from './panel.js';
+import { siteFor } from './sites.js';
+import { createPlayer } from './player.js';
+import { textHash, loadProgress, saveProgress, flushProgress, clearProgress, pruneProgress } from './progress.js';
 
 // ---- URL Guard ----
 const RESTRICTED_PROTOCOLS = ['edge:', 'about:', 'file:', 'chrome:', 'moz-extension:'];
@@ -12,795 +17,410 @@ function shouldInject() {
 
   var sites = window.__tts_zen_enabled_sites || {};
   var host = window.location.hostname;
-
-  // Check specific sites first
   for (var siteId in sites) {
     if (siteId === 'generic') continue;
-    if (host.includes(siteId)) {
-      return sites[siteId] !== false;
-    }
+    if (host.includes(siteId)) return sites[siteId] !== false;
   }
-
-  // No specific match — use generic setting
   return sites['generic'] !== false;
 }
 
-// ---- Text Extraction with DOM references ----
+// ---- Shared state with the panel ----
 
-async function waitForElement(selector, timeout = 10000) {
-  const el = document.querySelector(selector);
-  if (el) return el;
-  return new Promise((resolve) => {
-    const start = Date.now();
-    const observer = new MutationObserver(() => {
-      const found = document.querySelector(selector);
-      if (found) { observer.disconnect(); resolve(found); }
-      else if (Date.now() - start > timeout) { observer.disconnect(); resolve(null); }
-    });
-    observer.observe(document.body || document.documentElement, { childList: true, subtree: true });
-  });
+window.__tts_zen_state = {
+  currentVoice: 'es-ES-AlvaroNeural', localVoice: 'es_ES-davefx-medium',
+  currentRate: 1.0, currentEngine: 'native', serverAvailable: false,
+  lang: 'es', langIn: 'auto', langOut: 'es', autoNext: true
+};
+
+function st() { return window.__tts_zen_state; }
+
+function ts(key, arg) {
+  var T = {
+    es: {
+      ready: 'Listo', playing: 'Reproduciendo…', paused: 'Pausado', stopped: 'Detenido',
+      starting: 'Preparando lectura…', translating: 'Traduciendo…',
+      noTextFound: 'No se encontró texto en esta página',
+      voiceError: 'No se pudo leer con ninguna voz',
+      fallback_local: 'edge-tts no respondió — usando voz local',
+      fallback_native: 'Sin voz neural — usando la voz del navegador',
+      nextLoading: 'Cargando el capítulo siguiente…', nextFailed: 'No se pudo cargar el capítulo siguiente',
+      chapterDone: 'Capítulo terminado', pressRead: 'Pulsa Leer para continuar'
+    },
+    en: {
+      ready: 'Ready', playing: 'Playing…', paused: 'Paused', stopped: 'Stopped',
+      starting: 'Getting ready…', translating: 'Translating…',
+      noTextFound: 'No text found on this page',
+      voiceError: 'Could not read with any voice',
+      fallback_local: 'edge-tts did not answer — using the local voice',
+      fallback_native: 'No neural voice — using the browser voice',
+      nextLoading: 'Loading the next chapter…', nextFailed: 'Could not load the next chapter',
+      chapterDone: 'Chapter finished', pressRead: 'Press Read to continue'
+    }
+  };
+  var s = (T[st().lang] || T.es)[key] || key;
+  return arg !== undefined ? s.replace('%s', arg) : s;
 }
 
-function extractTextWithRefs() {
-  // Try site-specific extractors first
-  for (const site of SITE_EXTRACTORS) {
-    if (site.test && site.test()) {
-      const text = site.extract();
-      if (text && text.trim().length > 50) {
-        return { text, refs: [] };
-      }
-    }
-  }
+// ---- Extraction ----
 
-  // Generic extraction with multiple strategies
-  var result = mapParagraphsToText();
-  if (result && result.text && result.text.trim().length > 50) return result;
+var site = siteFor(window.location.hostname);
+var chapterDoc = document;           // document the current chapter came from
+var chapterUrl = new URL(window.location.href);
 
-  // Fallback: try Readability (handles translated pages better)
-  try {
-    var doc = document.cloneNode(true);
-    var reader = new Readability(doc);
-    var article = reader.parse();
-    if (article && article.textContent && article.textContent.trim().length > 50) {
-      return { text: article.textContent.trim(), refs: [] };
-    }
-  } catch (_) {}
-
-  // Last resort: body text
-  var body = document.body;
-  if (body && body.innerText && body.innerText.trim().length > 10) {
-    return { text: body.innerText.trim(), refs: [{ el: body, start: 0, end: body.innerText.trim().length }] };
-  }
-  return null;
+function isHidden(el) {
+  if (el.ownerDocument !== document) return false;
+  var cs = window.getComputedStyle(el);
+  return cs.display === 'none' || cs.visibility === 'hidden';
 }
-
-function mapParagraphsToText() {
-  const result = { text: '', refs: [] };
-
-  // Find all visible text-bearing elements
-  const candidates = document.querySelectorAll(
-    'p, pre, h1, h2, h3, h4, h5, h6, li, td, th, blockquote, div.story-text p, .userstuff p, .chapter-content p'
-  );
-
-  if (candidates.length === 0) {
-    // Fallback: use body text
-    const body = document.body;
-    if (body && body.innerText) {
-      result.text = body.innerText;
-      result.refs.push({ el: body, start: 0, end: body.innerText.length });
-      return result;
-    }
-    return null;
-  }
-
-  let offset = 0;
-  for (const el of candidates) {
-    // Skip hidden elements
-    const style = window.getComputedStyle(el);
-    if (style.display === 'none' || style.visibility === 'hidden') continue;
-
-    const txt = el.textContent.trim();
-    if (txt.length < 2) continue; // skip empty/near-empty
-
-    result.text += txt + '\n\n';
-    const start = offset;
-    const end = start + txt.length;
-    result.refs.push({ el, start, end });
-    offset = end + 2; // +2 for \n\n
-  }
-
-  if (!result.text.trim()) return null;
-  result.text = result.text.trim();
-  return result;
-}
-
-// ---- Site-Specific Extractors ----
-
-const SITE_EXTRACTORS = [
-  {
-    test: () => window.location.hostname.includes('wattpad.com'),
-    extract: () => {
-      // Story content is in: .panel.panel-reading (NOT .text-center) > pre > p[data-p-id]
-      // The header panel has .text-center class and contains metadata, not story
-      const paragraphs = document.querySelectorAll(
-        '.panel.panel-reading:not(.text-center) pre p[data-p-id]'
-      );
-      if (paragraphs.length === 0) return null;
-
-      const parts = [];
-      for (const p of paragraphs) {
-        const txt = p.textContent.trim();
-        if (txt.length > 20) parts.push(txt);
-      }
-      return parts.length > 0 ? parts.join('\n\n') : null;
-    }
-  },
-  {
-    test: () => window.location.hostname.includes('archiveofourown.org'),
-    extract: () => {
-      const chapter = document.querySelector('#chapters .userstuff');
-      return chapter?.textContent || null;
-    }
-  },
-  {
-    test: () => window.location.hostname.includes('fanfiction.net'),
-    extract: () => {
-      const story = document.querySelector('.storytext, #storytext');
-      return story?.textContent || null;
-    }
-  },
-  {
-    test: () => window.location.hostname.includes('webnovel.com'),
-    extract: () => {
-      // Webnovel loads content dynamically — try multiple selectors
-      var content = document.querySelector('.cha-words, .cha-content, .chapter-content, .read-content, [class*="cha-words"], [class*="cha-content"], .reader-content, .reader-main, [class*="reader"]');
-      if (!content) {
-        // Fallback: find the largest text block
-        var divs = document.querySelectorAll('div');
-        var best = null; var maxLen = 0;
-        for (var i = 0; i < divs.length; i++) {
-          var txt = divs[i].textContent.trim();
-          if (txt.length > maxLen && txt.length > 500) {
-            maxLen = txt.length; best = divs[i];
-          }
-        }
-        if (best) return best.textContent;
-        return null;
-      }
-      return content.textContent;
-    }
-  },
-];
-
-// ---- DOM Highlighting ----
-
-let currentHighlight = null;
-
-function highlightOnPage(refs, charOffset, charLength) {
-  // Remove previous highlight
-  if (currentHighlight) {
-    for (const el of currentHighlight) {
-      el.style.removeProperty('background');
-      el.style.removeProperty('box-shadow');
-    }
-    currentHighlight = null;
-  }
-
-  // Find which ref(s) contain this offset range
-  const endOffset = charOffset + charLength;
-  const matched = [];
-  for (const ref of refs) {
-    if (ref.start <= endOffset && ref.end >= charOffset) {
-      matched.push(ref.el);
-    }
-  }
-
-  if (matched.length > 0) {
-    for (const el of matched) {
-      el.style.background = 'rgba(243, 225, 154, 0.55)';
-      el.style.boxShadow = '-6px 0 0 rgba(243, 225, 154, 0.55), 6px 0 0 rgba(243, 225, 154, 0.55)';
-      el.style.transition = 'background 0.15s ease';
-    }
-    matched[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
-    currentHighlight = matched;
-  }
-}
-
-function clearHighlight() {
-  if (currentHighlight) {
-    for (const el of currentHighlight) {
-      el.style.removeProperty('background');
-      el.style.removeProperty('box-shadow');
-    }
-    currentHighlight = null;
-  }
-}
-
-// ---- Text cleaning ----
 
 function cleanText(text) {
   return text
-    // Normalize whitespace
     .replace(/[\t ]+/g, ' ')
-    .replace(/\n{3,}/g, '\n\n')
-    // Fix broken lines (single newlines within paragraphs)
-    .replace(/([^.!?…\n])\n([a-záéíóúñ])/gi, '$1 $2')
-    // Normalize punctuation
     .replace(/\.{3,}/g, '…')
-    .replace(/\s+\./g, '.')
-    .replace(/\s+,/g, ',')
-    .replace(/\s+!/g, '!')
-    .replace(/\s+\?/g, '?')
-    // Ensure periods have space after
+    .replace(/\s+([.,!?])/g, '$1')
     .replace(/\.([A-ZÁÉÍÓÚÑ])/g, '. $1')
-    // Remove leading/trailing whitespace per line
-    .split('\n').map(function(l) { return l.trim(); }).join('\n')
-    // Remove empty lines at start/end
-    .replace(/^\n+/, '').replace(/\n+$/, '')
-    // Collapse multiple spaces
     .replace(/ {2,}/g, ' ')
     .trim();
 }
 
-// ---- Dynamic content observer ----
+// Returns [{el, text}] — el is null when the text came from Readability
+function extractParagraphs() {
+  var container = site.container(document);
+  if (container) {
+    var paras = site.paragraphs(container)
+      .filter(function(el) { return !isHidden(el); })
+      .map(function(el) { return { el: el, text: cleanText(el.innerText || el.textContent || '') }; })
+      .filter(function(p) { return p.text.length >= 2; });
+    var total = paras.reduce(function(n, p) { return n + p.text.length; }, 0);
+    if (total > 50) return paras;
+  }
+  try {
+    var article = new Readability(document.cloneNode(true)).parse();
+    if (article && article.textContent && article.textContent.trim().length > 50) {
+      return article.textContent.split(/\n\s*\n/).map(function(t) { return { el: null, text: cleanText(t) }; })
+        .filter(function(p) { return p.text.length >= 2; });
+    }
+  } catch (_) {}
+  return [];
+}
+
+function splitIntoSentences(text) {
+  var parts = text.match(/[^.!?…\n]+[.!?…]*["'»”’)]*\s*/g) || [text];
+  return parts.map(function(p) { return p.trim(); }).filter(function(p) { return p.length > 0; });
+}
+
+function buildSentences(paras) {
+  var list = [];
+  paras.forEach(function(p, i) {
+    splitIntoSentences(p.text).forEach(function(s) { list.push({ text: s, refIdx: i }); });
+  });
+  return list;
+}
+
+async function translateParagraphs(paras) {
+  var to = st().langOut;
+  if (!to || to === 'auto') return paras;
+  setStatus(ts('translating'));
+  try {
+    var resp = await browser.runtime.sendMessage({
+      action: 'translate', texts: paras.map(function(p) { return p.text; }), from: st().langIn || 'auto', to: to
+    });
+    if (resp && Array.isArray(resp.texts) && resp.texts.length === paras.length) {
+      return paras.map(function(p, i) { return { el: p.el, text: cleanText(resp.texts[i] || p.text) }; });
+    }
+  } catch (e) {
+    console.error('[zenTTS] translate:', e.message || e);
+  }
+  return paras;
+}
+
+// ---- Page highlight ----
+
+var highlighted = null;
+var MARK = 'rgba(243, 225, 154, 0.55)';
+
+function clearHighlight() {
+  if (!highlighted) return;
+  highlighted.style.removeProperty('background');
+  highlighted.style.removeProperty('box-shadow');
+  highlighted = null;
+}
+
+function highlightParagraph(el) {
+  if (el === highlighted) return;
+  clearHighlight();
+  if (!el || !el.isConnected) return;
+  el.style.background = MARK;
+  el.style.boxShadow = '-6px 0 0 ' + MARK + ', 6px 0 0 ' + MARK;
+  el.style.transition = 'background 0.15s ease';
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  highlighted = el;
+}
+
+function highlightPreview(i) {
+  var host = document.getElementById('tts-zen-host');
+  if (!host || !host.shadowRoot) return;
+  var root = host.shadowRoot;
+  var overlay = root.getElementById('tts-zen-preview-overlay');
+  if (!overlay || overlay.classList.contains('hidden')) return;
+  if (!root.getElementById('tts-zen-preview-s-' + (sentences.length - 1))) updatePreviewSentences();
+  var prev = root.querySelector('#tts-zen-preview-content .sentence.active');
+  if (prev) { prev.classList.remove('active'); prev.classList.add('played'); }
+  var el = root.getElementById('tts-zen-preview-s-' + i);
+  if (el) { el.classList.add('active'); el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+}
+
+// ---- Reading session ----
+
+var paragraphs = [];
+var sentences = [];
+var chapterKey = null;
+var chapterHash = null;
+var resumeAt = null;      // { index, total } offered by the Continue button
+var prepared = false;     // sentences built for the current chapter
+var nextChapter = null;   // { url, promise }
+var engineNote = null;    // shown instead of "Playing…" after a fallback
+
+var player = createPlayer({
+  options: function() {
+    var s = st();
+    var lang = s.langOut && s.langOut !== 'auto' ? s.langOut : (document.documentElement.lang || 'es');
+    return { voice: s.currentVoice, localVoice: s.localVoice, rate: s.currentRate || 1, lang: lang };
+  },
+  onSentence: function(i) {
+    var s = sentences[i];
+    setCounter(i + 1, sentences.length);
+    highlightParagraph(s && paragraphs[s.refIdx] ? paragraphs[s.refIdx].el : null);
+    highlightPreview(i);
+    saveProgress(chapterKey, { index: i, total: sentences.length, hash: chapterHash, title: document.title });
+    if (i >= sentences.length * 0.8) prefetchNextChapter();
+  },
+  onState: function(state) {
+    var playing = state === 'playing';
+    var active = state !== 'idle';
+    setButtonsEnabled({ read: !active, pause: active, stop: active, prev: active, next: active });
+    setPauseIcon(playing);
+    if (state === 'playing') setStatus(engineNote || ts('playing'));
+    if (state === 'paused') setStatus(ts('paused'));
+  },
+  onEnd: function() {
+    clearHighlight();
+    clearProgress(chapterKey);
+    resumeAt = null;
+    setResume(null);
+    if (st().autoNext) goToNextChapter();
+    else setStatus(ts('chapterDone'));
+  },
+  onFallback: function(from, to) {
+    engineNote = ts('fallback_' + to);
+    setStatus(engineNote);
+    st().serverAvailable = from === 'server' ? false : st().serverAvailable;
+  },
+  onError: function(name, err) {
+    console.error('[zenTTS] ' + name + ':', err && (err.message || err));
+    setStatus(ts('voiceError'), true);
+  }
+});
+
+async function prepareChapter() {
+  var paras = extractParagraphs();
+  if (!paras.length) {
+    // Dynamic sites (Webnovel, Wattpad) may still be rendering
+    await new Promise(function(r) { setTimeout(r, 2000); });
+    paras = extractParagraphs();
+  }
+  if (!paras.length) return false;
+
+  chapterKey = site.chapterKey(chapterUrl);
+  chapterHash = textHash(paras.map(function(p) { return p.text; }).join('\n'));
+  paragraphs = await translateParagraphs(paras);
+  sentences = buildSentences(paragraphs);
+  window.__tts_zen_sentences = sentences;
+  window.__tts_zen_last_text = paragraphs.map(function(p) { return p.text; }).join('\n\n');
+  player.load(sentences);
+  prepared = true;
+  return true;
+}
+
+async function startReading(fromIndex) {
+  setStatus(ts('starting'));
+  if (!prepared && !(await prepareChapter())) {
+    setStatus(ts('noTextFound'), true);
+    return;
+  }
+  startContentObserver();
+  engineNote = null;
+  player.start(fromIndex || 0, st().currentEngine || 'native');
+}
+
+// ---- Resume ----
+
+async function offerResume() {
+  var key = site.chapterKey(chapterUrl);
+  var saved = await loadProgress(key);
+  resumeAt = saved && saved.index > 0 ? saved : null;
+  setResume(resumeAt ? { index: resumeAt.index, total: resumeAt.total } : null);
+}
+
+async function handleRead() {
+  if (player.state === 'paused') { player.resume(); return; }
+  var from = 0;
+  if (resumeAt) {
+    if (!prepared && !(await prepareChapter())) { setStatus(ts('noTextFound'), true); return; }
+    // Only resume if the chapter text is the one we saved
+    if (resumeAt.hash === chapterHash && resumeAt.index < sentences.length) from = resumeAt.index;
+  }
+  resumeAt = null;
+  setResume(null);
+  startReading(from);
+}
+
+function handleRestart() {
+  clearProgress(chapterKey || site.chapterKey(chapterUrl));
+  resumeAt = null;
+  setResume(null);
+  startReading(0);
+}
+
+// ---- Next chapter, in the same page ----
+
+async function fetchChapter(url) {
+  var resp = await fetch(url, { credentials: 'include' });
+  if (!resp.ok) {
+    var err = new Error('HTTP ' + resp.status);
+    err.status = resp.status;
+    throw err;
+  }
+  var doc = new DOMParser().parseFromString(await resp.text(), 'text/html');
+  var container = site.container(doc);
+  if (!container) throw new Error('no chapter content');
+  return { url: url, doc: doc, container: container };
+}
+
+function prefetchNextChapter() {
+  if (nextChapter || !st().autoNext) return;
+  var url = site.nextUrl(chapterDoc, chapterUrl);
+  if (!url) return;
+  nextChapter = { url: url, promise: fetchChapter(url) };
+  nextChapter.promise.catch(function() {});
+}
+
+async function goToNextChapter() {
+  prefetchNextChapter();
+  if (!nextChapter) { setStatus(ts('chapterDone')); return; }
+  var target = nextChapter;
+  nextChapter = null;
+  setStatus(ts('nextLoading'));
+  stopContentObserver();
+
+  var loaded;
+  try {
+    loaded = await target.promise;
+  } catch (e) {
+    console.error('[zenTTS] next chapter:', e.message || e);
+    if (e.status === 404 || e.status === 410) { setStatus(ts('nextFailed'), true); return; }
+    // Anything else (e.g. a Cloudflare check): navigate normally and resume there
+    try { await browser.storage.local.set({ pendingAutoplay: { url: target.url, ts: Date.now() } }); } catch (_) {}
+    window.location.href = target.url;
+    return;
+  }
+
+  var live = site.container(document);
+  if (!live) { window.location.href = target.url; return; }
+  var fresh = document.importNode(loaded.container, true);
+  live.replaceWith(fresh);
+  history.pushState(null, '', loaded.url);
+  if (loaded.doc.title) document.title = loaded.doc.title;
+
+  chapterDoc = loaded.doc;
+  chapterUrl = new URL(loaded.url);
+  prepared = false;
+  highlighted = null;
+  fresh.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  startReading(0);
+}
+
+async function checkPendingAutoplay() {
+  try {
+    var got = await browser.storage.local.get('pendingAutoplay');
+    var p = got.pendingAutoplay;
+    if (!p) return;
+    await browser.storage.local.remove('pendingAutoplay');
+    if (p.url !== window.location.href || Date.now() - p.ts > 120000) return;
+    setStatus(ts('pressRead'));
+    startReading(0);
+  } catch (_) {}
+}
+
+// ---- Dynamic content (Webnovel-style infinite scroll) ----
 
 var contentObserver = null;
-var scrollCheckInterval = null;
-var lastKnownText = '';
-var chunkCount = 0;
+var observedLength = 0;
 
 function startContentObserver() {
   stopContentObserver();
-  lastKnownText = window.__tts_zen_last_text || '';
-  chunkCount = 0;
-
-  // Find the main content area (article, main, or story container)
-  var target = document.querySelector('article, main, [role="main"], .cha-content, .chapter-content, .read-content, #chapters, .userstuff, .storytext, .panel-reading');
-  if (!target) target = document.body;
-
-  // Observer for DOM changes
-  contentObserver = new MutationObserver(function() {
-    checkForNewContent(target);
-  });
-  contentObserver.observe(target, { childList: true, subtree: true, characterData: true });
-
-  // Also check on scroll (for lazy-loaded images/text)
-  scrollCheckInterval = setInterval(function() {
-    checkForNewContent(target);
-  }, 2000);
+  if (site.id !== 'webnovel' && site.id !== 'generic') return;
+  var target = site.container(document) || document.body;
+  var root = target.parentElement || document.body;
+  observedLength = paragraphs.length;
+  contentObserver = new MutationObserver(function() { checkForNewParagraphs(root); });
+  contentObserver.observe(root, { childList: true, subtree: true });
 }
 
 function stopContentObserver() {
   if (contentObserver) { contentObserver.disconnect(); contentObserver = null; }
-  if (scrollCheckInterval) { clearInterval(scrollCheckInterval); scrollCheckInterval = null; }
 }
 
-function checkForNewContent(target) {
-  var currentText = target.innerText || target.textContent || '';
-  currentText = currentText.replace(/\s+/g, ' ').trim();
-  
-  if (currentText.length <= lastKnownText.length) return;
-  
-  // Get only the new portion
-  var newPortion = currentText.substring(lastKnownText.length).trim();
-  if (newPortion.length < 20) return;
-  
-  // Find the newest paragraph/chunk (last N chars)
-  var chunk = newPortion;
-  if (newPortion.length > 2000) {
-    chunk = newPortion.substring(newPortion.length - 2000);
-  }
-  
-  lastKnownText = currentText;
-  chunkCount++;
-  console.log('[TTS-zen] Chunk #' + chunkCount + ' detected, ' + chunk.length + ' chars');
-  onNewContent(chunk);
-}
-
-async function onNewContent(newText) {
-  newText = cleanText(newText);
-  window.__tts_zen_last_text = (window.__tts_zen_last_text || '') + '\n\n' + newText;
-
-  var st = window.__tts_zen_state || {};
-  var langOut = st.langOut || 'es';
-  if (langOut && langOut !== 'auto') {
-    try {
-      var resp = await browser.runtime.sendMessage({ action: 'translate', text: newText, from: 'auto', to: langOut });
-      if (resp && resp.text && resp.text !== newText) {
-        newText = resp.text;
-      }
-    } catch (_) {}
-  }
-
-  appendToPreview(newText);
-}
-
-function appendToPreview(text) {
-  var host = document.getElementById('tts-zen-host');
-  if (!host || !host.shadowRoot) return;
-  var overlay = host.shadowRoot.getElementById('tts-zen-preview-overlay');
-  if (!overlay || overlay.classList.contains('hidden')) return;
-  var content = host.shadowRoot.getElementById('tts-zen-preview-content');
-  if (!content) return;
-
-  var chunkLabel = document.createElement('div');
-  chunkLabel.className = 'chunk-label';
-  chunkLabel.textContent = '— ' + (chunkCount) + ' —';
-  content.appendChild(chunkLabel);
-
-  var p = document.createElement('p');
-  p.className = 'chunk-pending';
-  p.textContent = text.substring(0, 400);
-  if (text.length > 400) p.textContent += '…';
-  content.appendChild(p);
-  content.scrollTop = content.scrollHeight;
-}
-
-// ---- Server TTS Player (edge-tts) with chunking ----
-
-var serverAudio = null;
-var serverSentences = [];
-
-function splitText(text, maxLen) {
-  maxLen = maxLen || 3000;
-  if (text.length <= maxLen) return [text];
-  var parts = [];
-  var sentences = text.match(/[^.!?…\n]+[.!?…]*(\n|$)?/g) || [text];
-  var cur = '';
-  for (var i = 0; i < sentences.length; i++) {
-    if (cur.length + sentences[i].length > maxLen && cur.length > 0) {
-      parts.push(cur.trim()); cur = '';
-    }
-    cur += sentences[i];
-  }
-  if (cur.trim()) parts.push(cur.trim());
-  return parts;
-}
-
-async function startServerPlayback(text) {
-  stopSpeech();
-  var st = window.__tts_zen_state || {};
-  var voice = st.currentVoice || 'es-ES-AlvaroNeural';
-  var rate = st.currentRate || 1.0;
-  var rateStr = rate >= 1.0 ? '+' + Math.round((rate - 1) * 100) + '%' : '-' + Math.round((1 - rate) * 100) + '%';
-
-  // Split large texts into chunks edge-tts can handle
-  var chunks = splitText(text, 3000);
-  var totalChunks = chunks.length;
-  var allSentences = [];
-
-  isSpeaking = true;
-  setButtonsEnabled({ read: false, pause: true, stop: true, prev: true, next: true });
-  setPauseIcon(true);
-
+var checking = false;
+async function checkForNewParagraphs(root) {
+  if (checking) return;
+  checking = true;
   try {
-    for (var ci = 0; ci < totalChunks; ci++) {
-      if (!isSpeaking) { console.log('[TTS-zen] Chunk loop stopped: isSpeaking=false'); break; }
-      var progress = totalChunks > 1 ? ' [' + (ci + 1) + '/' + totalChunks + ']' : '';
-      setStatus(ts('serverMode') + progress);
-
-      console.log('[TTS-zen] Chunk ' + (ci+1) + '/' + totalChunks + ': sending ' + chunks[ci].length + ' chars');
-      var resp = await browser.runtime.sendMessage({ action: 'read_page_sync', text: chunks[ci], voice: voice, rate: rateStr });
-      console.log('[TTS-zen] Chunk ' + (ci+1) + ': resp success=' + resp.success);
-      if (!resp.success) throw new Error(ts('serverError'));
-
-      // Accumulate sentences with offset
-      var offset = allSentences.length > 0 ? allSentences[allSentences.length - 1].end : 0;
-      (resp.sentences || []).forEach(function(s) {
-        allSentences.push({ text: s.text, start: s.start + offset, end: s.end + offset });
-      });
-
-      serverSentences = allSentences;
-      window.__tts_zen_sentences = serverSentences;
-      sentenceData = allSentences;
-      window.__tts_zen_state.serverAvailable = true;
-
-      // Create and play audio
-      var audioBytes = Uint8Array.from(atob(resp.audio), function(c) { return c.charCodeAt(0); });
-      var blob = new Blob([audioBytes], { type: 'audio/mpeg' });
-      var url = URL.createObjectURL(blob);
-      if (serverAudio) { serverAudio.pause(); URL.revokeObjectURL(serverAudio.src); }
-      serverAudio = new Audio(url);
-      serverAudio.playbackRate = rate;
-
-      currentSentenceIdx = ci === 0 ? 0 : allSentences.length - (resp.sentences || []).length;
-
-      // Wait for audio to finish
-      await new Promise(function(resolve, reject) {
-        serverAudio.ontimeupdate = function() {
-          if (!isSpeaking || !serverSentences.length) return;
-          var t = serverAudio.currentTime;
-          for (var i = currentSentenceIdx; i < serverSentences.length; i++) {
-            if (t >= serverSentences[i].start && t < serverSentences[i].end) {
-              if (i !== currentSentenceIdx) {
-                currentSentenceIdx = i;
-                updateHighlightServer(i);
-              }
-              break;
-            }
-          }
-        };
-        serverAudio.onended = function() { console.log('[TTS-zen] Chunk ' + (ci+1) + ': audio ended'); resolve(); };
-        serverAudio.onerror = function(e) { console.error('[TTS-zen] Chunk ' + (ci+1) + ': audio error'); reject(new Error('audio')); };
-        serverAudio.play().catch(function(e) { console.error('[TTS-zen] Chunk ' + (ci+1) + ': play() failed', e.message); reject(e); });
-      });
-      console.log('[TTS-zen] Chunk ' + (ci+1) + ': done');
-    }
-
-    isSpeaking = false;
-    setStatus(ts('ready'));
-    setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
-    setPauseIcon(false);
-  } catch (e) {
-    window.__tts_zen_state.serverAvailable = false;
-    setStatus(ts('noServer'), true);
-    setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
-    isSpeaking = false;
+    var known = new Set(paragraphs.map(function(p) { return p.el; }));
+    var fresh = [];
+    root.querySelectorAll('p').forEach(function(el) {
+      if (known.has(el) || isHidden(el)) return;
+      var text = cleanText(el.innerText || el.textContent || '');
+      if (text.length >= 20) fresh.push({ el: el, text: text });
+    });
+    if (!fresh.length) return;
+    fresh = await translateParagraphs(fresh);
+    var base = paragraphs.length;
+    paragraphs.push.apply(paragraphs, fresh);
+    var more = [];
+    fresh.forEach(function(p, i) {
+      splitIntoSentences(p.text).forEach(function(s) { more.push({ text: s, refIdx: base + i }); });
+    });
+    player.append(more);
+    updatePreviewSentences();
+  } finally {
+    checking = false;
   }
 }
 
-function updateHighlightServer(idx) {
-  if (idx < 0 || idx >= serverSentences.length) return;
-  setCounter(idx + 1, serverSentences.length);
-
-  // Update preview overlay
-  var host = document.getElementById('tts-zen-host');
-  if (host && host.shadowRoot) {
-    var overlay = host.shadowRoot.getElementById('tts-zen-preview-overlay');
-    if (overlay && !overlay.classList.contains('hidden')) {
-      refreshPreviewContent(host.shadowRoot);
-      var prevActive = host.shadowRoot.querySelector('#tts-zen-preview-content .sentence.active');
-      if (prevActive) { prevActive.classList.remove('active'); prevActive.classList.add('played'); }
-      var prevEl = host.shadowRoot.getElementById('tts-zen-preview-s-' + idx);
-      if (prevEl) {
-        prevEl.classList.add('active');
-        prevEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
-    }
-  }
-
-  // Page-level highlight
-  var s = serverSentences[idx];
-  for (var i = 0; i < extractedRefs.length; i++) {
-    var ref = extractedRefs[i];
-    var refText = ref.el.textContent.trim();
-    var pos = refText.indexOf(s.text);
-    if (pos !== -1) {
-      highlightOnPage([ref], pos, s.text.length);
-      return;
-    }
-  }
-}
-
-// ---- SpeechSynthesis Player ----
-
-let sentenceData = [];
-let currentSentenceIdx = -1;
-let extractedRefs = [];
-let isSpeaking = false;
-let isPaused = false;
-
-function splitIntoSentences(text) {
-  // Split by sentence-ending punctuation, keeping delimiters
-  var parts = text.match(/[^.!?…\n]+[.!?…]*(\n|$)?/g) || [text];
-  return parts.map(function(p) { return p.trim(); }).filter(function(p) { return p.length > 0; });
-}
-
-function stopSpeech() {
-  speechSynthesis.cancel();
-  if (serverAudio) {
-    serverAudio.pause();
-    URL.revokeObjectURL(serverAudio.src);
-    serverAudio = null;
-  }
-  isSpeaking = false;
-  isPaused = false;
-  currentSentenceIdx = -1;
-  clearHighlight();
-  window.__tts_zen_sentences = [];
-}
-
-function speakSentence(idx) {
-  if (idx >= sentenceData.length) {
-    // Finished all sentences
-    setStatus(ts('ready'));
-    setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
-    setPauseIcon(false);
-    isSpeaking = false;
-    return;
-  }
-
-  currentSentenceIdx = idx;
-  var text = sentenceData[idx].text;
-  var st = window.__tts_zen_state || {};
-  var rate = st.currentRate || 1.0;
-
-  var utterance = new SpeechSynthesisUtterance(text);
-  utterance.rate = rate;
-  utterance.lang = 'es-ES';
-
-  // Try to find a matching voice
-  var selectedVoice = st.currentVoice || '';
-  if (selectedVoice && _nativeVoices.length > 0) {
-    var match = _nativeVoices.find(function(v) { return v.name === selectedVoice || v.voiceURI === selectedVoice; });
-    if (match) utterance.voice = match;
-  }
-
-  utterance.onstart = function() {
-    updateHighlight(idx);
-    setCounter(idx + 1, sentenceData.length);
-    setStatus(ts('playing'));
-  };
-
-  utterance.onend = function() {
-    if (!isSpeaking) return;
-    // Don't chain if paused — wait for resume
-    if (isPaused) {
-      isSpeaking = false;
-      return;
-    }
-    speakSentence(idx + 1);
-  };
-
-  utterance.onerror = function(e) {
-    if (e.error === 'canceled' || e.error === 'interrupted') return;
-    setStatus(ts('voiceError') + ': ' + e.error, true);
-    setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
-    isSpeaking = false;
-  };
-
-  speechSynthesis.speak(utterance);
-}
-
-function startSpeechPlayback(text) {
-  stopSpeech();
-
-  // Split into sentences and build data array
-  var rawSentences = splitIntoSentences(text);
-  sentenceData = rawSentences.map(function(s, i) {
-    return { text: s, start: i, end: i + 1 };
-  });
-  window.__tts_zen_sentences = sentenceData;
-
-  isSpeaking = true;
-  setButtonsEnabled({ read: false, pause: true, stop: true, prev: true, next: true });
-  setPauseIcon(true);
-
-  speakSentence(0);
-}
-
-function jumpToSentence(idx) {
-  if (idx < 0 || idx >= sentenceData.length) return;
-  speechSynthesis.cancel();
-  isSpeaking = true;
-  setButtonsEnabled({ read: false, pause: true, stop: true, prev: true, next: true });
-  setPauseIcon(true);
-  speakSentence(idx);
-}
-
-function updateHighlight(idx) {
-  if (idx < 0 || idx >= sentenceData.length) return;
-  var s = sentenceData[idx];
-
-  // Update preview popup highlight if open
-  var host = document.getElementById('tts-zen-host');
-  if (host && host.shadowRoot) {
-    var overlay = host.shadowRoot.getElementById('tts-zen-preview-overlay');
-    if (overlay && !overlay.classList.contains('hidden')) {
-      refreshPreviewContent(host.shadowRoot);
-      var prevActive = host.shadowRoot.querySelector('#tts-zen-preview-content .sentence.active');
-      if (prevActive) { prevActive.classList.remove('active'); prevActive.classList.add('played'); }
-      var prevEl = host.shadowRoot.getElementById('tts-zen-preview-s-' + idx);
-      if (prevEl) {
-        prevEl.classList.add('active');
-        prevEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
-    }
-  }
-
-  // Page-level highlight
-  for (var i = 0; i < extractedRefs.length; i++) {
-    var ref = extractedRefs[i];
-    var refText = ref.el.textContent.trim();
-    var pos = refText.indexOf(s.text);
-    if (pos !== -1) {
-      highlightOnPage([ref], pos, s.text.length);
-      setCounter(idx + 1, sentenceData.length);
-      return;
-    }
-  }
-  setCounter(idx + 1, sentenceData.length);
-}
-
-function refreshPreviewContent(shadow) {
-  var content = shadow.getElementById('tts-zen-preview-content');
-  if (!content) return;
-  var sentences = window.__tts_zen_sentences || [];
-  if (sentences.length === 0) return;
-  content.replaceChildren();
-  for (var i = 0; i < sentences.length; i++) {
-    var p = document.createElement('p');
-    p.style.cssText = 'margin:0 0 6px 0;line-height:inherit;';
-    var span = document.createElement('span');
-    span.className = 'sentence';
-    span.id = 'tts-zen-preview-s-' + i;
-    span.textContent = sentences[i].text;
-    p.appendChild(span);
-    content.appendChild(p);
-  }
-}
-
-async function dispatchReadPage(extractFn) {
-  stopContentObserver();
-
-  // Wait for dynamic content to load (websites like Webnovel)
-  if (window.location.hostname.includes('webnovel.com') || 
-      window.location.hostname.includes('wattpad.com')) {
-    await new Promise(function(r) { setTimeout(r, 1500); });
-  }
-
-  var result = extractFn();
-  if (!result || !result.text || result.text.trim().length < 20) {
-    // Retry after delay
-    await new Promise(function(r) { setTimeout(r, 2000); });
-    result = extractFn();
-  }
-  if (!result || !result.text || result.text.trim().length < 20) {
-    setStatus('No se encontró texto en esta página', true);
-    return;
-  }
-
-  extractedRefs = result.refs || [];
-  var text = cleanText(result.text);
-  window.__tts_zen_last_text = text;
-  console.log('[TTS-zen] Texto extraido: ' + text.length + ' chars, ~' + text.split(/[.!?…]/).length + ' oraciones');
-
-  setStatus(ts('starting'));
-
-  // Start watching for new content
-  startContentObserver();
-
-  var st = window.__tts_zen_state || {};
-  var langIn = st.langIn || 'auto';
-  var langOut = st.langOut || 'es';
-
-  // Translate if output language is set
-  if (langOut && langOut !== 'auto') {
-    try {
-      setStatus('Traduciendo...');
-      console.log('[TTS-zen] Translating from=' + langIn + ' to=' + langOut + ' text=' + text.substring(0,50) + '...');
-      var resp = await browser.runtime.sendMessage({ action: 'translate', text: text, from: langIn, to: langOut });
-      console.log('[TTS-zen] Translate resp:', resp);
-      if (resp && resp.text && resp.text !== text) {
-        text = resp.text;
-        console.log('[TTS-zen] Translated OK, first 50 chars:', text.substring(0,50));
-      }
-    } catch (e) {
-      console.error('[TTS-zen] Translate error:', e.message || e);
-    }
-  }
-
-  if (st.currentEngine === 'server') {
-    await startServerPlayback(text);
-    return;
-  }
-  startSpeechPlayback(text);
-}
-
-// ---- Audio Controls ----
+// ---- Controls ----
 
 function handlePause() {
-  if (!isSpeaking) return;
-  var st = window.__tts_zen_state || {};
-  if (st.currentEngine === 'server' && serverAudio) {
-    if (isPaused) {
-      serverAudio.play();
-      isPaused = false;
-      setStatus(ts('serverMode'));
-      setPauseIcon(true);
-    } else {
-      serverAudio.pause();
-      isPaused = true;
-      setStatus(ts('paused'));
-      setPauseIcon(false);
-    }
-    return;
-  }
-  if (isPaused) {
-    speechSynthesis.resume();
-    isPaused = false;
-    setStatus(ts('playing'));
-    setPauseIcon(true);
-  } else {
-    speechSynthesis.pause();
-    isPaused = true;
-    setStatus(ts('paused'));
-    setPauseIcon(false);
-  }
+  if (player.state === 'playing') player.pause();
+  else if (player.state === 'paused') player.resume();
 }
 
 function handleStop() {
   stopContentObserver();
-  stopSpeech();
+  player.stop();
+  clearHighlight();
+  flushProgress();
   setStatus(ts('stopped'));
-  setButtonsEnabled({ read: true, pause: false, stop: false, prev: false, next: false });
-  setPauseIcon(false);
+  offerResume();
 }
 
-function handlePrev() {
-  if (!sentenceData.length) return;
-  var st = window.__tts_zen_state || {};
-  if (st.currentEngine === 'server' && serverAudio) {
-    var idx = Math.max(0, currentSentenceIdx - 2);
-    serverAudio.currentTime = serverSentences[idx].start;
-    currentSentenceIdx = idx;
-    updateHighlightServer(idx);
-    return;
-  }
-  var idx = Math.max(0, currentSentenceIdx - 2);
-  jumpToSentence(idx);
-}
-
-function handleNext() {
-  if (!sentenceData.length) return;
-  var st = window.__tts_zen_state || {};
-  if (st.currentEngine === 'server' && serverAudio) {
-    var idx = Math.min(sentenceData.length - 1, currentSentenceIdx + 1);
-    serverAudio.currentTime = serverSentences[idx].start;
-    currentSentenceIdx = idx;
-    updateHighlightServer(idx);
-    return;
-  }
-  var idx = Math.min(sentenceData.length - 1, currentSentenceIdx + 1);
-  jumpToSentence(idx);
-}
-
-// ---- Panel state bridge ----
-
-// State shared with panel via global
-window.__tts_zen_state = { currentVoice: 'es-ES-AlvaroNeural', currentRate: 1.0, currentEngine: 'native', serverAvailable: false, lang: 'es', langIn: 'auto', langOut: 'es' };
-
-// Translation helper for status messages
-function ts(key) {
-  var lang = (window.__tts_zen_state && window.__tts_zen_state.lang) || 'es';
-  var T = {
-    es: {
-      ready: 'Listo', playing: 'Reproduciendo...', connecting: 'Conectando al servidor...',
-      serverError: 'Error del servidor', noTiming: 'Sin datos de timing', audioError: 'Error de audio',
-      serverMode: 'Reproduciendo (edge-tts)...', noServer: 'Servidor no disponible — usa modo Nativo',
-      noTextFound: 'No se encontró texto en esta página', starting: 'Iniciando lectura...',
-      paused: 'Pausado', stopped: 'Detenido', voiceError: 'Error de voz'
-    },
-    en: {
-      ready: 'Ready', playing: 'Playing...', connecting: 'Connecting to server...',
-      serverError: 'Server error', noTiming: 'No timing data', audioError: 'Audio error',
-      serverMode: 'Playing (edge-tts)...', noServer: 'Server unavailable — switch to Native mode',
-      noTextFound: 'No text found on this page', starting: 'Starting playback...',
-      paused: 'Paused', stopped: 'Stopped', voiceError: 'Voice error'
-    }
-  };
-  return (T[lang] || T['es'])[key] || key;
-}
-
-// Warm up speechSynthesis voices (async, needed before first speak)
-var _nativeVoices = [];
-function ensureVoices() {
-  _nativeVoices = speechSynthesis.getVoices();
-  if (_nativeVoices.length === 0) {
-    speechSynthesis.onvoiceschanged = function() {
-      _nativeVoices = speechSynthesis.getVoices();
-    };
-    // Trigger voice loading with a dummy utterance
-    var dummy = new SpeechSynthesisUtterance('');
-    dummy.volume = 0;
-    speechSynthesis.speak(dummy);
-  }
-}
-ensureVoices();
-// Default enabled sites (panel.js overrides from storage after async load)
-window.__tts_zen_enabled_sites = { 'wattpad.com': true, 'archiveofourown.org': true, 'fanfiction.net': true, 'webnovel.com': true, 'generic': true };
+function handlePrev() { if (player.index >= 0) player.jump(player.index - 1); }
+function handleNext() { if (player.index >= 0) player.jump(player.index + 1); }
 
 // ---- Initialization ----
+
+// Default enabled sites (panel.js overrides from storage after async load)
+window.__tts_zen_enabled_sites = { 'wattpad.com': true, 'archiveofourown.org': true, 'fanfiction.net': true, 'webnovel.com': true, 'generic': true };
 
 function injectPanel() {
   const host = document.createElement('div');
@@ -810,19 +430,27 @@ function injectPanel() {
 
   const shadow = host.attachShadow({ mode: 'open' });
   createPanel(shadow, {
-    onRead: () => dispatchReadPage(extractTextWithRefs),
+    onRead: handleRead,
+    onRestart: handleRestart,
     onPause: handlePause,
     onStop: handleStop,
     onPrev: handlePrev,
     onNext: handleNext,
+    onRate: function(r) { player.setRate(r); }
+  }).then(function() {
+    offerResume();
+    checkPendingAutoplay();
+    pruneProgress();
   });
+
+  window.addEventListener('pagehide', flushProgress);
+  // Back/forward after an in-page chapter swap: reload so the page matches the URL
+  window.addEventListener('popstate', function() { if (chapterUrl.href !== window.location.href) window.location.reload(); });
 }
 
 function tryInject() {
-  if (document.body) { injectPanel(); }
-  else { requestAnimationFrame(tryInject); }
+  if (document.body) injectPanel();
+  else requestAnimationFrame(tryInject);
 }
 
-if (shouldInject()) {
-  tryInject();
-}
+if (shouldInject()) tryInject();

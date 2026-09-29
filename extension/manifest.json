@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "zenTTS",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Floating TTS panel — read any page aloud. Native SpeechSynthesis or edge-tts neural voices. Wattpad, AO3, FanFiction support.",
   "author": "JoVi-Yashi",
   "homepage_url": "https://github.com/JoVi-Yashi/zenTTs",
@@ -11,16 +11,21 @@
       "strict_min_version": "142.0",
       "data_collection_permissions": {
         "usage": "none",
-        "required": ["none"]
+        "required": [
+          "none"
+        ]
       }
     }
   },
   "permissions": [
     "storage",
-    "activeTab"
+    "activeTab",
+    "unlimitedStorage"
   ],
   "host_permissions": [
-    "http://localhost:8765/*"
+    "http://localhost:8765/*",
+    "https://huggingface.co/*",
+    "https://*.hf.co/*"
   ],
   "icons": {
     "16": "icons/icon-16.png",
@@ -30,7 +35,10 @@
     "128": "icons/icon-128.png"
   },
   "background": {
-    "scripts": ["background.js"]
+    "scripts": [
+      "background.js"
+    ],
+    "type": "module"
   },
   "action": {
     "default_title": "zenTTS",
@@ -42,14 +50,25 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["icons/sites/*.svg"],
-      "matches": ["<all_urls>"]
+      "resources": [
+        "icons/sites/*.svg"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ],
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"]
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content.js"
+      ]
     }
-  ]
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  }
 }

@@ -96,13 +96,14 @@ get '/' do
   content_type :json
   {
     name: 'zenTTS',
-    version: '0.3.0',
+    version: '0.5.0',
     endpoints: {
       '/health' => 'GET — health check',
-      '/voices?locale=es-' => 'GET — list voices',
+      '/voices?locale=es-' => 'GET — list voices (all when no locale)',
       '/tts' => 'POST {text, voice?, rate?} — MP3 audio',
       '/tts/sync' => 'POST {text, voice?, rate?} — audio + timing',
-      '/extract' => 'POST {url, voice?, rate?} — extract + TTS'
+      '/extract' => 'POST {url, voice?, rate?} — extract + TTS',
+      '/translate' => 'POST {texts[], from?, to?} — translate paragraphs'
     }
   }.to_json
 end
@@ -122,7 +123,7 @@ get '/voices' do
   # edge-tts CLI outputs a formatted table, not JSON
   voices = parse_voice_table(out)
 
-  voices.select! { |v| v[:locale].start_with?(locale) } if locale
+  voices.select! { |v| v[:locale].start_with?(locale) } if locale && !locale.empty?
   content_type :json
   voices.to_json
 end
@@ -191,21 +192,62 @@ post '/extract' do
   end
 end
 
+# Google's free endpoint rejects long queries, so paragraphs are sent in
+# batches that stay under this size and never split a paragraph.
+TRANSLATE_BATCH = 1800
+BATCH_SEPARATOR = "\n\n"
+
+def google_translate(text, from, to)
+  uri = URI("https://translate.googleapis.com/translate_a/single?client=gtx&sl=#{from}&tl=#{to}&dt=t&q=#{URI.encode_www_form_component(text)}")
+  parsed = JSON.parse(Net::HTTP.get(uri))
+  parsed[0].map { |s| s[0] }.join
+end
+
+# Splits one long paragraph at sentence ends so each piece fits a request
+def split_long(text)
+  return [text] if text.length <= TRANSLATE_BATCH
+  text.scan(/[^.!?…]+[.!?…]*\s*/).each_with_object(['']) do |sentence, parts|
+    parts << '' if parts.last.length + sentence.length > TRANSLATE_BATCH && !parts.last.empty?
+    parts.last << sentence
+  end
+end
+
+def translate_paragraphs(texts, from, to)
+  batches = texts.each_with_index.each_with_object([[]]) do |(text, i), acc|
+    size = acc.last.sum { |j| texts[j].length + BATCH_SEPARATOR.length }
+    acc << [] if !acc.last.empty? && size + text.length > TRANSLATE_BATCH
+    acc.last << i
+  end
+
+  result = Array.new(texts.size)
+  batches.each do |batch|
+    next if batch.empty?
+    if batch.size > 1
+      parts = google_translate(batch.map { |i| texts[i] }.join(BATCH_SEPARATOR), from, to)
+              .split(/\n\s*\n/)
+      if parts.size == batch.size
+        batch.each_with_index { |i, k| result[i] = parts[k].strip }
+        next
+      end
+    end
+    # One by one when the batch did not come back with the same paragraph count
+    batch.each do |i|
+      result[i] = split_long(texts[i]).map { |piece| google_translate(piece, from, to) }.join(' ').strip
+    end
+  end
+  result
+end
+
 post '/translate' do
   body = JSON.parse(request.body.read) rescue {}
-  text = (body['text'] || '').strip
-  halt 400, { error: 'text required' }.to_json if text.empty?
+  texts = Array(body['texts'] || body['text']).map { |t| t.to_s.strip }
+  halt 400, { error: 'texts required' }.to_json if texts.all?(&:empty?)
 
   from = body['from'] || 'auto'
   to   = body['to']   || 'es'
 
-  uri = URI("https://translate.googleapis.com/translate_a/single?client=gtx&sl=#{from}&tl=#{to}&dt=t&q=#{URI.encode_www_form_component(text[0..2000])}")
-  resp = Net::HTTP.get(uri)
-  parsed = JSON.parse(resp)
-  translated = parsed[0].map { |s| s[0] }.join
-
   content_type :json
-  { text: translated, from: from, to: to }.to_json
+  { texts: translate_paragraphs(texts, from, to), from: from, to: to }.to_json
 rescue => e
   halt 500, { error: e.message }.to_json
 end
