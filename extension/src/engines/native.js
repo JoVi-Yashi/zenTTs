@@ -28,9 +28,13 @@ export function pickNativeVoice(name, lang) {
 export function createNativeEngine() {
   var running = null;
 
-  function speak(text, opts) {
+  function speak(text, opts, onWord) {
     return new Promise(function(resolve, reject) {
       var u = new SpeechSynthesisUtterance(text);
+      // Word boundaries, when the platform's speech engine reports them
+      u.onboundary = function(e) {
+        if (!e.name || e.name === 'word') onWord(e.charIndex);
+      };
       var voice = pickNativeVoice(opts.voice, opts.lang);
       if (voice) { u.voice = voice; u.lang = voice.lang; } else if (opts.lang) { u.lang = opts.lang; }
       u.rate = opts.rate();
@@ -54,7 +58,7 @@ export function createNativeEngine() {
       for (var i = start; i < ctx.sentences.length; i++) {
         if (run.cancelled) return;
         ctx.onSentence(i);
-        await speak(ctx.sentences[i].text, ctx);
+        await speak(ctx.sentences[i].text, ctx, ctx.onWord.bind(null, i));
         // speechSynthesis keeps a paused utterance pending, so the await above
         // only resolves once it is resumed and finished.
       }

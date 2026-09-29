@@ -20,6 +20,32 @@ function segmentFrom(sentences, start) {
 
 function norm(s) { return s.replace(/\s+/g, ' ').trim(); }
 
+function bare(s) { return s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ''); }
+
+// Pairs edge-tts word boundaries with the words of our sentences, in order.
+// Returns, per sentence, [{offset, time}] (offset = char index in the sentence).
+function wordTimes(ourSentences, words) {
+  var tokens = [];
+  ourSentences.forEach(function(s, k) {
+    var re = /\S+/g, m;
+    while ((m = re.exec(s.text))) tokens.push({ k: k, offset: m.index, key: bare(m[0]) });
+  });
+  var out = ourSentences.map(function() { return []; });
+  var j = 0;
+  (words || []).forEach(function(w) {
+    var key = bare(w.text || '');
+    if (!key) return;
+    for (var look = j; look < Math.min(tokens.length, j + 6); look++) {
+      if (tokens[look].key && tokens[look].key.includes(key)) {
+        out[tokens[look].k].push({ offset: tokens[look].offset, time: w.start });
+        j = look + 1;
+        return;
+      }
+    }
+  });
+  return out;
+}
+
 // Maps each of our sentences to a start time using the subtitle cues
 // edge-tts returns, by comparing character offsets.
 function sentenceTimes(ourSentences, cues) {
@@ -51,17 +77,40 @@ function sentenceTimes(ourSentences, cues) {
   return times;
 }
 
+// Sentence cues rebuilt from word boundaries (edge-tts sends one kind or the other)
+function wordsAsCues(words) {
+  return (words || []).map(function(w) { return { text: w.text, start: w.start, end: w.end }; });
+}
+
+// Char offset of the word being spoken in sentence k of a segment
+function wordAt(audio, k, t, duration, len) {
+  var list = audio.words[k];
+  if (list && list.length) {
+    var off = list[0].offset;
+    for (var i = 0; i < list.length && list[i].time <= t; i++) off = list[i].offset;
+    return off;
+  }
+  // No word timings: estimate from the sentence's share of the audio
+  var start = audio.times[k];
+  var end = k + 1 < audio.times.length ? audio.times[k + 1] : duration;
+  if (!(end > start)) return 0;
+  return Math.floor(Math.min(0.999, (t - start) / (end - start)) * len);
+}
+
 export function createServerEngine() {
   var player = createAudioPlayer();
   var running = null;
 
   async function synth(ctx, seg) {
     var text = ctx.sentences.slice(seg.start, seg.end).map(function(s) { return s.text; }).join(' ');
-    var resp = await browser.runtime.sendMessage({ action: 'read_page_sync', text: text, voice: ctx.voice, rate: '+0%' });
+    var resp = await browser.runtime.sendMessage({ action: 'read_page_sync', text: text, voice: ctx.voice, rate: '+0%', words: true });
     if (!resp || !resp.success || !resp.audio) throw new Error((resp && resp.error) || 'edge-tts');
+    var ours = ctx.sentences.slice(seg.start, seg.end);
+    var cues = resp.sentences && resp.sentences.length ? resp.sentences : wordsAsCues(resp.words);
     return {
       blob: blobFromBase64(resp.audio, 'audio/mpeg'),
-      times: sentenceTimes(ctx.sentences.slice(seg.start, seg.end), resp.sentences || [])
+      times: sentenceTimes(ours, cues),
+      words: wordTimes(ours, resp.words)
     };
   }
 
@@ -91,10 +140,11 @@ export function createServerEngine() {
         var current = seg.start;
         ctx.onSentence(current);
         var s = seg;
-        await player.play(audio.blob, ctx.rate(), function(t) {
+        await player.play(audio.blob, ctx.rate(), function(t, duration) {
           for (var k = audio.times.length - 1; k >= 0; k--) {
             if (t >= audio.times[k]) {
               if (s.start + k !== current) { current = s.start + k; ctx.onSentence(current); }
+              ctx.onWord(current, wordAt(audio, k, t, duration, ctx.sentences[current].text.length));
               break;
             }
           }

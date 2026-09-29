@@ -7,6 +7,7 @@ import { createPanel, setStatus, setButtonsEnabled, setCounter, setPauseIcon, se
 import { siteFor } from './sites.js';
 import { createPlayer } from './player.js';
 import { textHash, loadProgress, saveProgress, flushProgress, clearProgress, pruneProgress } from './progress.js';
+import * as marker from './highlight.js';
 
 // ---- URL Guard ----
 const RESTRICTED_PROTOCOLS = ['edge:', 'about:', 'file:', 'chrome:', 'moz-extension:'];
@@ -29,7 +30,7 @@ function shouldInject() {
 window.__tts_zen_state = {
   currentVoice: 'es-ES-AlvaroNeural', localVoice: 'es_ES-davefx-medium',
   currentRate: 1.0, currentEngine: 'native', serverAvailable: false,
-  lang: 'es', langIn: 'auto', langOut: 'es', autoNext: true
+  lang: 'es', langIn: 'auto', langOut: 'es', autoNext: true, wordHighlight: true
 };
 
 function st() { return window.__tts_zen_state; }
@@ -109,11 +110,26 @@ function splitIntoSentences(text) {
   return parts.map(function(p) { return p.trim(); }).filter(function(p) { return p.length > 0; });
 }
 
+function wordsOf(text) {
+  var out = [], re = /\S+/g, m;
+  while ((m = re.exec(text))) out.push({ start: m.index, text: m[0] });
+  return out;
+}
+
+// Sentences with their words and where they start in the paragraph (counted
+// without whitespace, which is how highlight.js finds them on the page)
+function sentencesOf(text, refIdx) {
+  var hint = 0;
+  return splitIntoSentences(text).map(function(s) {
+    var item = { text: s, refIdx: refIdx, words: wordsOf(s), hint: hint };
+    hint += marker.compact(s).length;
+    return item;
+  });
+}
+
 function buildSentences(paras) {
   var list = [];
-  paras.forEach(function(p, i) {
-    splitIntoSentences(p.text).forEach(function(s) { list.push({ text: s, refIdx: i }); });
-  });
+  paras.forEach(function(p, i) { list.push.apply(list, sentencesOf(p.text, i)); });
   return list;
 }
 
@@ -135,27 +151,11 @@ async function translateParagraphs(paras) {
 }
 
 // ---- Page highlight ----
+// highlight.js marks the sentence and the spoken word on the page itself
 
-var highlighted = null;
-var MARK = 'rgba(243, 225, 154, 0.55)';
+function clearHighlight() { marker.clear(); }
 
-function clearHighlight() {
-  if (!highlighted) return;
-  highlighted.style.removeProperty('background');
-  highlighted.style.removeProperty('box-shadow');
-  highlighted = null;
-}
-
-function highlightParagraph(el) {
-  if (el === highlighted) return;
-  clearHighlight();
-  if (!el || !el.isConnected) return;
-  el.style.background = MARK;
-  el.style.boxShadow = '-6px 0 0 ' + MARK + ', 6px 0 0 ' + MARK;
-  el.style.transition = 'background 0.15s ease';
-  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  highlighted = el;
-}
+var currentWord = -1;
 
 function highlightPreview(i) {
   var host = document.getElementById('tts-zen-host');
@@ -190,10 +190,21 @@ var player = createPlayer({
   onSentence: function(i) {
     var s = sentences[i];
     setCounter(i + 1, sentences.length);
-    highlightParagraph(s && paragraphs[s.refIdx] ? paragraphs[s.refIdx].el : null);
+    currentWord = -1;
+    marker.showSentence(s && paragraphs[s.refIdx] ? paragraphs[s.refIdx].el : null, s ? s.text : '', s ? s.words : [], s ? s.hint : 0);
     highlightPreview(i);
     saveProgress(chapterKey, { index: i, total: sentences.length, hash: chapterHash, title: document.title });
     if (i >= sentences.length * 0.8) prefetchNextChapter();
+  },
+  onWord: function(i, offset) {
+    if (st().wordHighlight === false) return;
+    var words = sentences[i] && sentences[i].words;
+    if (!words || !words.length) return;
+    var k = 0;
+    while (k + 1 < words.length && words[k + 1].start <= offset) k++;
+    if (k === currentWord) return;
+    currentWord = k;
+    marker.showWord(k);
   },
   onState: function(state) {
     var playing = state === 'playing';
@@ -335,7 +346,7 @@ async function goToNextChapter() {
   chapterDoc = loaded.doc;
   chapterUrl = new URL(loaded.url);
   prepared = false;
-  highlighted = null;
+  clearHighlight();
   fresh.scrollIntoView({ behavior: 'smooth', block: 'start' });
   startReading(0);
 }
@@ -388,9 +399,7 @@ async function checkForNewParagraphs(root) {
     var base = paragraphs.length;
     paragraphs.push.apply(paragraphs, fresh);
     var more = [];
-    fresh.forEach(function(p, i) {
-      splitIntoSentences(p.text).forEach(function(s) { more.push({ text: s, refIdx: base + i }); });
-    });
+    fresh.forEach(function(p, i) { more.push.apply(more, sentencesOf(p.text, base + i)); });
     player.append(more);
     updatePreviewSentences();
   } finally {

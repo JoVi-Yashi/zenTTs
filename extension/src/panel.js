@@ -124,6 +124,10 @@ const PANEL_HTML = `
         <input type="checkbox" id="tts-zen-follow-theme">
         <span id="tts-zen-follow-label">Usar los colores del tema del navegador</span>
       </label>
+      <label class="check-row">
+        <input type="checkbox" id="tts-zen-word-hl">
+        <span id="tts-zen-word-hl-label">Resaltar la palabra que suena</span>
+      </label>
       <div class="setting-row">
         <label id="tts-zen-accent-label">Acento</label>
         <div class="accent-group" id="tts-zen-accent-group">
@@ -562,7 +566,7 @@ var T = {
     downloadVoice: 'Descargar voz', downloading: 'Descargando…', downloaded: 'descargada',
     downloadFailed: 'No se pudo descargar',
     look: 'Aspecto', followTheme: 'Usar los colores del tema del navegador', accent: 'Acento',
-    pasteZen: 'Pegar color de Zen', otherColor: 'Otro color'
+    pasteZen: 'Pegar color de Zen', otherColor: 'Otro color', wordHighlight: 'Resaltar la palabra que suena'
   },
   en: {
     minimize: 'Minimize', preview: 'View extracted text', sites: 'Manage sites',
@@ -581,7 +585,7 @@ var T = {
     downloadVoice: 'Download voice', downloading: 'Downloading…', downloaded: 'downloaded',
     downloadFailed: 'Download failed',
     look: 'Appearance', followTheme: 'Use the browser theme colors', accent: 'Accent',
-    pasteZen: 'Paste Zen color', otherColor: 'Other color'
+    pasteZen: 'Paste Zen color', otherColor: 'Other color', wordHighlight: 'Highlight the spoken word'
   }
 };
 
@@ -598,6 +602,7 @@ let state = {
   autoNext: true,
   accent: '',
   followTheme: true,
+  wordHighlight: true,
   langIn: 'auto',
   langOut: 'es',
   lang: 'es'
@@ -607,7 +612,8 @@ let state = {
 
 async function loadSettings() {
   try {
-    const stored = await browser.storage.local.get(['voice', 'rate', 'engine', 'lang', 'langIn', 'langOut', 'localVoice', 'autoNext', 'accent', 'followTheme']);
+    const stored = await browser.storage.local.get(['voice', 'rate', 'engine', 'lang', 'langIn', 'langOut', 'localVoice', 'autoNext', 'accent', 'followTheme', 'wordHighlight']);
+    if (typeof stored.wordHighlight === 'boolean') state.wordHighlight = stored.wordHighlight;
     if (typeof stored.accent === 'string') state.accent = stored.accent;
     if (typeof stored.followTheme === 'boolean') state.followTheme = stored.followTheme;
     if (stored.localVoice) state.localVoice = stored.localVoice;
@@ -634,11 +640,12 @@ function syncShared() {
   shared.langIn = state.langIn;
   shared.langOut = state.langOut;
   shared.autoNext = state.autoNext;
+  shared.wordHighlight = state.wordHighlight;
 }
 
 async function saveSettings() {
   try {
-    await browser.storage.local.set({ voice: state.currentVoice, rate: state.currentRate, engine: state.currentEngine, lang: state.lang, langIn: state.langIn, langOut: state.langOut, localVoice: state.localVoice, autoNext: state.autoNext, accent: state.accent, followTheme: state.followTheme });
+    await browser.storage.local.set({ voice: state.currentVoice, rate: state.currentRate, engine: state.currentEngine, lang: state.lang, langIn: state.langIn, langOut: state.langOut, localVoice: state.localVoice, autoNext: state.autoNext, accent: state.accent, followTheme: state.followTheme, wordHighlight: state.wordHighlight });
   } catch (_) {}
 }
 
@@ -816,7 +823,7 @@ function applyLanguage(shadow) {
   [['tts-zen-voice-label', 'voice'], ['tts-zen-engine-label', 'engine'], ['tts-zen-lang-label', 'langLabel'],
    ['tts-zen-translate-title', 'translateTitle'], ['tts-zen-speed-text', 'speed'],
    ['tts-zen-autonext-label', 'autoNext'], ['tts-zen-restart', 'restart'],
-   ['tts-zen-look-title', 'look'], ['tts-zen-follow-label', 'followTheme'], ['tts-zen-accent-label', 'accent']].forEach(function(pair) {
+   ['tts-zen-look-title', 'look'], ['tts-zen-word-hl-label', 'wordHighlight'], ['tts-zen-follow-label', 'followTheme'], ['tts-zen-accent-label', 'accent']].forEach(function(pair) {
     var el = shadow.getElementById(pair[0]);
     if (el) el.textContent = T[lang][pair[1]];
   });
@@ -953,6 +960,10 @@ async function loadBrowserTheme() {
 }
 
 function setupColors(shadow) {
+  var wordHl = shadow.getElementById('tts-zen-word-hl');
+  wordHl.checked = state.wordHighlight;
+  wordHl.addEventListener('change', function() { state.wordHighlight = wordHl.checked; syncShared(); saveSettings(); });
+
   var follow = shadow.getElementById('tts-zen-follow-theme');
   follow.checked = state.followTheme;
   follow.addEventListener('change', function() { state.followTheme = follow.checked; saveSettings(); applyColors(); });

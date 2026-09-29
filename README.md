@@ -96,7 +96,7 @@ Shadow DOM encapsulado. El CSS del sitio jamás interfiere. Aparece abajo a la d
 Elige entre SpeechSynthesis nativo (sin dependencias) o edge-tts con voces neurales de Microsoft. Cambias desde ⚙ → Motor sin reiniciar.
 
 ### Highlighting sincronizado
-Cada oración se resalta en el DOM del sitio (marcador amarillo + scroll) y en un pop-up sincronizado con tipografía ajustable.
+La oración que suena se marca en la propia página y la palabra que se pronuncia se resalta encima, en tiempo real (tiempos reales con la voz neural, estimados con la local). El marcador fija su propio color de texto, así que se lee igual en sitios claros u oscuros. También se sincroniza con la vista de lectura del panel.
 
 ### Extractores por plataforma
 Wattpad, AO3, FanFiction y Webnovel tienen extractores optimizados con selectores específicos. Ignoran headers, navs, resúmenes y comentarios.

@@ -34,6 +34,11 @@ export function createPlayer(hooks) {
         if (run !== runId) return;
         current = i;
         hooks.onSentence(i);
+      },
+      // charOffset: where the spoken word starts inside sentence i
+      onWord: function(i, charOffset) {
+        if (run !== runId || i !== current || !hooks.onWord) return;
+        hooks.onWord(i, charOffset);
       }
     };
   }

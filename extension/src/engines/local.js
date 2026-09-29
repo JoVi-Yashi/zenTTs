@@ -47,7 +47,11 @@ export function createLocalEngine() {
         delete queue[i];
         if (run.cancelled) return;
         ctx.onSentence(i);
-        await player.play(blob, ctx.rate());
+        // Piper gives no timings: estimate the word from how far the audio is
+        var len = ctx.sentences[i].text.length;
+        await player.play(blob, ctx.rate(), function(t, duration) {
+          if (duration > 0 && isFinite(duration)) ctx.onWord(i, Math.floor(Math.min(0.999, t / duration) * len));
+        });
         if (run.cancelled) return;
       }
     },

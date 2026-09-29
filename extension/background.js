@@ -12522,7 +12522,7 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
       handleReadPage(message.text, message.voice, message.rate).then(sendResponse).catch((err) => sendResponse({ success: false, error: err.message }));
       return true;
     case "read_page_sync":
-      handleReadPageSync(message.text, message.voice, message.rate).then(sendResponse).catch((err) => sendResponse({ success: false, error: err.message }));
+      handleReadPageSync(message.text, message.voice, message.rate, message.words).then(sendResponse).catch((err) => sendResponse({ success: false, error: err.message }));
       return true;
     case "extract_url":
       handleExtractUrl(message.url, message.voice, message.rate).then(sendResponse).catch((err) => sendResponse({ success: false, error: err.message }));
@@ -12587,8 +12587,8 @@ async function handleReadPage(text, voice, rate) {
   const data = await resp.arrayBuffer();
   return { success: true, data };
 }
-async function handleReadPageSync(text, voice, rate) {
-  const body = { text };
+async function handleReadPageSync(text, voice, rate, words) {
+  const body = { text, words: !!words };
   if (voice) body.voice = voice;
   if (rate) body.rate = rate;
   const resp = await fetch("http://localhost:8765/tts/sync", {
@@ -12604,7 +12604,8 @@ async function handleReadPageSync(text, voice, rate) {
   return {
     success: true,
     audio: result.audio,
-    sentences: result.sentences
+    sentences: result.sentences,
+    words: result.words || []
   };
 }
 async function handleExtractUrl(url, voice, rate) {

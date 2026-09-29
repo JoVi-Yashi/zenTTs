@@ -2294,6 +2294,10 @@
         <input type="checkbox" id="tts-zen-follow-theme">
         <span id="tts-zen-follow-label">Usar los colores del tema del navegador</span>
       </label>
+      <label class="check-row">
+        <input type="checkbox" id="tts-zen-word-hl">
+        <span id="tts-zen-word-hl-label">Resaltar la palabra que suena</span>
+      </label>
       <div class="setting-row">
         <label id="tts-zen-accent-label">Acento</label>
         <div class="accent-group" id="tts-zen-accent-group">
@@ -2763,7 +2767,8 @@ button:focus-visible, select:focus-visible, input:focus-visible {
       followTheme: "Usar los colores del tema del navegador",
       accent: "Acento",
       pasteZen: "Pegar color de Zen",
-      otherColor: "Otro color"
+      otherColor: "Otro color",
+      wordHighlight: "Resaltar la palabra que suena"
     },
     en: {
       minimize: "Minimize",
@@ -2814,7 +2819,8 @@ button:focus-visible, select:focus-visible, input:focus-visible {
       followTheme: "Use the browser theme colors",
       accent: "Accent",
       pasteZen: "Paste Zen color",
-      otherColor: "Other color"
+      otherColor: "Other color",
+      wordHighlight: "Highlight the spoken word"
     }
   };
   function t(key) {
@@ -2829,13 +2835,15 @@ button:focus-visible, select:focus-visible, input:focus-visible {
     autoNext: true,
     accent: "",
     followTheme: true,
+    wordHighlight: true,
     langIn: "auto",
     langOut: "es",
     lang: "es"
   };
   async function loadSettings() {
     try {
-      const stored = await browser.storage.local.get(["voice", "rate", "engine", "lang", "langIn", "langOut", "localVoice", "autoNext", "accent", "followTheme"]);
+      const stored = await browser.storage.local.get(["voice", "rate", "engine", "lang", "langIn", "langOut", "localVoice", "autoNext", "accent", "followTheme", "wordHighlight"]);
+      if (typeof stored.wordHighlight === "boolean") state.wordHighlight = stored.wordHighlight;
       if (typeof stored.accent === "string") state.accent = stored.accent;
       if (typeof stored.followTheme === "boolean") state.followTheme = stored.followTheme;
       if (stored.localVoice) state.localVoice = stored.localVoice;
@@ -2861,10 +2869,11 @@ button:focus-visible, select:focus-visible, input:focus-visible {
     shared.langIn = state.langIn;
     shared.langOut = state.langOut;
     shared.autoNext = state.autoNext;
+    shared.wordHighlight = state.wordHighlight;
   }
   async function saveSettings() {
     try {
-      await browser.storage.local.set({ voice: state.currentVoice, rate: state.currentRate, engine: state.currentEngine, lang: state.lang, langIn: state.langIn, langOut: state.langOut, localVoice: state.localVoice, autoNext: state.autoNext, accent: state.accent, followTheme: state.followTheme });
+      await browser.storage.local.set({ voice: state.currentVoice, rate: state.currentRate, engine: state.currentEngine, lang: state.lang, langIn: state.langIn, langOut: state.langOut, localVoice: state.localVoice, autoNext: state.autoNext, accent: state.accent, followTheme: state.followTheme, wordHighlight: state.wordHighlight });
     } catch (_) {
     }
   }
@@ -3052,6 +3061,7 @@ button:focus-visible, select:focus-visible, input:focus-visible {
       ["tts-zen-autonext-label", "autoNext"],
       ["tts-zen-restart", "restart"],
       ["tts-zen-look-title", "look"],
+      ["tts-zen-word-hl-label", "wordHighlight"],
       ["tts-zen-follow-label", "followTheme"],
       ["tts-zen-accent-label", "accent"]
     ].forEach(function(pair) {
@@ -3125,10 +3135,10 @@ button:focus-visible, select:focus-visible, input:focus-visible {
     el.textContent = text;
     el.className = isError ? "error" : "";
   }
-  function setCounter(current, total) {
+  function setCounter(current2, total) {
     const el = getEl("tts-zen-counter");
     if (!el) return;
-    el.textContent = current + " / " + total;
+    el.textContent = current2 + " / " + total;
   }
   function setButtonsEnabled(btns) {
     for (const [action, enabled] of [["read", btns.read], ["pause", btns.pause], ["stop", btns.stop], ["prev", btns.prev], ["next", btns.next]]) {
@@ -3167,6 +3177,13 @@ button:focus-visible, select:focus-visible, input:focus-visible {
     applyColors();
   }
   function setupColors(shadow) {
+    var wordHl = shadow.getElementById("tts-zen-word-hl");
+    wordHl.checked = state.wordHighlight;
+    wordHl.addEventListener("change", function() {
+      state.wordHighlight = wordHl.checked;
+      syncShared();
+      saveSettings();
+    });
     var follow = shadow.getElementById("tts-zen-follow-theme");
     follow.checked = state.followTheme;
     follow.addEventListener("change", function() {
@@ -3818,9 +3835,12 @@ button:focus-visible, select:focus-visible, input:focus-visible {
   }
   function createNativeEngine() {
     var running = null;
-    function speak(text, opts) {
+    function speak(text, opts, onWord) {
       return new Promise(function(resolve, reject) {
         var u = new SpeechSynthesisUtterance(text);
+        u.onboundary = function(e) {
+          if (!e.name || e.name === "word") onWord(e.charIndex);
+        };
         var voice = pickNativeVoice(opts.voice, opts.lang);
         if (voice) {
           u.voice = voice;
@@ -3851,7 +3871,7 @@ button:focus-visible, select:focus-visible, input:focus-visible {
         for (var i = start; i < ctx.sentences.length; i++) {
           if (run.cancelled) return;
           ctx.onSentence(i);
-          await speak(ctx.sentences[i].text, ctx);
+          await speak(ctx.sentences[i].text, ctx, ctx.onWord.bind(null, i));
         }
       },
       pause: function() {
@@ -3877,7 +3897,12 @@ button:focus-visible, select:focus-visible, input:focus-visible {
   function createAudioPlayer() {
     var audio = null;
     var finish = null;
+    var frame = null;
     function release() {
+      if (frame) {
+        cancelAnimationFrame(frame);
+        frame = null;
+      }
       if (!audio) return;
       audio.ontimeupdate = audio.onended = audio.onerror = null;
       audio.pause();
@@ -3894,8 +3919,14 @@ button:focus-visible, select:focus-visible, input:focus-visible {
           a.playbackRate = rate || 1;
           if (startAt) a.currentTime = startAt;
           a.ontimeupdate = function() {
-            if (onTime) onTime(a.currentTime);
+            if (onTime) onTime(a.currentTime, a.duration);
           };
+          function tick() {
+            if (audio !== a) return;
+            if (!a.paused && onTime) onTime(a.currentTime, a.duration);
+            frame = requestAnimationFrame(tick);
+          }
+          frame = requestAnimationFrame(tick);
           a.onended = function() {
             release();
             resolve();
@@ -3943,6 +3974,32 @@ button:focus-visible, select:focus-visible, input:focus-visible {
   function norm(s) {
     return s.replace(/\s+/g, " ").trim();
   }
+  function bare(s) {
+    return s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+  }
+  function wordTimes(ourSentences, words) {
+    var tokens = [];
+    ourSentences.forEach(function(s, k) {
+      var re = /\S+/g, m;
+      while (m = re.exec(s.text)) tokens.push({ k, offset: m.index, key: bare(m[0]) });
+    });
+    var out = ourSentences.map(function() {
+      return [];
+    });
+    var j = 0;
+    (words || []).forEach(function(w) {
+      var key = bare(w.text || "");
+      if (!key) return;
+      for (var look = j; look < Math.min(tokens.length, j + 6); look++) {
+        if (tokens[look].key && tokens[look].key.includes(key)) {
+          out[tokens[look].k].push({ offset: tokens[look].offset, time: w.start });
+          j = look + 1;
+          return;
+        }
+      }
+    });
+    return out;
+  }
   function sentenceTimes(ourSentences, cues) {
     var cueStarts = [];
     var pos = 0;
@@ -3973,6 +4030,23 @@ button:focus-visible, select:focus-visible, input:focus-visible {
     });
     return times;
   }
+  function wordsAsCues(words) {
+    return (words || []).map(function(w) {
+      return { text: w.text, start: w.start, end: w.end };
+    });
+  }
+  function wordAt(audio, k, t2, duration, len) {
+    var list = audio.words[k];
+    if (list && list.length) {
+      var off = list[0].offset;
+      for (var i = 0; i < list.length && list[i].time <= t2; i++) off = list[i].offset;
+      return off;
+    }
+    var start = audio.times[k];
+    var end = k + 1 < audio.times.length ? audio.times[k + 1] : duration;
+    if (!(end > start)) return 0;
+    return Math.floor(Math.min(0.999, (t2 - start) / (end - start)) * len);
+  }
   function createServerEngine() {
     var player2 = createAudioPlayer();
     var running = null;
@@ -3980,11 +4054,14 @@ button:focus-visible, select:focus-visible, input:focus-visible {
       var text = ctx.sentences.slice(seg.start, seg.end).map(function(s) {
         return s.text;
       }).join(" ");
-      var resp = await browser.runtime.sendMessage({ action: "read_page_sync", text, voice: ctx.voice, rate: "+0%" });
+      var resp = await browser.runtime.sendMessage({ action: "read_page_sync", text, voice: ctx.voice, rate: "+0%", words: true });
       if (!resp || !resp.success || !resp.audio) throw new Error(resp && resp.error || "edge-tts");
+      var ours = ctx.sentences.slice(seg.start, seg.end);
+      var cues = resp.sentences && resp.sentences.length ? resp.sentences : wordsAsCues(resp.words);
       return {
         blob: blobFromBase64(resp.audio, "audio/mpeg"),
-        times: sentenceTimes(ctx.sentences.slice(seg.start, seg.end), resp.sentences || [])
+        times: sentenceTimes(ours, cues),
+        words: wordTimes(ours, resp.words)
       };
     }
     return {
@@ -4017,16 +4094,17 @@ button:focus-visible, select:focus-visible, input:focus-visible {
             pending2.catch(function() {
             });
           }
-          var current = seg.start;
-          ctx.onSentence(current);
+          var current2 = seg.start;
+          ctx.onSentence(current2);
           var s = seg;
-          await player2.play(audio.blob, ctx.rate(), function(t2) {
+          await player2.play(audio.blob, ctx.rate(), function(t2, duration) {
             for (var k = audio.times.length - 1; k >= 0; k--) {
               if (t2 >= audio.times[k]) {
-                if (s.start + k !== current) {
-                  current = s.start + k;
-                  ctx.onSentence(current);
+                if (s.start + k !== current2) {
+                  current2 = s.start + k;
+                  ctx.onSentence(current2);
                 }
+                ctx.onWord(current2, wordAt(audio, k, t2, duration, ctx.sentences[current2].text.length));
                 break;
               }
             }
@@ -4099,7 +4177,10 @@ button:focus-visible, select:focus-visible, input:focus-visible {
           delete queue[i];
           if (run.cancelled) return;
           ctx.onSentence(i);
-          await player2.play(blob, ctx.rate());
+          var len = ctx.sentences[i].text.length;
+          await player2.play(blob, ctx.rate(), function(t2, duration) {
+            if (duration > 0 && isFinite(duration)) ctx.onWord(i, Math.floor(Math.min(0.999, t2 / duration) * len));
+          });
           if (run.cancelled) return;
         }
       },
@@ -4128,7 +4209,7 @@ button:focus-visible, select:focus-visible, input:focus-visible {
       local: createLocalEngine()
     };
     var sentences2 = [];
-    var current = -1;
+    var current2 = -1;
     var engine = null;
     var runId = 0;
     var state2 = "idle";
@@ -4148,8 +4229,13 @@ button:focus-visible, select:focus-visible, input:focus-visible {
         },
         onSentence: function(i) {
           if (run2 !== runId) return;
-          current = i;
+          current2 = i;
           hooks.onSentence(i);
+        },
+        // charOffset: where the spoken word starts inside sentence i
+        onWord: function(i, charOffset) {
+          if (run2 !== runId || i !== current2 || !hooks.onWord) return;
+          hooks.onWord(i, charOffset);
         }
       };
     }
@@ -4165,7 +4251,7 @@ button:focus-visible, select:focus-visible, input:focus-visible {
         hooks.onEnd();
       } catch (err) {
         if (id !== runId) return;
-        var from = typeof err.at === "number" ? err.at : Math.max(start, current);
+        var from = typeof err.at === "number" ? err.at : Math.max(start, current2);
         for (var i = 0; i < FALLBACK[name].length; i++) {
           var alt = FALLBACK[name][i];
           if (await engines[alt].available(ctx)) {
@@ -4187,7 +4273,7 @@ button:focus-visible, select:focus-visible, input:focus-visible {
         return state2;
       },
       get index() {
-        return current;
+        return current2;
       },
       get count() {
         return sentences2.length;
@@ -4195,7 +4281,7 @@ button:focus-visible, select:focus-visible, input:focus-visible {
       load: function(list) {
         halt();
         sentences2 = list;
-        current = -1;
+        current2 = -1;
         setState("idle");
       },
       // Appends sentences (e.g. translated chunks of an infinite-scroll page)
@@ -4205,15 +4291,15 @@ button:focus-visible, select:focus-visible, input:focus-visible {
       start: function(index, name) {
         halt();
         if (!sentences2.length) return;
-        current = Math.max(0, Math.min(index || 0, sentences2.length - 1));
-        run(current, name);
+        current2 = Math.max(0, Math.min(index || 0, sentences2.length - 1));
+        run(current2, name);
       },
       jump: function(index) {
         if (!engine || !sentences2.length) return;
         var name = engine.name;
         halt();
-        current = Math.max(0, Math.min(index, sentences2.length - 1));
-        run(current, name);
+        current2 = Math.max(0, Math.min(index, sentences2.length - 1));
+        run(current2, name);
       },
       pause: function() {
         if (state2 !== "playing" || !engine) return;
@@ -4230,7 +4316,7 @@ button:focus-visible, select:focus-visible, input:focus-visible {
       },
       stop: function() {
         halt();
-        current = -1;
+        current2 = -1;
         setState("idle");
       }
     };
@@ -4300,6 +4386,151 @@ button:focus-visible, select:focus-visible, input:focus-visible {
     }
   }
 
+  // src/highlight.js
+  var SENTENCE = "zentts-sentence";
+  var WORD = "zentts-word";
+  var INK = "#1b1916";
+  var MARK = "#f6e7b0";
+  var WORD_MARK = "#e3b04b";
+  var supported = typeof CSS !== "undefined" && CSS.highlights && typeof Highlight !== "undefined";
+  function ensureStyles() {
+    if (document.getElementById("zentts-highlight")) return;
+    var style = document.createElement("style");
+    style.id = "zentts-highlight";
+    style.textContent = "::highlight(" + SENTENCE + ") { background-color: " + MARK + "; color: " + INK + "; }\n::highlight(" + WORD + ") { background-color: " + WORD_MARK + "; color: " + INK + "; }";
+    (document.head || document.documentElement).appendChild(style);
+  }
+  function compactChars(ch) {
+    if (/\s/.test(ch)) return "";
+    if (ch === "\u2026") return "...";
+    return ch;
+  }
+  function compact(text) {
+    var out = "";
+    for (var i = 0; i < text.length; i++) out += compactChars(text[i]);
+    return out;
+  }
+  var indexes = /* @__PURE__ */ new WeakMap();
+  function indexOf(el) {
+    var raw = el.textContent;
+    var cached = indexes.get(el);
+    if (cached && cached.raw === raw) return cached;
+    var text = "";
+    var map = [];
+    var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
+      acceptNode: function(n) {
+        var p = n.parentNode && n.parentNode.nodeName;
+        return p === "SCRIPT" || p === "STYLE" ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    for (var node = walker.nextNode(); node; node = walker.nextNode()) {
+      var data = node.data;
+      for (var i = 0; i < data.length; i++) {
+        var c = compactChars(data[i]);
+        for (var k = 0; k < c.length; k++) {
+          text += c[k];
+          map.push({ node, offset: i });
+        }
+      }
+    }
+    var idx = { raw, text, map };
+    indexes.set(el, idx);
+    return idx;
+  }
+  function rangeFromCompact(idx, start, end) {
+    if (start < 0 || end > idx.map.length || start >= end) return null;
+    var a = idx.map[start];
+    var b = idx.map[end - 1];
+    var r = document.createRange();
+    r.setStart(a.node, a.offset);
+    r.setEnd(b.node, b.offset + 1);
+    return r;
+  }
+  function find(idx, needle, hint) {
+    if (!needle) return -1;
+    var at = idx.text.indexOf(needle, Math.max(0, (hint || 0) - 8));
+    if (at === -1) at = idx.text.indexOf(needle);
+    return at;
+  }
+  var current = null;
+  var fallbackEl = null;
+  var fallbackStyle = null;
+  function clearFallback() {
+    if (!fallbackEl) return;
+    fallbackEl.style.background = fallbackStyle.background;
+    fallbackEl.style.boxShadow = fallbackStyle.boxShadow;
+    fallbackEl.style.color = fallbackStyle.color;
+    fallbackEl = null;
+  }
+  function markParagraph(el) {
+    if (el === fallbackEl) return;
+    clearFallback();
+    if (!el || !el.isConnected) return;
+    fallbackStyle = { background: el.style.background, boxShadow: el.style.boxShadow, color: el.style.color };
+    el.style.background = MARK;
+    el.style.boxShadow = "-6px 0 0 " + MARK + ", 6px 0 0 " + MARK;
+    el.style.color = INK;
+    fallbackEl = el;
+  }
+  function scrollIfNeeded(target) {
+    var rect = target.getBoundingClientRect();
+    var margin = Math.min(120, window.innerHeight * 0.15);
+    if (rect.top >= margin && rect.bottom <= window.innerHeight - margin) return;
+    var el = target.startContainer ? target.startContainer.parentElement : target;
+    if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+  function clear() {
+    if (supported) {
+      CSS.highlights.delete(SENTENCE);
+      CSS.highlights.delete(WORD);
+    }
+    clearFallback();
+    current = null;
+  }
+  function showSentence(el, sentence, words, hint) {
+    if (supported) CSS.highlights.delete(WORD);
+    if (!el || !el.isConnected) {
+      clear();
+      return;
+    }
+    if (supported) {
+      ensureStyles();
+      var idx = indexOf(el);
+      var needle = compact(sentence);
+      var at = find(idx, needle, hint);
+      var range = at >= 0 ? rangeFromCompact(idx, at, at + needle.length) : null;
+      if (range) {
+        clearFallback();
+        var wordRanges = [];
+        var pos = at;
+        (words || []).forEach(function(w) {
+          var wn = compact(w.text);
+          var wAt = wn ? idx.text.indexOf(wn, pos) : -1;
+          if (wAt >= 0 && wAt < at + needle.length) {
+            wordRanges.push(rangeFromCompact(idx, wAt, wAt + wn.length));
+            pos = wAt + wn.length;
+          } else {
+            wordRanges.push(null);
+          }
+        });
+        CSS.highlights.set(SENTENCE, new Highlight(range));
+        current = { el, range, words: wordRanges };
+        scrollIfNeeded(range);
+        return;
+      }
+    }
+    if (supported) CSS.highlights.delete(SENTENCE);
+    current = { el, range: null, words: [] };
+    markParagraph(el);
+    scrollIfNeeded(el);
+  }
+  function showWord(i) {
+    if (!supported || !current || !current.range) return;
+    var r = current.words[i];
+    if (r) CSS.highlights.set(WORD, new Highlight(r));
+    else CSS.highlights.delete(WORD);
+  }
+
   // src/content.js
   var RESTRICTED_PROTOCOLS = ["edge:", "about:", "file:", "chrome:", "moz-extension:"];
   function shouldInject() {
@@ -4322,7 +4553,8 @@ button:focus-visible, select:focus-visible, input:focus-visible {
     lang: "es",
     langIn: "auto",
     langOut: "es",
-    autoNext: true
+    autoNext: true,
+    wordHighlight: true
   };
   function st() {
     return window.__tts_zen_state;
@@ -4412,12 +4644,23 @@ button:focus-visible, select:focus-visible, input:focus-visible {
       return p.length > 0;
     });
   }
+  function wordsOf(text) {
+    var out = [], re = /\S+/g, m;
+    while (m = re.exec(text)) out.push({ start: m.index, text: m[0] });
+    return out;
+  }
+  function sentencesOf(text, refIdx) {
+    var hint = 0;
+    return splitIntoSentences(text).map(function(s) {
+      var item = { text: s, refIdx, words: wordsOf(s), hint };
+      hint += compact(s).length;
+      return item;
+    });
+  }
   function buildSentences(paras) {
     var list = [];
     paras.forEach(function(p, i) {
-      splitIntoSentences(p.text).forEach(function(s) {
-        list.push({ text: s, refIdx: i });
-      });
+      list.push.apply(list, sentencesOf(p.text, i));
     });
     return list;
   }
@@ -4444,24 +4687,10 @@ button:focus-visible, select:focus-visible, input:focus-visible {
     }
     return paras;
   }
-  var highlighted = null;
-  var MARK = "rgba(243, 225, 154, 0.55)";
   function clearHighlight() {
-    if (!highlighted) return;
-    highlighted.style.removeProperty("background");
-    highlighted.style.removeProperty("box-shadow");
-    highlighted = null;
+    clear();
   }
-  function highlightParagraph(el) {
-    if (el === highlighted) return;
-    clearHighlight();
-    if (!el || !el.isConnected) return;
-    el.style.background = MARK;
-    el.style.boxShadow = "-6px 0 0 " + MARK + ", 6px 0 0 " + MARK;
-    el.style.transition = "background 0.15s ease";
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
-    highlighted = el;
-  }
+  var currentWord = -1;
   function highlightPreview(i) {
     var host = document.getElementById("tts-zen-host");
     if (!host || !host.shadowRoot) return;
@@ -4497,10 +4726,21 @@ button:focus-visible, select:focus-visible, input:focus-visible {
     onSentence: function(i) {
       var s = sentences[i];
       setCounter(i + 1, sentences.length);
-      highlightParagraph(s && paragraphs[s.refIdx] ? paragraphs[s.refIdx].el : null);
+      currentWord = -1;
+      showSentence(s && paragraphs[s.refIdx] ? paragraphs[s.refIdx].el : null, s ? s.text : "", s ? s.words : [], s ? s.hint : 0);
       highlightPreview(i);
       saveProgress(chapterKey, { index: i, total: sentences.length, hash: chapterHash, title: document.title });
       if (i >= sentences.length * 0.8) prefetchNextChapter();
+    },
+    onWord: function(i, offset) {
+      if (st().wordHighlight === false) return;
+      var words = sentences[i] && sentences[i].words;
+      if (!words || !words.length) return;
+      var k = 0;
+      while (k + 1 < words.length && words[k + 1].start <= offset) k++;
+      if (k === currentWord) return;
+      currentWord = k;
+      showWord(k);
     },
     onState: function(state2) {
       var playing = state2 === "playing";
@@ -4648,7 +4888,7 @@ button:focus-visible, select:focus-visible, input:focus-visible {
     chapterDoc = loaded.doc;
     chapterUrl = new URL(loaded.url);
     prepared = false;
-    highlighted = null;
+    clearHighlight();
     fresh.scrollIntoView({ behavior: "smooth", block: "start" });
     startReading(0);
   }
@@ -4703,9 +4943,7 @@ button:focus-visible, select:focus-visible, input:focus-visible {
       paragraphs.push.apply(paragraphs, fresh);
       var more = [];
       fresh.forEach(function(p, i) {
-        splitIntoSentences(p.text).forEach(function(s) {
-          more.push({ text: s, refIdx: base + i });
-        });
+        more.push.apply(more, sentencesOf(p.text, base + i));
       });
       player.append(more);
       updatePreviewSentences();

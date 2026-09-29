@@ -31,7 +31,7 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
 
     case 'read_page_sync':
-      handleReadPageSync(message.text, message.voice, message.rate)
+      handleReadPageSync(message.text, message.voice, message.rate, message.words)
         .then(sendResponse)
         .catch(err => sendResponse({ success: false, error: err.message }));
       return true;
@@ -122,8 +122,8 @@ async function handleReadPage(text, voice, rate) {
   return { success: true, data };
 }
 
-async function handleReadPageSync(text, voice, rate) {
-  const body = { text };
+async function handleReadPageSync(text, voice, rate, words) {
+  const body = { text, words: !!words };
   if (voice) body.voice = voice;
   if (rate) body.rate = rate;
 
@@ -143,6 +143,7 @@ async function handleReadPageSync(text, voice, rate) {
     success: true,
     audio: result.audio,
     sentences: result.sentences,
+    words: result.words || [],
   };
 }
 
