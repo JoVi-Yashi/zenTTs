@@ -12527,6 +12527,9 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case "extract_url":
       handleExtractUrl(message.url, message.voice, message.rate).then(sendResponse).catch((err) => sendResponse({ success: false, error: err.message }));
       return true;
+    case "get_theme":
+      browser.theme.getCurrent(sender.tab && sender.tab.windowId).then((theme) => sendResponse({ success: true, theme })).catch((err) => sendResponse({ success: false, error: err.message }));
+      return true;
     case "local_voices":
       handleLocalVoices().then(sendResponse).catch((err) => sendResponse({ success: false, error: err.message }));
       return true;
@@ -12722,6 +12725,13 @@ function handleLocalSpeak(text, voiceId) {
   });
   return job;
 }
+browser.theme.onUpdated.addListener(async ({ theme, windowId }) => {
+  const tabs = await browser.tabs.query(windowId ? { windowId } : {});
+  for (const tab of tabs) {
+    browser.tabs.sendMessage(tab.id, { action: "theme_changed", theme }).catch(() => {
+    });
+  }
+});
 /*! Bundled license information:
 
 onnxruntime-web/dist/ort.wasm.bundle.min.mjs:
