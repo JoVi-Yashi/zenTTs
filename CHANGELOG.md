@@ -10,6 +10,7 @@
 - **Datos del libro:** búsqueda en Open Library y Google Books por título, o por el ISBN impreso en el PDF, con una ventana de coincidencias para elegir la correcta. Aplica título, autor, año, editorial, ISBN y portada. Se ofrece al añadir PDF ("Revisar datos") y desde la ficha ("Buscar datos…"). Los permisos se piden solo al usarlo.
 - **Biblioteca PDF / Web:** selector arriba a la derecha. La vista Web muestra las obras que zenTTS te ha leído en páginas web, una balda por sitio, con su capítulo y "Seguir leyendo". Se puede desactivar ("Recordar lo que leo en la web").
 - Página y READMEs con la biblioteca.
+- **Logos de los sitios:** AO3, FanFiction.net, Wattpad y Webnovel llevan su logo en el panel (Sitios compatibles), en la biblioteca y en la página, en lugar de una letra genérica.
 
 ## 1.0.1 — 2026-09-30
 

@@ -205,3 +205,5 @@ zenTTs/
 ## License
 
 MIT
+
+Site logos are trademarks of their owners and are used only to show which sites zenTTS works with. The AO3 and Wattpad ones come from [Simple Icons](https://simpleicons.org) (CC0); the FanFiction.net and Webnovel ones are based on [Arcticons](https://github.com/Arcticons-Team/Arcticons) (CC BY-SA 4.0).

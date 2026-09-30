@@ -211,7 +211,8 @@
   .shelf-row .bk b { font: 600 14px/1.15 var(--display); }
   .shelf-row .bk em { font: italic 12px var(--text); }
   .shelf-row .end { flex: none; width: 9px; height: 70px; margin-left: 3px; background: linear-gradient(90deg, #8a6420, #e3c27a 40%, #b8872e 70%, #6e4f18); border-radius: 2px 2px 0 0; }
-  .shelf-row .tag { align-self: flex-start; margin: 0 6px 0 10px; padding: 1px 8px; border-radius: 3px; background: linear-gradient(180deg, #e3c27a, #b8872e); color: #2b1d12; font: 600 11px var(--text); }
+  .shelf-row .tag { align-self: flex-start; margin: 0 6px 0 10px; padding: 1px 8px; border-radius: 3px; background: linear-gradient(180deg, #e3c27a, #b8872e); color: #2b1d12; font: 600 11px var(--text); display: inline-flex; align-items: center; gap: 5px; }
+  .shelf-row .tag img { width: 13px; height: 13px; border-radius: 3px; }
   .shelf-demo .plank { height: 16px; margin: 0 -4px 16px; border-radius: 2px; background: linear-gradient(180deg, #c99e6e, #a87b4f 55%, #7a5533); box-shadow: 0 8px 14px rgba(0,0,0,.35); }
   @media (max-width: 760px) { .shelf-row .sp:nth-child(n+5) { display: none; } .shelf-row .bk { margin: 0 12px; } }
 
@@ -225,7 +226,7 @@
 
   .sites { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 30px; margin: 0; padding: 0; list-style: none; font: italic 20px var(--text); }
   .sites li { display: flex; align-items: center; gap: 8px; }
-  .sites img { width: 20px; height: 20px; border-radius: 3px; }
+  .sites img { width: 22px; height: 22px; border-radius: 5px; }
 
   table { width: 100%; border-collapse: collapse; font-size: 18px; border-top: 2px solid var(--ink); border-bottom: 2px solid var(--ink); }
   th, td { text-align: left; vertical-align: top; padding: 12px 14px 12px 0; border-top: 1px solid var(--rule); }
@@ -387,10 +388,10 @@
         </div>
         <div class="plank"></div>
         <div class="shelf-row web">
-          <span class="tag">AO3</span>
+          <span class="tag"><img src="site-ao3.svg" alt="">AO3</span>
           <span class="sp" style="--c:#8f1d1d;--d:34px">Obra en curso</span>
           <span class="sp" style="--c:#8f1d1d;--d:28px">One-shot</span>
-          <span class="tag">Webnovel</span>
+          <span class="tag"><img src="site-webnovel.svg" alt="">Webnovel</span>
           <span class="sp" style="--c:#23457a;--d:48px">Naruto: Kazekage</span>
           <span class="end"></span>
         </div>
