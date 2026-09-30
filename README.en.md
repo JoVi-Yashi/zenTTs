@@ -96,7 +96,12 @@ make build-extension
 The zenTTS button in the browser toolbar (or `Alt+Shift+Z`) shows or hides the panel in that tab; it stays through reloads and chapter changes, and the button shows a dot while it's on. ⚙ → Reading → "Always open on this site" makes it open by itself on that domain. The panel lives in Shadow DOM, so the site's CSS doesn't touch it.
 
 ### PDF reader
-On a tab with a PDF, the button opens the zenTTS reader: the pages rendered with pdf.js, the sentence and the word marked on top, without repeated headers or page numbers, and with "pick up where you left off". Web PDFs load by themselves (the first time it may ask for permission for that site). Firefox doesn't let extensions read local files (`file://`), so for a PDF on your computer the reader asks you to drop or choose it once.
+On a tab with a PDF, the button opens the zenTTS reader in a new tab next to it: the pages rendered with pdf.js, the sentence and the word marked on top, without repeated headers or page numbers, and with "pick up where you left off". Web PDFs load by themselves (the first time it may ask for permission for that site). Firefox doesn't let extensions read local files (`file://`), so for a PDF on your computer the reader asks you to drop or choose it once; after that it stays in the library.
+
+The **Contents** button shows the document's table of contents (with sub-levels) and takes you to each section; while reading, the reading jumps there. The reader remembers the page you were on and reads two-column documents in order.
+
+### PDF library
+The PDFs you open are placed on a 3D bookshelf (**Library** button in the reader, or ⚙ → Reading → "Open the PDF library"). Each book shows its spine (color and thickness from the PDF); hovering pulls it out and turns its cover to you, and choosing it brings it to the middle, turning, with the shelf blurred behind. From there you continue at your page, change the cover, back cover and spine color, and add tags, which work as shelves of their own. In ⚙ you choose the wood, the order and the size, and whether a copy of each PDF is kept (which lets PDFs from your computer open without choosing them again).
 
 ### Voice performance and which translation to pick
 - **High-quality** Local voices do much more work per second of audio, and Piper runs on a single thread inside the browser: on modest computers they can fall behind the reading and leave pauses between sentences. zenTTS loads the voice ahead of time, cuts long sentences and generates several ahead; if it still can't keep up, ⚙ → Voice says so. **Standard** quality is the best balance.
@@ -109,7 +114,7 @@ Choose between native SpeechSynthesis (no dependencies) or edge-tts with Microso
 The sentence being read is marked on the page itself and the spoken word is highlighted on top of it, in real time (exact timings with the neural voice, estimated with the local one). The marker sets its own text color, so it reads the same on light and dark sites. The panel's reading view follows along too.
 
 ### Next chapter, automatically
-On AO3, FanFiction.net and Wattpad, when a chapter ends the next one loads in the same page and reading continues. Turn it off in ⚙ → "Continue with the next chapter".
+On AO3, FanFiction.net and Wattpad, when a chapter ends the next one loads in the same page and reading continues. On Webnovel, which loads chapters by infinite scroll, zenTTS makes it load the next one and keeps reading; if there is only a "Next" button, it uses it. Turn it off in ⚙ → "Continue with the next chapter".
 
 ### Language detection and offline translation
 zenTTS detects the chapter's language with Firefox's own detector. If it differs from the language you want to listen in (⚙ → "Read in": automatic, a specific language or the original), it offers to download a Firefox Translations pack (about 25 MB per direction). After that it translates on your computer, offline. Pairs without a direct model go through English. You can also read in the original language or, with the server running, translate online.

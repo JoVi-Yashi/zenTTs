@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "zenTTS",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Reads the page aloud, sentence by sentence, marking where it is: fanfics, articles and PDFs. Browser, neural (edge-tts) or offline (Piper) voices, and offline translation.",
   "author": "JoVi-Yashi",
   "homepage_url": "https://github.com/JoVi-Yashi/zenTTs",

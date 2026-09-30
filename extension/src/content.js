@@ -5,7 +5,7 @@
 import { Readability } from '@mozilla/readability';
 import { createPanel, setStatus, setButtonsEnabled, setCounter, setPauseIcon, setResume, updatePreviewSentences,
          setDetectedLanguage, setTranslateOffer, setTranslateProgress, refreshPacks, setPickActive, setPanelVisible } from './panel.js';
-import { siteFor } from './sites.js';
+import { siteFor, setActiveChapter } from './sites.js';
 import { createPlayer } from './player.js';
 import { textHash, loadProgress, saveProgress, flushProgress, clearProgress, pruneProgress } from './progress.js';
 import * as marker from './highlight.js';
@@ -40,6 +40,7 @@ function ts(key, arg) {
       fallback_local: 'edge-tts no respondió — usando voz local',
       fallback_native: 'Sin voz neural — usando la voz del navegador',
       nextLoading: 'Cargando el capítulo siguiente…', nextFailed: 'No se pudo cargar el capítulo siguiente',
+      nextNotFound: 'No se encontró el capítulo siguiente', nextLocked: 'El capítulo siguiente está bloqueado',
       chapterDone: 'Capítulo terminado', pressRead: 'Pulsa Leer para continuar'
     },
     en: {
@@ -53,6 +54,7 @@ function ts(key, arg) {
       fallback_local: 'edge-tts did not answer — using the local voice',
       fallback_native: 'No neural voice — using the browser voice',
       nextLoading: 'Loading the next chapter…', nextFailed: 'Could not load the next chapter',
+      nextNotFound: 'Could not find the next chapter', nextLocked: 'The next chapter is locked',
       chapterDone: 'Chapter finished', pressRead: 'Press Read to continue'
     }
   };
@@ -112,7 +114,8 @@ function extractParagraphs() {
 }
 
 function splitIntoSentences(text) {
-  var parts = text.match(/[^.!?…\n]+[.!?…]*["'»”’)]*\s*/g) || [text];
+  // A dot between digits ("2.1", "3.5") doesn't end a sentence
+  var parts = text.match(/(?:[^.!?…\n]|\.(?=\d))+[.!?…]*["'»”’)]*\s*/g) || [text];
   return parts.map(function(p) { return p.trim(); }).filter(function(p) { return p.length > 0; });
 }
 
@@ -393,6 +396,7 @@ function highlightPreview(i) {
 var paragraphs = [];
 var sentences = [];
 var chapterKey = null;
+var currentContainer = null;  // chapter element on the page (sites that load chapters in-page)
 var chapterHash = null;
 var resumeAt = null;      // { index, total } offered by the Continue button
 var prepared = false;     // sentences built for the current chapter
@@ -412,6 +416,8 @@ var player = createPlayer({
     setCounter(i + 1, sentences.length);
     currentWord = -1;
     var el = s && paragraphs[s.refIdx] ? paragraphs[s.refIdx].el : null;
+    // PDF reader: tells it which paragraph is being read (current section, page)
+    if (embed && el) window.dispatchEvent(new CustomEvent('zentts-reading', { detail: { el: el } }));
     marker.showSentence(el, s ? s.text : '', s ? s.words : [], s ? s.hint : 0);
     // Translated text: show it next to the original paragraph
     if (chapterTranslation && st().inlineTr !== false && s && el) marker.showCaption(el, s.text, s.words);
@@ -479,7 +485,9 @@ async function prepareChapter() {
   background = null;
   chapterTranslation = null;
   st().speechLang = null;
-  chapterKey = site.chapterKey(chapterUrl);
+  currentContainer = site.container(document);
+  if (site.inPage) setActiveChapter(currentContainer);
+  chapterKey = site.chapterKey(chapterUrl, currentContainer);
   chapterHash = textHash(paras.map(function(p) { return p.text; }).join('\n'));
 
   var plan = await decideLanguage(paras);
@@ -533,7 +541,7 @@ async function startReading(fromIndex) {
 // ---- Resume ----
 
 async function offerResume() {
-  var key = site.chapterKey(chapterUrl);
+  var key = site.chapterKey(chapterUrl, site.container(document));
   var saved = await loadProgress(key);
   resumeAt = saved && saved.index > 0 ? saved : null;
   setResume(resumeAt ? { index: resumeAt.index, total: resumeAt.total } : null);
@@ -553,7 +561,7 @@ async function handleRead() {
 }
 
 function handleRestart() {
-  clearProgress(chapterKey || site.chapterKey(chapterUrl));
+  clearProgress(chapterKey || site.chapterKey(chapterUrl, site.container(document)));
   resumeAt = null;
   setResume(null);
   startReading(0);
@@ -582,7 +590,69 @@ function prefetchNextChapter() {
   nextChapter.promise.catch(function() {});
 }
 
+// ---- Next chapter on sites that load it in the same page (Webnovel) ----
+// The reading itself says when the chapter ends. Then: the next chapter may
+// already be on the page; if not, the site's infinite scroll is nudged and we
+// wait for it; failing that, the "next" link is followed (reading resumes
+// after the page loads) or the "next" button pressed.
+
+function waitFor(test, ms) {
+  return new Promise(function(resolve) {
+    var found = test();
+    if (found) { resolve(found); return; }
+    var done = false;
+    function finish(v) { if (done) return; done = true; mo.disconnect(); clearInterval(nudge); clearTimeout(timer); resolve(v); }
+    var mo = new MutationObserver(function() { var v = test(); if (v) finish(v); });
+    mo.observe(document.documentElement, { childList: true, subtree: true });
+    var nudge = setInterval(function() { var v = test(); if (v) finish(v); else if (site.pullMore) site.pullMore(currentContainer); }, 1500);
+    var timer = setTimeout(function() { finish(test() || null); }, ms);
+  });
+}
+
+async function readInPage(next) {
+  setActiveChapter(next);
+  chapterUrl = new URL(window.location.href);
+  prepared = false;
+  clearHighlight();
+  next.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  startReading(0);
+}
+
+async function advanceInPage() {
+  setStatus(ts('nextLoading'));
+  stopContentObserver();
+  var cur = currentContainer;
+  var next = site.nextContainer(document, cur);
+  if (!next) {
+    site.pullMore(cur);
+    next = await waitFor(function() { return site.nextContainer(document, cur); }, 10000);
+  }
+  if (next) {
+    if (site.isLocked(next)) { setStatus(ts('nextLocked'), true); return; }
+    return readInPage(next);
+  }
+  var ctl = site.nextControl(document, cur, chapterUrl);
+  if (ctl && ctl.href) {
+    try { await browser.storage.local.set({ pendingAutoplay: { url: ctl.href, ts: Date.now() } }); } catch (_) {}
+    window.location.href = ctl.href;
+    return;
+  }
+  if (ctl && ctl.button) {
+    var before = window.location.href;
+    ctl.button.click();
+    next = await waitFor(function() {
+      var n = site.nextContainer(document, cur);
+      if (n) return n;
+      var now = site.container(document);
+      return window.location.href !== before && now && now !== cur && now.isConnected ? now : null;
+    }, 10000);
+    if (next) return site.isLocked(next) ? setStatus(ts('nextLocked'), true) : readInPage(next);
+  }
+  setStatus(site.isLocked(cur) ? ts('nextLocked') : ts('nextNotFound'), true);
+}
+
 async function goToNextChapter() {
+  if (site.inPage) return advanceInPage();
   prefetchNextChapter();
   if (!nextChapter) { setStatus(ts('chapterDone')); return; }
   var target = nextChapter;
@@ -623,7 +693,9 @@ async function checkPendingAutoplay() {
     var p = got.pendingAutoplay;
     if (!p) return;
     await browser.storage.local.remove('pendingAutoplay');
-    if (p.url !== window.location.href || Date.now() - p.ts > 120000) return;
+    var target = new URL(p.url);
+    // Sites may redirect to a canonical URL: same host is enough
+    if (target.hostname !== window.location.hostname || Date.now() - p.ts > 120000) return;
     setStatus(ts('pressRead'));
     startReading(0);
   } catch (_) {}
@@ -638,7 +710,8 @@ function startContentObserver() {
   stopContentObserver();
   if (site.id !== 'webnovel' && site.id !== 'generic') return;
   var target = site.container(document) || document.body;
-  var root = target.parentElement || document.body;
+  // Webnovel: only paragraphs of this chapter (the next one is handled at its end)
+  var root = site.inPage ? target : (target.parentElement || document.body);
   observedLength = paragraphs.length;
   contentObserver = new MutationObserver(function() { checkForNewParagraphs(root); });
   contentObserver.observe(root, { childList: true, subtree: true });
@@ -856,6 +929,15 @@ async function hidePanel() {
   if (player.state !== 'idle') handleStop();
   setPanelVisible(false);
 }
+
+// PDF reader: a table of contents entry was chosen — reading moves there if active
+window.addEventListener('zentts-seek', function(e) {
+  if (player.state === 'idle' || !e.detail) return;
+  var p = paragraphs.findIndex(function(x) { return x.el === e.detail.el; });
+  if (p < 0) return;
+  var i = sentences.findIndex(function(s) { return s.refIdx === p; });
+  if (i >= 0) player.jump(i);
+});
 
 browser.runtime.onMessage.addListener(function(msg) {
   if (msg && msg.action === 'panel_toggle') { if (msg.on) showPanel(); else hidePanel(); }

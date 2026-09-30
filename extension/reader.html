@@ -25,7 +25,36 @@
   .logo { font: 600 17px var(--serif); }
   .logo em { font-style: italic; font-weight: 400; color: var(--accent); }
   #doc-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-soft); }
-  #doc-pages { color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+  #doc-pages, #doc-page { color: var(--ink-soft); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  #doc-page { color: var(--ink); }
+  .btn.ghost { border-color: transparent; }
+  .btn.ghost:hover { border-color: var(--rule); }
+  #toc-btn::before { content: "☰ "; }
+
+  /* Table of contents: a sidebar that pushes the pages aside on wide screens */
+  #toc {
+    position: fixed; z-index: 9; top: 49px; bottom: 0; left: 0; width: 310px; overflow: auto;
+    background: var(--sheet); border-right: 1px solid var(--rule);
+    transform: translateX(-100%); transition: transform .28s cubic-bezier(.2,.8,.2,1), box-shadow .28s ease;
+  }
+  body.toc-open #toc { transform: none; box-shadow: 0 10px 40px rgba(0,0,0,.18); }
+  @media (min-width: 1200px) { body.toc-open #pages { padding-left: 330px; } #pages { transition: padding-left .28s cubic-bezier(.2,.8,.2,1); } }
+  .toc-head { position: sticky; top: 0; display: flex; justify-content: space-between; align-items: center; padding: 10px 12px 10px 16px; background: var(--sheet); border-bottom: 1px solid var(--rule); font: 600 16px var(--serif); }
+  #toc ul { list-style: none; margin: 0; padding: 0; }
+  #toc li > ul { display: none; }
+  #toc li.open > ul { display: block; }
+  .toc-row { display: flex; align-items: flex-start; gap: 2px; padding-right: 8px; }
+  .toc-toggle { flex: 0 0 18px; height: 26px; border: none; background: none; color: var(--ink-soft); cursor: pointer; padding: 0; transition: transform .15s ease; font-size: 11px; }
+  li.open > .toc-row > .toc-toggle { transform: rotate(90deg); }
+  .toc-link {
+    flex: 1; display: flex; justify-content: space-between; gap: 10px; min-width: 0; text-align: left;
+    padding: 4px 6px; border: none; border-radius: 4px; background: none; color: var(--ink); font: 14px/1.35 var(--serif); cursor: pointer;
+  }
+  .toc-link:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); }
+  .toc-page { flex-shrink: 0; color: var(--ink-soft); font: 12px var(--sans); font-variant-numeric: tabular-nums; }
+  li.current > .toc-row .toc-link { color: var(--accent); font-weight: 600; background: color-mix(in srgb, var(--accent) 9%, transparent); }
+  .toc-empty { padding: 16px; color: var(--ink-soft); }
+  @media (max-width: 640px) { #doc-pages, .logo { display: none; } .bar { gap: 8px; padding: 8px 10px; } }
   .btn {
     padding: 5px 12px; border-radius: 4px; border: 1px solid var(--ink); background: transparent; color: var(--ink);
     font: 13px var(--sans); cursor: pointer;
@@ -60,9 +89,12 @@
 </head>
 <body>
   <header class="bar">
+    <button type="button" class="btn ghost" id="toc-btn" aria-controls="toc" aria-expanded="false" hidden></button>
     <span class="logo">zen<em>TTS</em></span>
     <span id="doc-title"></span>
+    <span id="doc-page"></span>
     <span id="doc-pages"></span>
+    <button type="button" class="btn ghost" id="library-btn"></button>
     <button type="button" class="btn" id="open-other" hidden></button>
     <input type="file" id="file" accept="application/pdf,.pdf" hidden>
   </header>
@@ -84,6 +116,11 @@
     <p id="loading-text"></p>
     <div class="meter"><i id="loading-bar"></i></div>
   </section>
+
+  <aside id="toc" aria-labelledby="toc-title">
+    <div class="toc-head"><span id="toc-title"></span><button type="button" class="btn ghost" id="toc-close">✕</button></div>
+    <nav id="toc-list"></nav>
+  </aside>
 
   <main id="pages"></main>
 

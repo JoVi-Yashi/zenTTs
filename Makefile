@@ -20,7 +20,7 @@ VERSION := $(shell sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' extension/manifes
 package: build-extension
 	@mkdir -p dist
 	@rm -f dist/zentts-$(VERSION).zip
-	cd extension && zip -qr ../dist/zentts-$(VERSION).zip manifest.json background.js content.js reader.js reader.html icons vendor worker
+	cd extension && zip -qr ../dist/zentts-$(VERSION).zip manifest.json background.js content.js reader.js reader.html library.js library.html icons vendor worker
 	@echo "✅ dist/zentts-$(VERSION).zip"
 
 # ── Launcher ───────────────────────────────────────────

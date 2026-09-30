@@ -103,6 +103,12 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
         .catch(() => sendResponse({ success: true, on: false }));
       return true;
 
+    case 'open_library':
+      browser.tabs.create({ url: browser.runtime.getURL('library.html'), index: sender.tab ? sender.tab.index + 1 : undefined })
+        .then(() => sendResponse({ success: true }))
+        .catch(err => sendResponse({ success: false, error: err.message }));
+      return true;
+
     case 'panel_set':
       // The panel itself turned off (e.g. "Always open here" unchecked and hidden)
       if (sender.tab) setTabActive(sender.tab.id, !!message.on);
@@ -432,9 +438,17 @@ function showBadge(tabId, on) {
   browser.action.setTitle({ tabId, title: on ? 'zenTTS · activo (clic para ocultar)' : 'zenTTS · clic para mostrar' }).catch(() => {});
 }
 
-function openReader(tab) {
+// A new tab created by the extension: loading an extension page by navigating
+// the PDF's own tab (file:// or web) is refused by Firefox in MV3 and shows
+// "file not found", so the reader opens next to it instead.
+async function openReader(tab) {
   const url = browser.runtime.getURL('reader.html') + '?src=' + encodeURIComponent(tab.url);
-  return browser.tabs.update(tab.id, { url });
+  try {
+    await browser.tabs.create({ url, index: tab.index + 1, openerTabId: tab.id });
+  } catch (e) {
+    console.error('[zenTTS] reader:', e.message || e);
+    await browser.tabs.create({ url });
+  }
 }
 
 async function toggle(tab) {

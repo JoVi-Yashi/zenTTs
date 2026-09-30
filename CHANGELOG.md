@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.1 — 2026-09-30
+
+### Arreglos
+- **PDF en la versión publicada:** el lector se abre ahora en una pestaña nueva junto al PDF. Firefox no deja cargar una página de la extensión navegando la propia pestaña del PDF (local o web) y mostraba "Archivo no encontrado".
+- **Subtítulo de traducción:** fijo a la pantalla y anclado al párrafo que se lee; sigue el scroll (también el de contenedores internos, como en Webnovel) y los cambios de tamaño, y se oculta si el párrafo sale de la vista.
+- **Webnovel:** al terminar un capítulo pasa al siguiente: si ya está en la página lo lee; si no, provoca la carga del scroll infinito y espera; si hay un enlace o botón "Siguiente", lo sigue y la lectura continúa. Avisa si el capítulo está bloqueado.
+- Los números como "2.1" ya no cortan una frase.
+
+### Nuevo
+- **Biblioteca de PDF:** estantería 3D con los PDF que abres (portada generada, lomo con color y grosor según páginas, página en la que te quedaste). Al pasar el ratón el libro sale y gira hacia ti; al elegirlo pasa al centro y gira mostrando portada y contraportada, con la estantería desenfocada detrás. Portadas propias, color del lomo, etiquetas como sub-bibliotecas, estilos de madera, orden y tamaño. Guarda una copia del PDF para abrir los locales sin volver a elegirlos.
+- **Índice del PDF:** el índice real del documento (con subniveles) en un panel lateral; lleva a cada sección y, si está leyendo, la lectura salta ahí. Marca la sección que se lee. Sin índice, se genera con los títulos.
+- **El lector recuerda la página** en la que estabas y la muestra en la barra.
+- **PDF a varias columnas:** se leen en orden (título, columna izquierda completa, luego la derecha).
+
 ## 1.0.0 — 2026-09-30
 
 Primera versión estable. / First stable release.

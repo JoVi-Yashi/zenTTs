@@ -96,7 +96,12 @@ make build-extension
 El botón de zenTTS en la barra del navegador (o `Alt+Mayús+Z`) muestra u oculta el panel en esa pestaña; se queda al recargar y al pasar de capítulo, y el botón lleva un punto mientras está activo. En ⚙ → Lectura → "Abrir siempre en este sitio" hace que se abra solo en ese dominio. El panel vive en Shadow DOM, así que el CSS del sitio no le afecta.
 
 ### Lector de PDF
-En una pestaña con un PDF, el botón abre el lector de zenTTS: las páginas renderizadas con pdf.js, la frase y la palabra marcadas encima, sin encabezados repetidos ni números de página, y con "Continuar donde lo dejaste". Los PDF de internet se cargan solos (la primera vez puede pedir permiso para ese sitio). Firefox no deja que las extensiones lean archivos locales (`file://`), así que para un PDF de tu equipo el lector te pide soltarlo o elegirlo una vez.
+En una pestaña con un PDF, el botón abre el lector de zenTTS en una pestaña nueva, al lado: las páginas renderizadas con pdf.js, la frase y la palabra marcadas encima, sin encabezados repetidos ni números de página, y con "Continuar donde lo dejaste". Los PDF de internet se cargan solos (la primera vez puede pedir permiso para ese sitio). Firefox no deja que las extensiones lean archivos locales (`file://`), así que para un PDF de tu equipo el lector te pide soltarlo o elegirlo una vez; después queda en la biblioteca.
+
+El botón **Índice** muestra el índice del documento (con subniveles) y lleva a cada sección; si está leyendo, la lectura salta ahí. El lector recuerda la página en la que estabas y lee en orden los documentos a dos columnas.
+
+### Biblioteca de PDF
+Los PDF que abres se colocan en una estantería 3D (botón **Biblioteca** en el lector, o ⚙ → Lectura → "Abrir la biblioteca de PDF"). Cada libro muestra su lomo (color y grosor según el PDF); al pasar el ratón sale y gira su portada hacia ti, y al elegirlo pasa al centro girando, con la estantería desenfocada detrás. Desde ahí sigues leyendo por tu página, cambias portada, contraportada y color del lomo, y le pones etiquetas, que funcionan como estanterías propias. En ⚙ eliges la madera, el orden y el tamaño, y si se guarda una copia de cada PDF (lo que permite abrir los de tu equipo sin volver a elegirlos).
 
 ### Rendimiento de las voces y qué traducción elegir
 - Las voces Local de **alta calidad** hacen bastante más cálculo por segundo de audio y Piper corre en un solo hilo dentro del navegador: en equipos modestos pueden ir más lentas que la lectura y dejar pausas entre frases. zenTTS precarga la voz, parte las frases largas y genera varias por delante; si aun así no llega, lo avisa en ⚙ → Voz. La calidad **Normal** es el mejor equilibrio.
@@ -112,7 +117,7 @@ La oración que suena se marca en la propia página y la palabra que se pronunci
 Wattpad, AO3, FanFiction y Webnovel tienen extractores optimizados con selectores específicos. Ignoran headers, navs, resúmenes y comentarios.
 
 ### Siguiente capítulo automático
-En AO3, FanFiction.net y Wattpad, al terminar un capítulo se carga el siguiente en la misma página y la lectura sigue sola. Se desactiva en ⚙ → "Seguir con el siguiente capítulo".
+En AO3, FanFiction.net y Wattpad, al terminar un capítulo se carga el siguiente en la misma página y la lectura sigue sola. En Webnovel, que carga los capítulos con scroll infinito, zenTTS provoca la carga del siguiente y sigue leyendo; si solo hay un botón "Siguiente", lo usa. Se desactiva en ⚙ → "Seguir con el siguiente capítulo".
 
 ### Idioma detectado y traducción sin conexión
 zenTTS detecta el idioma del capítulo con el detector de Firefox. Si no coincide con el idioma en el que quieres escuchar (⚙ → "Leer en": automático, un idioma concreto o el original), te ofrece descargar un paquete de traducción de Firefox Translations (unos 25 MB por dirección). Después traduce en tu equipo, sin conexión. Los pares sin modelo directo pasan por el inglés. También puedes leer en el idioma original o, con el servidor en marcha, traducir en línea.
