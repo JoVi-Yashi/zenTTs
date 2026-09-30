@@ -121,6 +121,8 @@ La ventana muestra lo que se entendió del nombre (serie, volumen, "Novela liger
 
 **Tu idioma y tu orden:** en ⚙ → "Idioma de los datos" eliges en qué idioma quieres los datos (por defecto, el del libro, que se detecta al añadirlo). Si el ISBN lleva a una edición en otro idioma, también se busca la de tu idioma por título, y la otra aparece marcada como "Otra edición". Al elegir una coincidencia ves **qué cambiaría, campo por campo** (con la portada actual y la nueva, y el idioma de esa edición) y marcas lo que quieres tomar: por ejemplo, conservar tu título en español y quedarte con la portada y el año. Si la edición es de otro idioma, el título, el autor y el ISBN solo vienen marcados si a tu libro le faltan.
 
+**Una portada por volumen:** la búsqueda siempre lleva el volumen («Serie Vol 15», «Serie Volume 15») y cada resultado dice si es ese volumen, otro, o la portada de la serie. La portada de la serie (AniList y MyAnimeList, que suele ser la del vol. 1), la de otro volumen o la que ya tiene otro tomo de la saga nunca se toman por defecto: la vista previa lo avisa y abre una galería con las portadas encontradas para ese tomo, la página 1 del propio PDF y el resto, para que elijas la correcta. Cada libro guarda su propia portada. El nombre reconoce `Vol. 2`, `v03`, `Tom 4`, `Tome 4`, `Volume 5`, `#6`…
+
 La primera vez pide permiso para acceder a Open Library, Google Books, AniList y MyAnimeList; nada se envía si no lo usas.
 
 En ⚙ eliges la madera, el orden, el tamaño de los libros y el idioma de los datos.

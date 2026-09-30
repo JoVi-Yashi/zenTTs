@@ -121,6 +121,8 @@ The window shows what was read from the name (series, volume, "Light novel / man
 
 **Your language and your order:** in ⚙ → "Language of the details" you choose which language you want the details in (by default the book's own, detected when it's added). If the ISBN leads to an edition in another language, yours is also searched by title, and the other one is marked "Other edition". When you choose a match you see **what would change, field by field** (with the current and the new cover, and that edition's language) and tick what to take: for example, keep your Spanish title and take the cover and the year. For an edition in another language, title, author and ISBN come ticked only where your book has none.
 
+**One cover per volume:** the search always carries the volume ("Series Vol 15", "Series Volume 15") and each match says whether it's that volume, another, or the series' cover. The series' cover (AniList and MyAnimeList, usually volume 1's), another volume's, or one another volume of the saga already has is never taken by default: the preview says so and opens a gallery with the covers found for that volume, page 1 of the PDF itself and the rest, so you choose the right one. Each book keeps its own cover. The name understands `Vol. 2`, `v03`, `Tom 4`, `Tome 4`, `Volume 5`, `#6`…
+
 The first time it asks for access to Open Library, Google Books, AniList and MyAnimeList; nothing is sent unless you use it.
 
 In ⚙ you choose the wood, the order, the size of the books and the language of the details.
