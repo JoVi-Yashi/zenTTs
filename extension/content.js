@@ -820,7 +820,7 @@
             this.log("No body found in document. Abort.");
             return null;
           }
-          var pageCacheHtml = page.innerHTML;
+          var pageCacheNodes = Array.from(page.childNodes).map((n) => n.cloneNode(true));
           while (true) {
             this.log("Starting grabArticle loop");
             var stripUnlikelyCandidates = this._flagIsActive(
@@ -1127,7 +1127,8 @@
             var textLength = this._getInnerText(articleContent, true).length;
             if (textLength < this._charThreshold) {
               parseSuccessful = false;
-              page.innerHTML = pageCacheHtml;
+              while (page.firstChild) page.removeChild(page.firstChild);
+              pageCacheNodes.forEach((n) => page.appendChild(n.cloneNode(true)));
               this._attempts.push({
                 articleContent,
                 textLength
@@ -1372,7 +1373,8 @@
               return;
             }
             var tmp = doc.createElement("div");
-            tmp.innerHTML = noscript.innerHTML;
+            var parsedNoscript = new DOMParser().parseFromString(noscript.innerHTML, "text/html");
+            while (parsedNoscript.body.firstChild) tmp.appendChild(parsedNoscript.body.firstChild);
             var prevElement = noscript.previousElementSibling;
             if (prevElement && this._isSingleImage(prevElement)) {
               var prevImg = prevElement;
@@ -4156,7 +4158,10 @@ button:active:not(:disabled) { transform: scale(.96); }
     style.textContent = PANEL_CSS;
     shadow.appendChild(style);
     const container = document.createElement("div");
-    container.innerHTML = PANEL_HTML;
+    const parsedPanel = new DOMParser().parseFromString(PANEL_HTML, "text/html");
+    while (parsedPanel.body.firstChild) {
+      container.appendChild(parsedPanel.body.firstChild);
+    }
     shadow.appendChild(container);
     applyCollapsed();
     const minimizeBtn = shadow.getElementById("tts-zen-minimize");
@@ -4743,7 +4748,11 @@ button:active:not(:disabled) { transform: scale(.96); }
     var btn = getEl("tts-zen-pause");
     if (!btn) return;
     btn.textContent = "";
-    btn.insertAdjacentHTML("beforeend", isPlaying ? PAUSE_ICON : PLAY_ICON);
+    var iconHtml = isPlaying ? PAUSE_ICON : PLAY_ICON;
+    var parsedIcon = new DOMParser().parseFromString(iconHtml, "text/html");
+    while (parsedIcon.body.firstChild) {
+      btn.appendChild(parsedIcon.body.firstChild);
+    }
   }
   var PRESETS = [
     { id: "archiveofourown.org", name: "Archive of Our Own", icon: "icons/sites/ao3.svg", what: "presetNext" },

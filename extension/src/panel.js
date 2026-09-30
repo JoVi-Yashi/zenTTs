@@ -1517,7 +1517,10 @@ export async function createPanel(shadow, handlers) {
   shadow.appendChild(style);
 
   const container = document.createElement('div');
-  container.innerHTML = PANEL_HTML;
+  const parsedPanel = new DOMParser().parseFromString(PANEL_HTML, 'text/html');
+  while (parsedPanel.body.firstChild) {
+    container.appendChild(parsedPanel.body.firstChild);
+  }
   shadow.appendChild(container);
   applyCollapsed();
 
@@ -2124,7 +2127,11 @@ export function setPauseIcon(isPlaying) {
   var btn = getEl('tts-zen-pause');
   if (!btn) return;
   btn.textContent = '';
-  btn.insertAdjacentHTML('beforeend', isPlaying ? PAUSE_ICON : PLAY_ICON);
+  var iconHtml = isPlaying ? PAUSE_ICON : PLAY_ICON;
+  var parsedIcon = new DOMParser().parseFromString(iconHtml, 'text/html');
+  while (parsedIcon.body.firstChild) {
+    btn.appendChild(parsedIcon.body.firstChild);
+  }
 }
 
 

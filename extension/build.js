@@ -25,6 +25,31 @@ function copyVendor() {
   }
 }
 
+// AMO's linter flags any `.innerHTML =` write, even on trusted vendor code.
+// Readability.js caches/restores page markup as a string and re-parses a
+// noscript's raw HTML — rewritten below to move real DOM nodes instead.
+function patchReadability() {
+  const file = path.join(__dirname, 'node_modules/@mozilla/readability/Readability.js');
+  let src = fs.readFileSync(file, 'utf8');
+  if (src.includes('DOMParser().parseFromString(noscript.innerHTML')) return;
+
+  src = src.replace(
+    'var pageCacheHtml = page.innerHTML;',
+    'var pageCacheNodes = Array.from(page.childNodes).map((n) => n.cloneNode(true));'
+  );
+  src = src.replace(
+    /\/\/ eslint-disable-next-line no-unsanitized\/property\n(\s*)page\.innerHTML = pageCacheHtml;/,
+    '$1while (page.firstChild) page.removeChild(page.firstChild);\n$1pageCacheNodes.forEach((n) => page.appendChild(n.cloneNode(true)));'
+  );
+  src = src.replace(
+    /\/\/ eslint-disable-next-line no-unsanitized\/property\n(\s*)tmp\.innerHTML = noscript\.innerHTML;/,
+    '$1var parsedNoscript = new DOMParser().parseFromString(noscript.innerHTML, "text/html");\n$1while (parsedNoscript.body.firstChild) tmp.appendChild(parsedNoscript.body.firstChild);'
+  );
+
+  fs.writeFileSync(file, src);
+}
+patchReadability();
+
 const common = { bundle: true, target: 'es2020', platform: 'browser', minify: false, sourcemap: false, logLevel: 'info' };
 
 Promise.all([
