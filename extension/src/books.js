@@ -84,9 +84,10 @@ export async function removeFile(id, name) {
   try { var dir = await bookDir(id, false); await dir.removeEntry(name); } catch (_) {}
 }
 
-// Object URL of a cover ("cover" or "back"): yours if set, else the generated one
+// Object URL of a cover ("cover" or "back"): yours if set, then the one from
+// the book's data (Open Library / Google Books), then the generated one
 export async function coverUrl(id, which) {
-  var f = (await readFile(id, which + '-custom')) || (await readFile(id, which));
+  var f = (await readFile(id, which + '-custom')) || (await readFile(id, which + '-meta')) || (await readFile(id, which));
   return f ? URL.createObjectURL(f) : null;
 }
 

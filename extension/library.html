@@ -86,7 +86,7 @@
     box-shadow: 0 1px 2px rgba(0,0,0,.35);
   }
   [data-wood="minimal"] .group-label { background: none; box-shadow: none; color: var(--ink-soft); padding: 0; margin-left: 4px; }
-  .row { position: relative; display: flex; align-items: flex-end; gap: 3px; padding: 0 18px; min-height: calc(var(--h) + 20px); perspective: 1400px; }
+  .row { --w: calc(var(--h) * .7); position: relative; display: flex; align-items: flex-end; gap: 3px; padding: 0 18px; min-height: calc(var(--h) + 20px); perspective: 1400px; }
   .plank {
     height: 20px; margin: 0 -2px 22px; border-radius: 2px;
     background: linear-gradient(180deg, var(--wood-1) 0, var(--wood-2) 55%, var(--wood-3) 100%);
@@ -102,11 +102,15 @@
     --d: 30px; --w: calc(var(--h) * .7); --turn: -78deg;
     position: relative; flex: none; width: var(--d); height: var(--h); margin: 0; padding: 0;
     border: none; background: none; cursor: pointer; transform-style: preserve-3d;
-    transition: margin .35s cubic-bezier(.2,.8,.2,1);
-    animation: arrive .6s cubic-bezier(.2,.8,.2,1) both; animation-delay: var(--delay, 0s);
+    transition: transform .4s cubic-bezier(.2,.8,.2,1);
   }
+  /* Only books that just arrived on the shelf slide in (re-renders don't replay it) */
+  .book.new { animation: arrive .6s cubic-bezier(.2,.8,.2,1) backwards; animation-delay: var(--delay, 0s); }
   @keyframes arrive { from { opacity: 0; transform: translateY(-40px); } to { opacity: 1; transform: none; } }
   .book:focus-visible { outline: none; }
+  /* Only the book's fixed slot takes the pointer: the turning faces never do,
+     so the hover area can't move under the pointer (no flicker) */
+  .b3, .face { pointer-events: none; }
   .b3 {
     position: absolute; inset: 0; transform-style: preserve-3d;
     transform: translateZ(calc(var(--w) / -2));
@@ -144,16 +148,21 @@
     background: repeating-linear-gradient(90deg, #f3ecdc 0 1px, #e2d6bd 1px 2px);
   }
 
-  /* Hover / focus: the book comes out and turns its cover to you, towards the nearest side */
-  .book:hover, .book:focus-visible { margin: 0 calc(var(--w) * .42); z-index: 2; }
-  .book:hover .b3, .book:focus-visible .b3 { transform: translateZ(calc(var(--w) / -2 + 70px)) translateY(-10px) rotateY(var(--turn)); }
+  /* Lifted (hover after a short intent delay, or keyboard focus): the book comes
+     out and turns its cover to you, towards the nearest side. Its own box stays
+     put; the neighbours slide aside with transforms. */
+  .book.lifted, .book:focus-visible { z-index: 2; }
+  .book.lifted .b3, .book:focus-visible .b3 { transform: translateZ(calc(var(--w) / -2 + 70px)) translateY(-10px) rotateY(var(--turn)); }
+  .row .book.lifted ~ .book, .row .book:focus-visible ~ .book, .row .book.lifted ~ .bookend { transform: translateX(calc(var(--w) * .46)); }
+  .row .book:has(~ .book.lifted), .row .book:has(~ .book:focus-visible) { transform: translateX(calc(var(--w) * -.46)); }
   .book:focus-visible .spine { box-shadow: 0 0 0 2px var(--accent); }
   .book.dragging { opacity: .4; }
   /* A brass bookend closing each row */
   .bookend {
     flex: none; width: 10px; height: calc(var(--h) * .55); margin-left: 4px; border-radius: 2px 2px 0 0;
     background: linear-gradient(90deg, #8a6420, #e3c27a 40%, #b8872e 70%, #6e4f18);
-    box-shadow: 2px 0 6px rgba(0,0,0,.35); animation: arrive .6s cubic-bezier(.2,.8,.2,1) both;
+    box-shadow: 2px 0 6px rgba(0,0,0,.35); animation: arrive .6s cubic-bezier(.2,.8,.2,1) backwards;
+    transition: transform .4s cubic-bezier(.2,.8,.2,1);
   }
   [data-wood="minimal"] .bookend { background: var(--ink-soft); box-shadow: none; width: 4px; }
   .progress-tick { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgba(0,0,0,.25); }
@@ -169,7 +178,9 @@
   #focus .holder { display: flex; justify-content: center; align-items: center; perspective: 1600px; height: 100%; min-height: 0; }
   #focus .book { --h: min(64vh, 470px); --d: calc(var(--thick, 30px) * 2); animation: none; cursor: grab; pointer-events: auto; }
   #focus .book:active { cursor: grabbing; }
-  #focus .book:hover { margin: 0; }
+  #focus .book.lifted .b3 { transform: rotateY(var(--spin, -90deg)); }
+  /* The book in the middle is turned by dragging any of its faces */
+  #focus .b3, #focus .face { pointer-events: auto; }
   #focus .b3 { transition: none; transform: rotateY(var(--spin, -90deg)); }
   #focus .b3.fly { transition: transform .7s cubic-bezier(.2,.8,.2,1); }
   #focus .shadow { position: absolute; bottom: -38px; left: 50%; width: calc(var(--w) * 1.1); height: 26px; margin-left: calc(var(--w) * -.55); border-radius: 50%; background: radial-gradient(rgba(0,0,0,.35), transparent 70%); transform: none; }
@@ -204,10 +215,64 @@
   @keyframes pop { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
   #settings label { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
   #settings select { padding: 4px 8px; border-radius: 4px; border: 1px solid var(--rule); background: var(--paper); }
-  .seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; }
-  .seg button { border: none; background: none; padding: 3px 10px; cursor: pointer; }
-  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--sheet); }
   #settings .muted { color: var(--ink-soft); font-size: 12px; }
+
+  /* PDF / Web */
+  .seg.mode { margin-left: 4px; }
+  .seg.mode button { padding: 6px 14px; font-weight: 600; }
+  .seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; }
+  .seg button { border: none; background: none; padding: 3px 10px; cursor: pointer; color: var(--ink-soft); }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--sheet); }
+  .group-label img { width: 14px; height: 14px; vertical-align: -2px; margin-right: 6px; border-radius: 2px; }
+  .card .static { border: none; }
+  .card .author.static { display: flex; align-items: center; gap: 6px; }
+  .card .details { font-variant-numeric: tabular-nums; }
+
+  /* A duplicate you tried to add again: it waves at you */
+  .book.pulse .spine { animation: pulse 1.2s ease 2; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 3px #e9c46a, 0 0 18px #e9c46a; } }
+
+  /* Import progress and summary */
+  #import {
+    position: fixed; z-index: 40; left: 50%; bottom: 24px; transform: translateX(-50%);
+    width: min(520px, calc(100vw - 32px)); padding: 14px 16px; display: flex; flex-direction: column; gap: 8px;
+    background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; box-shadow: 0 16px 40px rgba(0,0,0,.22);
+    animation: pop .2s ease;
+  }
+  #import .bad, .lk-list .bad { color: var(--accent); }
+  #drop-hint {
+    position: fixed; inset: 12px; z-index: 35; display: none; align-items: center; justify-content: center;
+    border: 3px dashed var(--accent); border-radius: 14px; background: color-mix(in srgb, var(--paper) 80%, transparent);
+    font: 600 20px var(--serif); color: var(--ink); pointer-events: none;
+  }
+  body.dropping #drop-hint { display: flex; }
+
+  /* Book details: the matches */
+  #lookup {
+    position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 20px;
+    background: rgba(20,18,15,.35); opacity: 0; transition: opacity .2s ease;
+  }
+  #lookup.show { opacity: 1; }
+  .lk-box {
+    width: min(640px, 100%); max-height: 86vh; overflow: auto; padding: 20px 22px; border-radius: 12px;
+    background: var(--sheet); border: 1px solid var(--rule); box-shadow: 0 24px 60px rgba(0,0,0,.3);
+    transform: translateY(8px); transition: transform .25s cubic-bezier(.2,.8,.2,1);
+  }
+  #lookup.show .lk-box { transform: none; }
+  .lk-head { display: flex; justify-content: space-between; align-items: baseline; }
+  .lk-head h2 { margin: 0; font: 600 20px var(--serif); }
+  .lk-form { display: flex; gap: 8px; margin: 6px 0 12px; }
+  .lk-form input { flex: 1; min-width: 0; padding: 7px 10px; border-radius: 6px; border: 1px solid var(--rule); background: var(--paper); }
+  .lk-list { display: flex; flex-direction: column; gap: 8px; min-height: 60px; }
+  .lk-item { display: grid; grid-template-columns: 46px 1fr auto; gap: 12px; align-items: center; padding: 8px; border-radius: 8px; border: 1px solid var(--rule); }
+  .lk-item:hover { border-color: var(--ink-soft); }
+  .lk-thumb { width: 46px; height: 68px; border-radius: 3px; overflow: hidden; background: var(--rule); }
+  .lk-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .lk-text { min-width: 0; font-size: 13px; line-height: 1.35; }
+  .lk-text b { display: block; font: 600 15px/1.25 var(--serif); }
+  .lk-src { display: inline-block; margin-top: 3px; padding: 0 6px; border-radius: 8px; font-size: 11px; background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink-soft); }
+  .lk-foot { justify-content: flex-end; margin-top: 12px; }
+  .muted { color: var(--ink-soft); }
 
   [hidden] { display: none !important; }
   @media (max-width: 820px) {
@@ -228,6 +293,9 @@
     <span class="spacer"></span>
     <input id="search" type="search" autocomplete="off">
     <button type="button" class="btn main" id="open-pdf"></button>
+    <span class="seg mode" id="mode" role="group">
+      <button type="button" id="mode-pdf" data-mode="pdf" aria-pressed="true">PDF</button><button type="button" id="mode-web" data-mode="web" aria-pressed="false">Web</button>
+    </span>
     <button type="button" class="btn ghost" id="settings-btn" aria-haspopup="dialog">⚙</button>
   </header>
   <nav id="tabs" role="tablist"></nav>
@@ -240,6 +308,14 @@
 
   <div id="settings" hidden role="dialog"></div>
   <input type="file" id="img-input" accept="image/*" hidden>
+  <input type="file" id="pdf-input" accept="application/pdf,.pdf" multiple hidden>
+
+  <div id="import" hidden role="status" aria-live="polite"></div>
+  <div id="drop-hint" aria-hidden="true"></div>
+
+  <section id="lookup" hidden role="dialog" aria-modal="true">
+    <div class="lk-box" id="lookup-body"></div>
+  </section>
 
   <script type="module" src="library.js"></script>
 </body>

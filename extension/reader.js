@@ -10,6 +10,10 @@ var __esm = (fn, res) => function __init() {
 var __commonJS = (cb, mod) => function __require() {
   return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
 };
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
 var __copyProps = (to, from, except, desc) => {
   if (from && typeof from === "object" || typeof from === "function") {
     for (let key of __getOwnPropNames(from))
@@ -4050,7 +4054,7 @@ var init_panel = __esm({
           <span id="tts-zen-inline-tr-label">Mostrar la traducci\xF3n junto al texto</span>
         </label>
         <div class="setting-row">
-          <button type="button" class="link-btn" id="tts-zen-open-library">Abrir la biblioteca de PDF</button>
+          <button type="button" class="link-btn" id="tts-zen-open-library">Abrir la biblioteca</button>
         </div>
        </section>
        <section class="tab-page" data-page="tr" role="tabpanel">
@@ -4785,7 +4789,7 @@ button:active:not(:disabled) { transform: scale(.96); }
         infoNativeRobotic: "Voz del sistema (espeak) \xB7 suena rob\xF3tica",
         infoServer: "Neural \xB7 la m\xE1s natural; necesita el servidor",
         slowVoice: "En tu equipo esta voz se genera m\xE1s despacio de lo que suena (x%s), por eso hay pausas entre frases. Prueba una de calidad Normal o Ligera.",
-        openLibrary: "Abrir la biblioteca de PDF",
+        openLibrary: "Abrir la biblioteca",
         autoOpen: "Abrir siempre en este sitio",
         presetsTitle: "Sitios con extractor propio",
         presetNext: "solo la historia \xB7 cap\xEDtulo siguiente en la misma p\xE1gina",
@@ -4893,7 +4897,7 @@ button:active:not(:disabled) { transform: scale(.96); }
         infoNativeRobotic: "System voice (espeak) \xB7 sounds robotic",
         infoServer: "Neural \xB7 the most natural; needs the server",
         slowVoice: "On your computer this voice takes longer to generate than to play (x%s), hence the pauses between sentences. Try a Standard or Light one.",
-        openLibrary: "Open the PDF library",
+        openLibrary: "Open the library",
         autoOpen: "Always open on this site",
         presetsTitle: "Sites with their own extractor",
         presetNext: "just the story \xB7 next chapter in the same page",
@@ -5007,6 +5011,15 @@ function absolute(href, base) {
 function relNext(doc, url) {
   var link = doc.querySelector('link[rel="next"][href], a[rel="next"][href]');
   return link ? absolute(link.getAttribute("href"), url) : null;
+}
+function textOf(doc, sel) {
+  var el = doc.querySelector(sel);
+  return el ? visibleText(el) : "";
+}
+function titleParts(doc) {
+  return (doc.title || "").split(/\s+[-|–—]\s+/).map(function(x) {
+    return x.trim();
+  }).filter(Boolean);
 }
 function setActiveChapter(el) {
   active = el;
@@ -5153,6 +5166,22 @@ var init_sites = __esm({
         nextUrl: function(doc, url) {
           var a = doc.querySelector("li.chapter.next a[href], .chapter.next a[href]");
           return a ? absolute(a.getAttribute("href"), url) : null;
+        },
+        // The work this chapter belongs to, for the library's Web shelf
+        work: function(doc, url) {
+          var m = url.pathname.match(/\/works\/(\d+)/);
+          if (!m) return null;
+          var total = (textOf(doc, "dd.chapters").split("/")[1] || "").trim();
+          var sel = doc.querySelector("#selected_id");
+          return {
+            key: "ao3:" + m[1],
+            title: textOf(doc, "h2.title") || titleParts(doc)[0],
+            author: textOf(doc, 'a[rel="author"]'),
+            workUrl: url.origin + "/works/" + m[1],
+            chapterTitle: textOf(doc, ".chapter.preface h3.title, .chapter h3.title"),
+            chapterNum: sel ? sel.selectedIndex + 1 : 1,
+            chapters: /^\d+$/.test(total) ? +total : null
+          };
         }
       },
       {
@@ -5177,6 +5206,21 @@ var init_sites = __esm({
           var sel = doc.querySelector("#chap_select");
           if (!sel || !sel.querySelector('option[value="' + n + '"]')) return null;
           return absolute("/s/" + m[1] + "/" + n + (m[3] || "/"), url);
+        },
+        work: function(doc, url) {
+          var m = url.pathname.match(/\/s\/(\d+)(?:\/(\d+))?/);
+          if (!m) return null;
+          var sel = doc.querySelector("#chap_select");
+          var opt = sel && sel.options[sel.selectedIndex];
+          return {
+            key: "ffn:" + m[1],
+            title: textOf(doc, "#profile_top b.xcontrast_txt") || titleParts(doc)[0],
+            author: textOf(doc, '#profile_top a.xcontrast_txt[href^="/u/"]'),
+            workUrl: url.origin + "/s/" + m[1],
+            chapterTitle: opt ? opt.textContent.trim() : "",
+            chapterNum: parseInt(m[2] || "1", 10),
+            chapters: sel ? sel.options.length : 1
+          };
         }
       },
       {
@@ -5201,6 +5245,18 @@ var init_sites = __esm({
         nextUrl: function(doc, url) {
           var a = doc.querySelector("a.next-part-link[href], .next-part a[href]");
           return a ? absolute(a.getAttribute("href"), url) : relNext(doc, url);
+        },
+        work: function(doc, url) {
+          var link = doc.querySelector('a[href*="/story/"]');
+          var m = link && link.getAttribute("href").match(/\/story\/(\d+)/);
+          var parts = titleParts(doc);
+          var title = link && visibleText(link) || parts[1] || parts[0];
+          return {
+            key: "wattpad:" + (m ? m[1] : title.toLowerCase()),
+            title,
+            workUrl: m ? absolute(link.getAttribute("href"), url) : url.href,
+            chapterTitle: textOf(doc, "h1.h2, .part-title, h1") || parts[0]
+          };
         }
       },
       {
@@ -5223,6 +5279,18 @@ var init_sites = __esm({
         },
         nextUrl: function() {
           return null;
+        },
+        work: function(doc, url) {
+          var m = url.pathname.match(/\/book\/(?:[^/]*?_)?(\d{6,})/);
+          if (!m) return null;
+          var parts = titleParts(doc);
+          var chapter = active && active.querySelector("h3, h2, .cha-tit");
+          return {
+            key: "webnovel:" + m[1],
+            title: textOf(doc, ".det-hd h1, .cha-hd-mn-text a, .j_bookName") || parts[1] || parts[0],
+            workUrl: url.origin + "/book/" + m[1],
+            chapterTitle: chapter ? visibleText(chapter) : parts[0]
+          };
         },
         nextContainer: function(doc, current2) {
           return chapterAfter(doc, current2);
@@ -6370,6 +6438,51 @@ function highlightPreview(i) {
     el.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 }
+function workInfo() {
+  var url = new URL(window.location.href);
+  var host = url.hostname.replace(/^www\./, "");
+  var w = null;
+  try {
+    w = site.work ? site.work(document, url) : null;
+  } catch (_) {
+  }
+  if (!w) {
+    var parts = (document.title || host).split(/\s+[-|–—]\s+/);
+    w = { key: "web:" + host + url.pathname, title: parts[0], workUrl: url.href, chapterTitle: "" };
+  }
+  var og = document.querySelector('meta[property="og:image"][content]');
+  return Object.assign({
+    kind: "web",
+    site: site.id,
+    siteName: SITE_NAMES[site.id] || host,
+    host,
+    image: og ? og.getAttribute("content") : null
+  }, w);
+}
+async function recordWork(force) {
+  if (embed || !chapterKey) return;
+  var now = Date.now();
+  if (!force && now - lastWorkSave < 15e3 && lastWorkChapter === chapterKey) return;
+  lastWorkSave = now;
+  lastWorkChapter = chapterKey;
+  try {
+    var got = await browser.storage.local.get(["webWorks", "rememberWeb"]);
+    if (got.rememberWeb === false) return;
+    var info2 = workInfo();
+    if (!info2.title) return;
+    var store = got.webWorks || { works: {} };
+    var prev = store.works[info2.key] || { addedAt: now, tags: [] };
+    store.works[info2.key] = Object.assign(prev, info2, {
+      chapterUrl: window.location.href,
+      chapterKey,
+      chapterProgress: sentences.length && player.index >= 0 ? +((player.index + 1) / sentences.length).toFixed(3) : prev.chapterProgress || 0,
+      openedAt: now
+    });
+    await browser.storage.local.set({ webWorks: store });
+  } catch (e) {
+    console.error("[zenTTS] web shelf:", e.message || e);
+  }
+}
 async function prepareChapter() {
   var paras = extractParagraphs();
   if (!paras.length) {
@@ -6861,7 +6974,7 @@ async function boot() {
   }
   if (state2 && state2.on) showPanel();
 }
-var import_readability, RESTRICTED_PROTOCOLS, embed, site, chapterDoc, chapterUrl, chapterTranslation, pendingOffer, FIRST_CHARS, BATCH, background, chapterGen, chapterEls, sentenceTicks, currentWord, paragraphs, sentences, chapterKey, currentContainer, chapterHash, resumeAt, prepared, nextChapter, engineNote, player, contentObserver, observedLength, checking, picking, restartOnResume, panelReady;
+var import_readability, RESTRICTED_PROTOCOLS, embed, site, chapterDoc, chapterUrl, chapterTranslation, pendingOffer, FIRST_CHARS, BATCH, background, chapterGen, chapterEls, sentenceTicks, currentWord, SITE_NAMES, lastWorkSave, lastWorkChapter, paragraphs, sentences, chapterKey, currentContainer, chapterHash, resumeAt, prepared, nextChapter, engineNote, player, contentObserver, observedLength, checking, picking, restartOnResume, panelReady;
 var init_content = __esm({
   "src/content.js"() {
     import_readability = __toESM(require_readability());
@@ -6912,6 +7025,9 @@ var init_content = __esm({
     chapterEls = /* @__PURE__ */ new Set();
     sentenceTicks = [];
     currentWord = -1;
+    SITE_NAMES = { ao3: "Archive of Our Own", ffn: "FanFiction.net", wattpad: "Wattpad", webnovel: "Webnovel" };
+    lastWorkSave = 0;
+    lastWorkChapter = null;
     paragraphs = [];
     sentences = [];
     chapterKey = null;
@@ -6943,6 +7059,7 @@ var init_content = __esm({
         else hideCaption();
         highlightPreview(i);
         saveProgress(chapterKey, { index: i, total: sentences.length, hash: chapterHash, title: document.title });
+        recordWork(false);
         if (i >= sentences.length * 0.8) prefetchNextChapter();
       },
       onWord: function(i, offset) {
@@ -7021,7 +7138,161 @@ var init_content = __esm({
   }
 });
 
+// src/reader.js
+init_highlight();
+
+// src/books.js
+var KEY = "library";
+var DEFAULT_SETTINGS = { wood: "oak", sort: "recent", size: "m", keepCopies: true };
+function bookId(key) {
+  var h = 2166136261;
+  for (var i = 0; i < key.length; i++) {
+    h ^= key.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return "b" + (h >>> 0).toString(36);
+}
+async function loadLibrary() {
+  var got = {};
+  try {
+    got = (await browser.storage.local.get(KEY))[KEY] || {};
+  } catch (_) {
+  }
+  return {
+    books: got.books || {},
+    tags: got.tags || [],
+    settings: Object.assign({}, DEFAULT_SETTINGS, got.settings || {})
+  };
+}
+async function saveLibrary(lib) {
+  try {
+    await browser.storage.local.set({ [KEY]: lib });
+  } catch (_) {
+  }
+}
+async function updateBook(id, patch) {
+  var lib = await loadLibrary();
+  var book = Object.assign({ id, tags: [], addedAt: Date.now() }, lib.books[id] || {}, patch);
+  lib.books[id] = book;
+  await saveLibrary(lib);
+  return book;
+}
+async function libraryDir(create) {
+  var root = await navigator.storage.getDirectory();
+  return root.getDirectoryHandle("library", { create });
+}
+async function bookDir(id, create) {
+  var lib = await libraryDir(create);
+  return lib.getDirectoryHandle(id, { create });
+}
+async function writeFile(id, name, blob) {
+  var dir = await bookDir(id, true);
+  var handle = await dir.getFileHandle(name, { create: true });
+  var w = await handle.createWritable();
+  await w.write(blob);
+  await w.close();
+}
+async function readFile(id, name) {
+  try {
+    var dir = await bookDir(id, false);
+    return await (await dir.getFileHandle(name)).getFile();
+  } catch (_) {
+    return null;
+  }
+}
+function dominantColor(canvas) {
+  try {
+    var small = document.createElement("canvas");
+    small.width = 24;
+    small.height = 32;
+    var ctx = small.getContext("2d");
+    ctx.drawImage(canvas, 0, 0, 24, 32);
+    var d = ctx.getImageData(0, 0, 24, 32).data;
+    var r = 0, g = 0, b = 0, n = 0;
+    for (var i = 0; i < d.length; i += 4) {
+      if (d[i] > 235 && d[i + 1] > 235 && d[i + 2] > 235) continue;
+      r += d[i];
+      g += d[i + 1];
+      b += d[i + 2];
+      n++;
+    }
+    if (n < 20) return null;
+    r /= n;
+    g /= n;
+    b /= n;
+    var max = Math.max(r, g, b), min = Math.min(r, g, b);
+    if (max - min < 28) return null;
+    return "#" + [r, g, b].map(function(v) {
+      return Math.round(v * 0.72).toString(16).padStart(2, "0");
+    }).join("");
+  } catch (_) {
+    return null;
+  }
+}
+var CLOTH = ["#7b2e22", "#2f4f6e", "#3d5a3e", "#6b3f5e", "#8a5a1f", "#44505a", "#5c3a27", "#2c5a57"];
+function clothColor(id) {
+  var h = 0;
+  for (var i = 0; i < id.length; i++) h = h * 31 + id.charCodeAt(i) >>> 0;
+  return CLOTH[h % CLOTH.length];
+}
+function realAuthor(a) {
+  return a && !/^(anonymous|unknown|author|user|admin|desconocido)$/i.test(a.trim()) ? a.trim() : "";
+}
+function canvasBlob(canvas, type, quality) {
+  return new Promise(function(resolve) {
+    canvas.toBlob(resolve, type || "image/webp", quality || 0.85);
+  });
+}
+
 // node_modules/pdfjs-dist/build/pdf.mjs
+var pdf_exports = {};
+__export(pdf_exports, {
+  AbortException: () => __webpack_exports__AbortException,
+  AnnotationEditorLayer: () => __webpack_exports__AnnotationEditorLayer,
+  AnnotationEditorParamsType: () => __webpack_exports__AnnotationEditorParamsType,
+  AnnotationEditorType: () => __webpack_exports__AnnotationEditorType,
+  AnnotationEditorUIManager: () => __webpack_exports__AnnotationEditorUIManager,
+  AnnotationLayer: () => __webpack_exports__AnnotationLayer,
+  AnnotationMode: () => __webpack_exports__AnnotationMode,
+  ColorPicker: () => __webpack_exports__ColorPicker,
+  DOMSVGFactory: () => __webpack_exports__DOMSVGFactory,
+  DrawLayer: () => __webpack_exports__DrawLayer,
+  FeatureTest: () => __webpack_exports__FeatureTest,
+  GlobalWorkerOptions: () => __webpack_exports__GlobalWorkerOptions,
+  ImageKind: () => __webpack_exports__ImageKind,
+  InvalidPDFException: () => __webpack_exports__InvalidPDFException,
+  MissingPDFException: () => __webpack_exports__MissingPDFException,
+  OPS: () => __webpack_exports__OPS,
+  OutputScale: () => __webpack_exports__OutputScale,
+  PDFDataRangeTransport: () => __webpack_exports__PDFDataRangeTransport,
+  PDFDateString: () => __webpack_exports__PDFDateString,
+  PDFWorker: () => __webpack_exports__PDFWorker,
+  PasswordResponses: () => __webpack_exports__PasswordResponses,
+  PermissionFlag: () => __webpack_exports__PermissionFlag,
+  PixelsPerInch: () => __webpack_exports__PixelsPerInch,
+  RenderingCancelledException: () => __webpack_exports__RenderingCancelledException,
+  TextLayer: () => __webpack_exports__TextLayer,
+  TouchManager: () => __webpack_exports__TouchManager,
+  UnexpectedResponseException: () => __webpack_exports__UnexpectedResponseException,
+  Util: () => __webpack_exports__Util,
+  VerbosityLevel: () => __webpack_exports__VerbosityLevel,
+  XfaLayer: () => __webpack_exports__XfaLayer,
+  build: () => __webpack_exports__build,
+  createValidAbsoluteUrl: () => __webpack_exports__createValidAbsoluteUrl,
+  fetchData: () => __webpack_exports__fetchData,
+  getDocument: () => __webpack_exports__getDocument,
+  getFilenameFromUrl: () => __webpack_exports__getFilenameFromUrl,
+  getPdfFilenameFromUrl: () => __webpack_exports__getPdfFilenameFromUrl,
+  getXfaPageViewport: () => __webpack_exports__getXfaPageViewport,
+  isDataScheme: () => __webpack_exports__isDataScheme,
+  isPdfFile: () => __webpack_exports__isPdfFile,
+  noContextMenu: () => __webpack_exports__noContextMenu,
+  normalizeUnicode: () => __webpack_exports__normalizeUnicode,
+  setLayerDimensions: () => __webpack_exports__setLayerDimensions,
+  shadow: () => __webpack_exports__shadow,
+  stopEvent: () => __webpack_exports__stopEvent,
+  version: () => __webpack_exports__version
+});
 var __webpack_require__ = {};
 (() => {
   __webpack_require__.d = (exports, definition) => {
@@ -28227,114 +28498,129 @@ var __webpack_exports__shadow = __webpack_exports__.shadow;
 var __webpack_exports__stopEvent = __webpack_exports__.stopEvent;
 var __webpack_exports__version = __webpack_exports__.version;
 
-// src/reader.js
-init_highlight();
-
-// src/books.js
-var KEY = "library";
-var DEFAULT_SETTINGS = { wood: "oak", sort: "recent", size: "m", keepCopies: true };
-function bookId(key) {
-  var h = 2166136261;
-  for (var i = 0; i < key.length; i++) {
-    h ^= key.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return "b" + (h >>> 0).toString(36);
-}
-async function loadLibrary() {
-  var got = {};
-  try {
-    got = (await browser.storage.local.get(KEY))[KEY] || {};
-  } catch (_) {
-  }
-  return {
-    books: got.books || {},
-    tags: got.tags || [],
-    settings: Object.assign({}, DEFAULT_SETTINGS, got.settings || {})
-  };
-}
-async function saveLibrary(lib) {
-  try {
-    await browser.storage.local.set({ [KEY]: lib });
-  } catch (_) {
-  }
-}
-async function updateBook(id, patch) {
-  var lib = await loadLibrary();
-  var book = Object.assign({ id, tags: [], addedAt: Date.now() }, lib.books[id] || {}, patch);
-  lib.books[id] = book;
-  await saveLibrary(lib);
-  return book;
-}
-async function libraryDir(create) {
-  var root = await navigator.storage.getDirectory();
-  return root.getDirectoryHandle("library", { create });
-}
-async function bookDir(id, create) {
-  var lib = await libraryDir(create);
-  return lib.getDirectoryHandle(id, { create });
-}
-async function writeFile(id, name, blob) {
-  var dir = await bookDir(id, true);
-  var handle = await dir.getFileHandle(name, { create: true });
-  var w = await handle.createWritable();
-  await w.write(blob);
-  await w.close();
-}
-async function readFile(id, name) {
-  try {
-    var dir = await bookDir(id, false);
-    return await (await dir.getFileHandle(name)).getFile();
-  } catch (_) {
-    return null;
-  }
-}
-function dominantColor(canvas) {
-  try {
-    var small = document.createElement("canvas");
-    small.width = 24;
-    small.height = 32;
-    var ctx = small.getContext("2d");
-    ctx.drawImage(canvas, 0, 0, 24, 32);
-    var d = ctx.getImageData(0, 0, 24, 32).data;
-    var r = 0, g = 0, b = 0, n = 0;
-    for (var i = 0; i < d.length; i += 4) {
-      if (d[i] > 235 && d[i + 1] > 235 && d[i + 2] > 235) continue;
-      r += d[i];
-      g += d[i + 1];
-      b += d[i + 2];
-      n++;
-    }
-    if (n < 20) return null;
-    r /= n;
-    g /= n;
-    b /= n;
-    var max = Math.max(r, g, b), min = Math.min(r, g, b);
-    if (max - min < 28) return null;
-    return "#" + [r, g, b].map(function(v) {
-      return Math.round(v * 0.72).toString(16).padStart(2, "0");
-    }).join("");
-  } catch (_) {
-    return null;
-  }
-}
-var CLOTH = ["#7b2e22", "#2f4f6e", "#3d5a3e", "#6b3f5e", "#8a5a1f", "#44505a", "#5c3a27", "#2c5a57"];
-function clothColor(id) {
-  var h = 0;
-  for (var i = 0; i < id.length; i++) h = h * 31 + id.charCodeAt(i) >>> 0;
-  return CLOTH[h % CLOTH.length];
-}
-function realAuthor(a) {
-  return a && !/^(anonymous|unknown|author|user|admin|desconocido)$/i.test(a.trim()) ? a.trim() : "";
-}
-function canvasBlob(canvas, type, quality) {
-  return new Promise(function(resolve) {
-    canvas.toBlob(resolve, type || "image/webp", quality || 0.85);
-  });
-}
-
-// src/reader.js
+// src/pdfimport.js
 __webpack_exports__GlobalWorkerOptions.workerSrc = browser.runtime.getURL("vendor/pdfjs/pdf.worker.min.mjs");
+async function sha256Hex(bytes) {
+  var digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest), function(b) {
+    return b.toString(16).padStart(2, "0");
+  }).join("");
+}
+function findByHash(lib, hash) {
+  return Object.values(lib.books).find(function(b) {
+    return b.hash === hash;
+  }) || null;
+}
+async function renderThumb(doc, n) {
+  var page = await doc.getPage(n);
+  var base = page.getViewport({ scale: 1 });
+  var vp = page.getViewport({ scale: 360 / base.width });
+  var canvas = document.createElement("canvas");
+  canvas.width = Math.floor(vp.width);
+  canvas.height = Math.floor(vp.height);
+  var ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  await page.render({ canvasContext: ctx, viewport: vp }).promise;
+  return canvas;
+}
+function validIsbn(d) {
+  if (d.length === 10) {
+    var s = 0;
+    for (var i = 0; i < 10; i++) s += (d[i] === "X" ? 10 : +d[i]) * (10 - i);
+    return s % 11 === 0;
+  }
+  if (d.length === 13 && /^97[89]/.test(d)) {
+    var t2 = 0;
+    for (var k = 0; k < 13; k++) t2 += +d[k] * (k % 2 ? 3 : 1);
+    return t2 % 10 === 0;
+  }
+  return false;
+}
+function isbnIn(text) {
+  var re = /ISBN(?:-1[03])?[:\s]*((?:97[89][\s-]?)?(?:\d[\s-]?){9}[\dX])/gi, m;
+  while (m = re.exec(text)) {
+    var digits = m[1].replace(/[\s-]/g, "").toUpperCase();
+    if (validIsbn(digits)) return digits;
+  }
+  var bare2 = text.match(/\b97[89][\d-]{10,14}\b/g) || [];
+  for (var i = 0; i < bare2.length; i++) {
+    var d = bare2[i].replace(/-/g, "");
+    if (d.length === 13 && validIsbn(d)) return d;
+  }
+  return null;
+}
+async function findIsbn(doc) {
+  var pages = [];
+  for (var n = 1; n <= Math.min(6, doc.numPages); n++) pages.push(n);
+  for (var k = Math.max(7, doc.numPages - 1); k <= doc.numPages; k++) pages.push(k);
+  for (var i = 0; i < pages.length; i++) {
+    try {
+      var tc = await (await doc.getPage(pages[i])).getTextContent();
+      var found = isbnIn(tc.items.map(function(it) {
+        return it.str;
+      }).join(" "));
+      if (found) return found;
+    } catch (_) {
+    }
+  }
+  return null;
+}
+async function shelveDocument(doc, info2) {
+  var hash = await sha256Hex(info2.data);
+  var lib = await loadLibrary();
+  var existing = findByHash(lib, hash) || lib.books[bookId(info2.key)] || null;
+  var id = existing ? existing.id : bookId(info2.key);
+  var key = existing && existing.key ? existing.key : info2.key;
+  var prev = existing || {};
+  var patch = {
+    key,
+    hash,
+    title: prev.titleEdited || prev.meta ? prev.title : info2.title,
+    author: prev.authorEdited || prev.meta ? prev.author : realAuthor(info2.author) || prev.author || "",
+    name: prev.name || info2.name,
+    pages: doc.numPages,
+    openedAt: Date.now(),
+    src: info2.src || prev.src || null,
+    size: info2.data.byteLength
+  };
+  if (lib.settings.keepCopies && !await readFile(id, "pdf")) {
+    try {
+      await writeFile(id, "pdf", new Blob([info2.data], { type: "application/pdf" }));
+      patch.hasFile = true;
+    } catch (_) {
+    }
+  }
+  var book = await updateBook(id, patch);
+  try {
+    if (!await readFile(id, "cover")) {
+      var c = await renderThumb(doc, 1);
+      await writeFile(id, "cover", await canvasBlob(c));
+      if (!book.color) await updateBook(id, { color: dominantColor(c) || clothColor(id) });
+      c.width = c.height = 0;
+    }
+  } catch (e) {
+    console.error("[zenTTS] cover:", e.message || e);
+  }
+  var rest = (async function() {
+    try {
+      if (doc.numPages > 1 && !await readFile(id, "back")) {
+        var b = await renderThumb(doc, doc.numPages);
+        await writeFile(id, "back", await canvasBlob(b));
+        b.width = b.height = 0;
+      }
+      if (!book.isbnFound) {
+        var isbn = await findIsbn(doc);
+        if (isbn) await updateBook(id, { isbnFound: isbn });
+      }
+    } catch (e) {
+      console.error("[zenTTS] cover:", e.message || e);
+    }
+  })();
+  return { id, key, duplicate: !!existing, done: rest };
+}
+
+// src/reader.js
 var ES = (function() {
   try {
     return browser.i18n.getUILanguage().toLowerCase().startsWith("es");
@@ -28761,7 +29047,7 @@ async function renderDocument(doc) {
     })(page, viewport, div);
     io.observe(div);
     var content = await page.getTextContent();
-    var tl = new __webpack_exports__TextLayer({ textContentSource: content, container: layer, viewport });
+    var tl = new pdf_exports.TextLayer({ textContentSource: content, container: layer, viewport });
     await tl.render();
     var spans = tl.textDivs;
     var items = [];
@@ -28785,63 +29071,17 @@ async function renderDocument(doc) {
   }
   return pages;
 }
-async function renderThumb(doc, n) {
-  var page = await doc.getPage(n);
-  var base = page.getViewport({ scale: 1 });
-  var vp = page.getViewport({ scale: 360 / base.width });
-  var canvas = document.createElement("canvas");
-  canvas.width = Math.floor(vp.width);
-  canvas.height = Math.floor(vp.height);
-  var ctx = canvas.getContext("2d");
-  ctx.fillStyle = "#fff";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  await page.render({ canvasContext: ctx, viewport: vp }).promise;
-  return canvas;
-}
 async function shelve(doc, got, title, author) {
-  var id = bookId(got.key);
-  var lib = await loadLibrary();
-  var prev = lib.books[id] || {};
-  var patch = {
-    key: got.key,
-    title: prev.titleEdited ? prev.title : title,
-    author: prev.authorEdited ? prev.author : author || prev.author || "",
+  var res = await shelveDocument(doc, {
+    data: got.data,
     name: got.name,
-    pages: doc.numPages,
-    openedAt: Date.now(),
-    src: src && /^https?:/i.test(src) ? src : prev.src || null,
-    size: got.data.byteLength
-  };
-  if (lib.settings.keepCopies && !await readFile(id, "pdf")) {
-    try {
-      await writeFile(id, "pdf", new Blob([got.data], { type: "application/pdf" }));
-      patch.hasFile = true;
-    } catch (_) {
-    }
-  }
-  var book = await updateBook(id, patch);
-  try {
-    if (!await readFile(id, "cover")) {
-      var c = await renderThumb(doc, 1);
-      await writeFile(id, "cover", await canvasBlob(c));
-      if (!book.color) await updateBook(id, { color: dominantColor(c) || clothColor(id) });
-      c.width = c.height = 0;
-    }
-  } catch (e) {
-    console.error("[zenTTS] cover:", e.message || e);
-  }
-  (async function() {
-    try {
-      if (doc.numPages > 1 && !await readFile(id, "back")) {
-        var b = await renderThumb(doc, doc.numPages);
-        await writeFile(id, "back", await canvasBlob(b));
-        b.width = b.height = 0;
-      }
-    } catch (e) {
-      console.error("[zenTTS] cover:", e.message || e);
-    }
-  })();
-  return id;
+    key: got.key,
+    src: src && /^https?:/i.test(src) ? src : null,
+    title,
+    author
+  });
+  got.key = res.key;
+  return res.id;
 }
 var bookKey = null;
 var currentPage = 1;
@@ -29057,7 +29297,7 @@ async function start() {
   $("loading-text").textContent = S.loading;
   var doc;
   try {
-    doc = await __webpack_exports__getDocument({ data: got.data.slice(0) }).promise;
+    doc = await pdf_exports.getDocument({ data: got.data.slice(0) }).promise;
   } catch (e) {
     $("loading-text").textContent = f(S.failed, e.message);
     return;

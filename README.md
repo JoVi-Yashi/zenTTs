@@ -100,8 +100,17 @@ En una pestaña con un PDF, el botón abre el lector de zenTTS en una pestaña n
 
 El botón **Índice** muestra el índice del documento (con subniveles) y lleva a cada sección; si está leyendo, la lectura salta ahí. El lector recuerda la página en la que estabas y lee en orden los documentos a dos columnas.
 
-### Biblioteca de PDF
-Los PDF que abres se colocan en una estantería 3D (botón **Biblioteca** en el lector, o ⚙ → Lectura → "Abrir la biblioteca de PDF"). Cada libro muestra su lomo (color y grosor según el PDF); al pasar el ratón sale y gira su portada hacia ti, y al elegirlo pasa al centro girando, con la estantería desenfocada detrás. Desde ahí sigues leyendo por tu página, cambias portada, contraportada y color del lomo, y le pones etiquetas, que funcionan como estanterías propias. En ⚙ eliges la madera, el orden y el tamaño, y si se guarda una copia de cada PDF (lo que permite abrir los de tu equipo sin volver a elegirlos).
+### La biblioteca
+Una estantería 3D con lo que lees (botón **Biblioteca** en el lector de PDF, o ⚙ → Lectura → "Abrir la biblioteca"). Arriba a la derecha eliges qué mostrar:
+
+- **PDF:** los PDF que abres o añades. **Añadir PDF** acepta varios a la vez (o suéltalos sobre la estantería); cada archivo se compara por su contenido (SHA-256), así que un PDF repetido no se duplica: se avisa y se resalta el que ya estaba. Se guarda una copia, de modo que los PDF de tu equipo se abren desde aquí sin volver a elegirlos.
+- **Web:** las obras que zenTTS te ha leído en páginas web, una balda por sitio (AO3, FanFiction, Wattpad, Webnovel y el resto por dominio), con el capítulo por el que vas. **Seguir leyendo** abre ese capítulo. Se puede desactivar en ⚙ ("Recordar lo que leo en la web").
+
+Cada libro muestra su lomo (color y grosor según el libro); al pasar el ratón sale y gira su portada hacia ti, y al elegirlo pasa al centro girando, con la estantería desenfocada detrás. Desde su ficha sigues leyendo, cambias portada, contraportada y color del lomo, y le pones etiquetas, que funcionan como estanterías propias.
+
+**Datos del libro:** "Buscar datos…" (o "Revisar datos" después de añadir PDF) busca el libro por su título, o por el ISBN si viene impreso en el PDF, en Open Library y Google Books, y te muestra las coincidencias para que elijas la correcta. Se aplican título, autor, año, editorial, ISBN y portada. La primera vez pide permiso para acceder a esos dos sitios; nada se envía si no lo usas.
+
+En ⚙ eliges la madera, el orden y el tamaño de los libros.
 
 ### Rendimiento de las voces y qué traducción elegir
 - Las voces Local de **alta calidad** hacen bastante más cálculo por segundo de audio y Piper corre en un solo hilo dentro del navegador: en equipos modestos pueden ir más lentas que la lectura y dejar pausas entre frases. zenTTS precarga la voz, parte las frases largas y genera varias por delante; si aun así no llega, lo avisa en ⚙ → Voz. La calidad **Normal** es el mejor equilibrio.

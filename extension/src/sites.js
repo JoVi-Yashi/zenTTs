@@ -32,6 +32,14 @@ function relNext(doc, url) {
 
 var BLOCKS = 'p, h1, h2, h3, h4, h5, h6, li, blockquote, pre';
 
+function textOf(doc, sel) {
+  var el = doc.querySelector(sel);
+  return el ? visibleText(el) : '';
+}
+
+// "Chapter 3: Rain - The Book - Wattpad" → parts
+function titleParts(doc) { return (doc.title || '').split(/\s+[-|–—]\s+/).map(function(x) { return x.trim(); }).filter(Boolean); }
+
 export var SITES = [
   {
     id: 'ao3',
@@ -47,6 +55,18 @@ export var SITES = [
     nextUrl: function(doc, url) {
       var a = doc.querySelector('li.chapter.next a[href], .chapter.next a[href]');
       return a ? absolute(a.getAttribute('href'), url) : null;
+    },
+    // The work this chapter belongs to, for the library's Web shelf
+    work: function(doc, url) {
+      var m = url.pathname.match(/\/works\/(\d+)/);
+      if (!m) return null;
+      var total = (textOf(doc, 'dd.chapters').split('/')[1] || '').trim();
+      var sel = doc.querySelector('#selected_id');
+      return {
+        key: 'ao3:' + m[1], title: textOf(doc, 'h2.title') || titleParts(doc)[0], author: textOf(doc, 'a[rel="author"]'),
+        workUrl: url.origin + '/works/' + m[1], chapterTitle: textOf(doc, '.chapter.preface h3.title, .chapter h3.title'),
+        chapterNum: sel ? sel.selectedIndex + 1 : 1, chapters: /^\d+$/.test(total) ? +total : null
+      };
     }
   },
   {
@@ -65,6 +85,17 @@ export var SITES = [
       var sel = doc.querySelector('#chap_select');
       if (!sel || !sel.querySelector('option[value="' + n + '"]')) return null;
       return absolute('/s/' + m[1] + '/' + n + (m[3] || '/'), url);
+    },
+    work: function(doc, url) {
+      var m = url.pathname.match(/\/s\/(\d+)(?:\/(\d+))?/);
+      if (!m) return null;
+      var sel = doc.querySelector('#chap_select');
+      var opt = sel && sel.options[sel.selectedIndex];
+      return {
+        key: 'ffn:' + m[1], title: textOf(doc, '#profile_top b.xcontrast_txt') || titleParts(doc)[0],
+        author: textOf(doc, '#profile_top a.xcontrast_txt[href^="/u/"]'), workUrl: url.origin + '/s/' + m[1],
+        chapterTitle: opt ? opt.textContent.trim() : '', chapterNum: parseInt(m[2] || '1', 10), chapters: sel ? sel.options.length : 1
+      };
     }
   },
   {
@@ -85,6 +116,17 @@ export var SITES = [
     nextUrl: function(doc, url) {
       var a = doc.querySelector('a.next-part-link[href], .next-part a[href]');
       return a ? absolute(a.getAttribute('href'), url) : relNext(doc, url);
+    },
+    work: function(doc, url) {
+      var link = doc.querySelector('a[href*="/story/"]');
+      var m = link && link.getAttribute('href').match(/\/story\/(\d+)/);
+      var parts = titleParts(doc);
+      var title = (link && visibleText(link)) || parts[1] || parts[0];
+      return {
+        key: 'wattpad:' + (m ? m[1] : title.toLowerCase()), title: title,
+        workUrl: m ? absolute(link.getAttribute('href'), url) : url.href,
+        chapterTitle: textOf(doc, 'h1.h2, .part-title, h1') || parts[0]
+      };
     }
   },
   {
@@ -100,6 +142,16 @@ export var SITES = [
       return 'webnovel:' + (id || url.pathname);
     },
     nextUrl: function() { return null; },
+    work: function(doc, url) {
+      var m = url.pathname.match(/\/book\/(?:[^/]*?_)?(\d{6,})/);
+      if (!m) return null;
+      var parts = titleParts(doc);
+      var chapter = active && active.querySelector('h3, h2, .cha-tit');
+      return {
+        key: 'webnovel:' + m[1], title: textOf(doc, '.det-hd h1, .cha-hd-mn-text a, .j_bookName') || parts[1] || parts[0],
+        workUrl: url.origin + '/book/' + m[1], chapterTitle: chapter ? visibleText(chapter) : parts[0]
+      };
+    },
     nextContainer: function(doc, current) { return chapterAfter(doc, current); },
     pullMore: function(current) { pullMore(current); },
     nextControl: function(doc, current, url) { return nextControl(doc, current, url); },

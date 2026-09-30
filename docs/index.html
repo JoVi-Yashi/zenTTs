@@ -188,6 +188,33 @@
   .panel-ctrls .play { flex: 1; background: #2a2622; color: #fbf8f1; border-color: #2a2622; font-weight: 600; gap: 6px; }
   .panel-st { text-align: center; padding: 0 12px 10px; font-size: 12px; color: #6d655a; }
 
+  /* ---- The library, drawn ---- */
+  .shelf-demo { margin: 6px 0 22px; }
+  .shelf-demo .case {
+    padding: 18px 16px 4px; border-radius: 6px; perspective: 900px;
+    background: linear-gradient(180deg, #5e4028, #3f2a19);
+    box-shadow: inset 0 0 0 10px #a87b4f, inset 0 0 0 11px rgba(0,0,0,.25), inset 0 16px 34px rgba(0,0,0,.35), 0 16px 40px rgba(43,29,18,.2);
+  }
+  .shelf-row { display: flex; align-items: flex-end; gap: 3px; height: 150px; padding: 0 14px; }
+  .shelf-row .sp {
+    width: var(--d); height: 132px; border-radius: 2px; flex: none;
+    background: linear-gradient(90deg, rgba(0,0,0,.28), rgba(255,255,255,.14) 28%, rgba(0,0,0,.05) 60%, rgba(0,0,0,.3)), var(--c);
+    color: #f6ecd8; writing-mode: vertical-rl; font: 600 11px/1 var(--text); text-align: center; padding: 10px 0; overflow: hidden; white-space: nowrap;
+    border-top: 2px solid rgba(233,196,106,.6); border-bottom: 2px solid rgba(233,196,106,.6);
+  }
+  .shelf-row .bk { flex: none; width: 96px; height: 138px; margin: 0 26px; transform: translateZ(40px) translateY(-8px) rotateY(-16deg); transform-style: preserve-3d; }
+  .shelf-row .bk .cover {
+    display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 6px; height: 100%;
+    background: var(--c); color: #f6ecd8; border: 3px double rgba(233,196,106,.8); border-radius: 2px 4px 4px 2px;
+    box-shadow: -8px 12px 22px rgba(0,0,0,.45), inset 5px 0 8px rgba(0,0,0,.3); font-style: normal; text-align: center; padding: 8px;
+  }
+  .shelf-row .bk b { font: 600 14px/1.15 var(--display); }
+  .shelf-row .bk em { font: italic 12px var(--text); }
+  .shelf-row .end { flex: none; width: 9px; height: 70px; margin-left: 3px; background: linear-gradient(90deg, #8a6420, #e3c27a 40%, #b8872e 70%, #6e4f18); border-radius: 2px 2px 0 0; }
+  .shelf-row .tag { align-self: flex-start; margin: 0 6px 0 10px; padding: 1px 8px; border-radius: 3px; background: linear-gradient(180deg, #e3c27a, #b8872e); color: #2b1d12; font: 600 11px var(--text); }
+  .shelf-demo .plank { height: 16px; margin: 0 -4px 16px; border-radius: 2px; background: linear-gradient(180deg, #c99e6e, #a87b4f 55%, #7a5533); box-shadow: 0 8px 14px rgba(0,0,0,.35); }
+  @media (max-width: 760px) { .shelf-row .sp:nth-child(n+5) { display: none; } .shelf-row .bk { margin: 0 12px; } }
+
   /* ---- Features ---- */
   .intro::after { content: ""; display: block; clear: both; }
   .intro p { margin: 0 0 14px; text-align: justify; hyphens: auto; }
@@ -255,7 +282,7 @@
 
   <header>
     <div class="top">
-      <span>zenTTS · 1.0</span>
+      <span>zenTTS · 1.1</span>
       <span class="lang" role="group" aria-label="Idioma / Language">
         <button type="button" data-lang="es" aria-pressed="true" aria-label="Español" data-name="Español">/ɲ/</button><button type="button" data-lang="en" aria-pressed="false" aria-label="English" data-name="English">/ə/</button>
       </span>
@@ -345,6 +372,42 @@
       <li><img src="site-webnovel.svg" alt="">Webnovel</li>
     </ul>
     <p class="note" data-en="Any other page is read with the article extractor; PDFs with the reader.">Cualquier otra página se lee con el extractor de artículos; los PDF, con el lector.</p>
+
+    <h2 data-en="Of the library">De la biblioteca</h2>
+    <figure class="shelf-demo" aria-hidden="true">
+      <div class="case">
+        <div class="shelf-row">
+          <span class="sp" style="--c:#7b2e22;--d:30px">La casa de la lluvia</span>
+          <span class="sp" style="--c:#2f4f6e;--d:44px">El nombre del viento</span>
+          <span class="bk lifted" style="--c:#3d5a3e"><i class="cover"><b>Mushoku Tensei</b><em>Vol. 15</em></i></span>
+          <span class="sp" style="--c:#6b3f5e;--d:26px">Dos columnas</span>
+          <span class="sp" style="--c:#8a5a1f;--d:38px">Crónicas</span>
+          <span class="sp" style="--c:#2c5a57;--d:22px">Artículo</span>
+          <span class="end"></span>
+        </div>
+        <div class="plank"></div>
+        <div class="shelf-row web">
+          <span class="tag">AO3</span>
+          <span class="sp" style="--c:#8f1d1d;--d:34px">Obra en curso</span>
+          <span class="sp" style="--c:#8f1d1d;--d:28px">One-shot</span>
+          <span class="tag">Webnovel</span>
+          <span class="sp" style="--c:#23457a;--d:48px">Naruto: Kazekage</span>
+          <span class="end"></span>
+        </div>
+        <div class="plank"></div>
+      </div>
+    </figure>
+    <div class="intro">
+      <p><span data-en="Everything you read ends up on a 3D bookshelf. &lt;b&gt;PDF&lt;/b&gt; holds the documents you open or add, several at once and never twice (each file is recognised by its content); &lt;b&gt;Web&lt;/b&gt; holds the works read on web pages, one shelf per site, at the chapter you reached. Hover a book and it comes out and turns its cover to you; choose it and it turns in the middle while the shelf steps back, blurred.">Todo lo que lees acaba en una estantería 3D. En <b>PDF</b> están los documentos que abres o añades, varios a la vez y nunca dos veces (cada archivo se reconoce por su contenido); en <b>Web</b>, las obras leídas en páginas web, una balda por sitio y en el capítulo por el que ibas. Pasa el ratón y el libro sale y gira su portada hacia ti; elígelo y gira en el centro mientras la estantería se aparta, desenfocada.</span></p>
+    </div>
+    <dl>
+      <dt data-en="Its real details">Sus datos de verdad</dt>
+      <dd data-en="Looks the book up in Open Library and Google Books by its title, or by the ISBN printed inside, and you choose the right match: title, author, year, publisher, ISBN and cover.">Busca el libro en Open Library y Google Books por su título, o por el ISBN impreso dentro, y tú eliges la coincidencia correcta: título, autor, año, editorial, ISBN y portada.</dd>
+      <dt data-en="Shelves of your own">Estanterías tuyas</dt>
+      <dd data-en="Tags become sub-libraries; your own covers and back covers, the spine's color, and oak, walnut, dark or minimal wood.">Las etiquetas se vuelven sub-bibliotecas; portadas y contraportadas propias, el color del lomo, y madera de roble, nogal, oscura o minimalista.</dd>
+      <dt data-en="A PDF with its contents">Un PDF con su índice</dt>
+      <dd data-en="The document's own table of contents takes you to each chapter, the reader remembers your page, and two-column pages are read in order.">El índice del propio documento te lleva a cada capítulo, el lector recuerda tu página y las páginas a dos columnas se leen en orden.</dd>
+    </dl>
 
     <h2 data-en="Of the three voices">De las tres voces</h2>
     <table>
