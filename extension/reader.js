@@ -6152,7 +6152,7 @@ function splitIntoSentences(text) {
     return p.length > 0;
   });
 }
-function wordsOf(text) {
+function wordsOf2(text) {
   var out = [], re = /\S+/g, m;
   while (m = re.exec(text)) out.push({ start: m.index, text: m[0] });
   return out;
@@ -6160,7 +6160,7 @@ function wordsOf(text) {
 function sentencesOf(text, refIdx) {
   var hint = 0;
   return splitIntoSentences(text).map(function(s) {
-    var item = { text: s, refIdx, words: wordsOf(s), hint };
+    var item = { text: s, refIdx, words: wordsOf2(s), hint };
     hint += compact(s).length;
     return item;
   });
@@ -7141,9 +7141,72 @@ var init_content = __esm({
 // src/reader.js
 init_highlight();
 
+// src/lookup.js
+var JUNK = /\b(z-?lib(?:rary)?(?:\.org)?|libgen|annas?[- ]archive|epub|pdf|mobi|azw3?|retail|digital|scan(?:lation)?s?|fan[- ]?trad(?:uccion|ucción)?|fan[- ]?translat(?:ion|ed)|www\.[^\s)]*|\S+\.(?:com|org|net))\b/gi;
+var JUNK_ONE = new RegExp(JUNK.source, "i");
+var LN = /\b(LN|WN|light[\s_-]?novel|novela[\s_-]?ligera|web[\s_-]?novel|isekai)\b/i;
+var STOP = new Set("the a an of and or to in on at for with de del la las el los y o en un una unos unas al por para con su sus no ni vol volume volumen tomo libro book part parte edition edicion edici\xF3n novel novela ligera light".split(" "));
+function fold(s) {
+  return String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+}
+function wordsOf(s) {
+  return fold(s).replace(/[^\p{L}\p{N}]+/gu, " ").trim().split(" ").filter(function(w) {
+    return w && !STOP.has(w);
+  });
+}
+function parseTitle(name) {
+  var s = String(name || "").replace(/\.(pdf|epub|mobi|azw3?|txt)$/i, "");
+  var tagged = /\[[^\]]*\]/.test(s);
+  var lnHint = LN.test(s);
+  s = s.replace(/\[[^\]]*\]|\{[^}]*\}/g, " ");
+  s = s.replace(/\(([^)]*)\)/g, function(m2, inner) {
+    return JUNK_ONE.test(inner) || LN.test(inner) || /\b(press|edition|edici[oó]n|ediciones|editorial|publishing|kodansha|yen|j-?novel|seven seas)\b/i.test(inner) ? " " : m2;
+  });
+  s = s.replace(/[_+]+/g, " ").replace(/\.(?!\d)/g, " ");
+  s = s.replace(JUNK, " ").replace(new RegExp(LN.source, "gi"), " ");
+  var volume = null, chapter = null, m;
+  if ((m = s.match(/\b(?:vol(?:ume|umen)?|tomo|libro|book|t)\s*\.?\s*(\d{1,3}(?:\.\d)?)\b/i)) || (m = s.match(/\bv(\d{1,3})\b/i))) {
+    volume = parseFloat(m[1]);
+    s = s.replace(m[0], " ");
+  }
+  if (m = s.match(/\b(?:cap[ií]tulo|chapter|cap|ch)\s*\.?\s*(\d{1,4})\b/i)) {
+    chapter = parseInt(m[1], 10);
+    s = s.replace(m[0], " ");
+  }
+  if (volume == null && (m = s.match(/(?:\s[\-–—]\s*(\d{1,3})|\s(\d{1,2}))\s*$/)) && s.slice(0, m.index).trim()) {
+    m[1] = m[1] || m[2];
+    volume = parseInt(m[1], 10);
+    s = s.slice(0, m.index);
+  }
+  var series = s.replace(/\s*[\-–—:,]+\s*$/, "").replace(/^\s*[\-–—:,]+\s*/, "").replace(/\s{2,}/g, " ").trim();
+  if (tagged && volume != null) lnHint = true;
+  return {
+    series,
+    volume,
+    chapter,
+    keywords: wordsOf(series),
+    lnHint,
+    clean: series + (volume != null ? " Vol. " + volume : "") + (chapter != null ? " \xB7 " + chapter : "")
+  };
+}
+function sortKeyOf(series, volume) {
+  var v = volume == null ? "" : String(Math.round(volume * 10)).padStart(5, "0");
+  return wordsOf(series).join(" ") + "|" + v;
+}
+var LANG3 = { es: "spa", en: "eng", ja: "jpn", fr: "fre", de: "ger", it: "ita", pt: "por", zh: "chi", ko: "kor", ru: "rus", ca: "cat" };
+var LANG2 = Object.fromEntries(Object.entries(LANG3).map(function(e) {
+  return [e[1], e[0]];
+}));
+
 // src/books.js
 var KEY = "library";
-var DEFAULT_SETTINGS = { wood: "oak", sort: "recent", size: "m", keepCopies: true };
+var DEFAULT_SETTINGS = { wood: "oak", sort: "recent", size: "m", keepCopies: true, metaLang: "auto" };
+function seriesFields(name, title) {
+  var a = parseTitle(name || ""), b = parseTitle(title || "");
+  var series = a.series || b.series || title || name || "";
+  var volume = a.volume != null ? a.volume : b.volume;
+  return { series, volume: volume == null ? null : volume, sortKey: sortKeyOf(series, volume) };
+}
 function bookId(key) {
   var h = 2166136261;
   for (var i = 0; i < key.length; i++) {
@@ -7158,8 +7221,12 @@ async function loadLibrary() {
     got = (await browser.storage.local.get(KEY))[KEY] || {};
   } catch (_) {
   }
+  var books = got.books || {};
+  Object.values(books).forEach(function(b) {
+    if (!b.sortKey && b.id && b.id.charAt(0) === "b") Object.assign(b, seriesFields(b.name, b.title));
+  });
   return {
-    books: got.books || {},
+    books,
     tags: got.tags || [],
     settings: Object.assign({}, DEFAULT_SETTINGS, got.settings || {})
   };
@@ -28550,21 +28617,39 @@ function isbnIn(text) {
   }
   return null;
 }
+async function pageText(doc, n) {
+  try {
+    return (await (await doc.getPage(n)).getTextContent()).items.map(function(it) {
+      return it.str;
+    }).join(" ");
+  } catch (_) {
+    return "";
+  }
+}
 async function findIsbn(doc) {
   var pages = [];
   for (var n = 1; n <= Math.min(6, doc.numPages); n++) pages.push(n);
   for (var k = Math.max(7, doc.numPages - 1); k <= doc.numPages; k++) pages.push(k);
   for (var i = 0; i < pages.length; i++) {
-    try {
-      var tc = await (await doc.getPage(pages[i])).getTextContent();
-      var found = isbnIn(tc.items.map(function(it) {
-        return it.str;
-      }).join(" "));
-      if (found) return found;
-    } catch (_) {
-    }
+    var found = isbnIn(await pageText(doc, pages[i]));
+    if (found) return found;
   }
   return null;
+}
+async function findLanguage(doc, metaLang) {
+  var m = /^([a-z]{2})\b/i.exec(metaLang || "");
+  if (m) return m[1].toLowerCase();
+  var text = "";
+  for (var n = 1; n <= Math.min(12, doc.numPages) && text.length < 4e3; n++) text += " " + await pageText(doc, n);
+  text = text.replace(/\s+/g, " ").trim();
+  if (text.length < 80) return null;
+  try {
+    var r = await browser.i18n.detectLanguage(text.slice(0, 6e3));
+    var best = r && r.isReliable !== false && r.languages && r.languages[0];
+    return best && best.percentage >= 50 ? best.language.slice(0, 2) : null;
+  } catch (_) {
+    return null;
+  }
 }
 async function shelveDocument(doc, info2) {
   var hash = await sha256Hex(info2.data);
@@ -28584,6 +28669,7 @@ async function shelveDocument(doc, info2) {
     src: info2.src || prev.src || null,
     size: info2.data.byteLength
   };
+  if (!prev.sortKey) Object.assign(patch, seriesFields(prev.name || info2.name, patch.title));
   if (lib.settings.keepCopies && !await readFile(id, "pdf")) {
     try {
       await writeFile(id, "pdf", new Blob([info2.data], { type: "application/pdf" }));
@@ -28612,6 +28698,10 @@ async function shelveDocument(doc, info2) {
       if (!book.isbnFound) {
         var isbn = await findIsbn(doc);
         if (isbn) await updateBook(id, { isbnFound: isbn });
+      }
+      if (!book.lang) {
+        var lang = await findLanguage(doc, info2.lang);
+        if (lang) await updateBook(id, { lang });
       }
     } catch (e) {
       console.error("[zenTTS] cover:", e.message || e);

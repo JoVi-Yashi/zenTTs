@@ -1,6 +1,354 @@
+// src/lookup.js
+var ORIGINS = [
+  "https://openlibrary.org/*",
+  "https://covers.openlibrary.org/*",
+  "https://www.googleapis.com/*",
+  "https://books.google.com/*",
+  "https://graphql.anilist.co/*",
+  "https://s4.anilist.co/*",
+  "https://api.jikan.moe/*",
+  "https://cdn.myanimelist.net/*"
+];
+function askAccess(extra) {
+  try {
+    return browser.permissions.request({ origins: ORIGINS.concat(extra || []) });
+  } catch (_) {
+    return Promise.resolve(false);
+  }
+}
+var JUNK = /\b(z-?lib(?:rary)?(?:\.org)?|libgen|annas?[- ]archive|epub|pdf|mobi|azw3?|retail|digital|scan(?:lation)?s?|fan[- ]?trad(?:uccion|ucción)?|fan[- ]?translat(?:ion|ed)|www\.[^\s)]*|\S+\.(?:com|org|net))\b/gi;
+var JUNK_ONE = new RegExp(JUNK.source, "i");
+var LN = /\b(LN|WN|light[\s_-]?novel|novela[\s_-]?ligera|web[\s_-]?novel|isekai)\b/i;
+var STOP = new Set("the a an of and or to in on at for with de del la las el los y o en un una unos unas al por para con su sus no ni vol volume volumen tomo libro book part parte edition edicion edici\xF3n novel novela ligera light".split(" "));
+function fold(s) {
+  return String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+}
+function wordsOf(s) {
+  return fold(s).replace(/[^\p{L}\p{N}]+/gu, " ").trim().split(" ").filter(function(w) {
+    return w && !STOP.has(w);
+  });
+}
+function parseTitle(name) {
+  var s = String(name || "").replace(/\.(pdf|epub|mobi|azw3?|txt)$/i, "");
+  var tagged = /\[[^\]]*\]/.test(s);
+  var lnHint = LN.test(s);
+  s = s.replace(/\[[^\]]*\]|\{[^}]*\}/g, " ");
+  s = s.replace(/\(([^)]*)\)/g, function(m2, inner) {
+    return JUNK_ONE.test(inner) || LN.test(inner) || /\b(press|edition|edici[oó]n|ediciones|editorial|publishing|kodansha|yen|j-?novel|seven seas)\b/i.test(inner) ? " " : m2;
+  });
+  s = s.replace(/[_+]+/g, " ").replace(/\.(?!\d)/g, " ");
+  s = s.replace(JUNK, " ").replace(new RegExp(LN.source, "gi"), " ");
+  var volume = null, chapter = null, m;
+  if ((m = s.match(/\b(?:vol(?:ume|umen)?|tomo|libro|book|t)\s*\.?\s*(\d{1,3}(?:\.\d)?)\b/i)) || (m = s.match(/\bv(\d{1,3})\b/i))) {
+    volume = parseFloat(m[1]);
+    s = s.replace(m[0], " ");
+  }
+  if (m = s.match(/\b(?:cap[ií]tulo|chapter|cap|ch)\s*\.?\s*(\d{1,4})\b/i)) {
+    chapter = parseInt(m[1], 10);
+    s = s.replace(m[0], " ");
+  }
+  if (volume == null && (m = s.match(/(?:\s[\-–—]\s*(\d{1,3})|\s(\d{1,2}))\s*$/)) && s.slice(0, m.index).trim()) {
+    m[1] = m[1] || m[2];
+    volume = parseInt(m[1], 10);
+    s = s.slice(0, m.index);
+  }
+  var series = s.replace(/\s*[\-–—:,]+\s*$/, "").replace(/^\s*[\-–—:,]+\s*/, "").replace(/\s{2,}/g, " ").trim();
+  if (tagged && volume != null) lnHint = true;
+  return {
+    series,
+    volume,
+    chapter,
+    keywords: wordsOf(series),
+    lnHint,
+    clean: series + (volume != null ? " Vol. " + volume : "") + (chapter != null ? " \xB7 " + chapter : "")
+  };
+}
+function cleanTitle(name) {
+  return parseTitle(name).clean;
+}
+function sortKeyOf(series, volume) {
+  var v = volume == null ? "" : String(Math.round(volume * 10)).padStart(5, "0");
+  return wordsOf(series).join(" ") + "|" + v;
+}
+var LANG3 = { es: "spa", en: "eng", ja: "jpn", fr: "fre", de: "ger", it: "ita", pt: "por", zh: "chi", ko: "kor", ru: "rus", ca: "cat" };
+var LANG2 = Object.fromEntries(Object.entries(LANG3).map(function(e) {
+  return [e[1], e[0]];
+}));
+function langName(code, es) {
+  try {
+    return new Intl.DisplayNames([es ? "es" : "en"], { type: "language" }).of(code);
+  } catch (_) {
+    return code;
+  }
+}
+function https(url) {
+  return url ? url.replace(/^http:/, "https:") : null;
+}
+function pickIsbn(list) {
+  var all = (list || []).map(function(x) {
+    return String(x).replace(/[^\dX]/gi, "");
+  });
+  return { isbn13: all.find(function(x) {
+    return x.length === 13;
+  }) || null, isbn10: all.find(function(x) {
+    return x.length === 10;
+  }) || null };
+}
+async function getJson(url, init2) {
+  var resp = await fetch(url, Object.assign({ credentials: "omit" }, init2 || {}));
+  if (!resp.ok) throw new Error("HTTP " + resp.status);
+  return resp.json();
+}
+async function openLibrary(by, lang) {
+  var fields = "key,title,subtitle,author_name,first_publish_year,publisher,isbn,cover_i,number_of_pages_median,language";
+  var params = "limit=8&fields=" + fields;
+  if (by.isbn) params += "&isbn=" + encodeURIComponent(by.isbn);
+  else if (by.title) params += "&title=" + encodeURIComponent(by.title);
+  else params += "&q=" + encodeURIComponent(by.q);
+  if (lang && LANG3[lang]) params += "&language=" + LANG3[lang];
+  var data = await getJson("https://openlibrary.org/search.json?" + params);
+  return (data.docs || []).map(function(d) {
+    var ids = pickIsbn(d.isbn);
+    if (by.isbn) {
+      if (by.isbn.length === 13) ids.isbn13 = by.isbn;
+      else ids.isbn10 = by.isbn;
+    }
+    var langs = (d.language || []).map(function(l) {
+      return LANG2[l] || l;
+    });
+    return {
+      source: "Open Library",
+      kind: "book",
+      title: d.title,
+      subtitle: d.subtitle || "",
+      authors: d.author_name || [],
+      year: d.first_publish_year || null,
+      publisher: (d.publisher || [])[0] || "",
+      isbn13: ids.isbn13,
+      isbn10: ids.isbn10,
+      pages: d.number_of_pages_median || null,
+      // An edition in several languages is taken as yours if yours is among them
+      lang: lang && langs.indexOf(lang) >= 0 ? lang : langs[0] || null,
+      thumb: d.cover_i ? "https://covers.openlibrary.org/b/id/" + d.cover_i + "-M.jpg" : null,
+      cover: d.cover_i ? "https://covers.openlibrary.org/b/id/" + d.cover_i + "-L.jpg" : null
+    };
+  });
+}
+async function googleBooks(q, lang) {
+  var url = "https://www.googleapis.com/books/v1/volumes?maxResults=10&printType=books&q=" + encodeURIComponent(q);
+  if (lang) url += "&langRestrict=" + lang;
+  var data = await getJson(url);
+  return (data.items || []).map(function(it) {
+    var v = it.volumeInfo || {};
+    var ids = pickIsbn((v.industryIdentifiers || []).map(function(x) {
+      return x.identifier;
+    }));
+    var img = v.imageLinks || {};
+    var thumb = https(img.thumbnail || img.smallThumbnail);
+    return {
+      source: "Google Books",
+      kind: "book",
+      title: v.title,
+      subtitle: v.subtitle || "",
+      authors: v.authors || [],
+      year: v.publishedDate ? parseInt(v.publishedDate, 10) || null : null,
+      publisher: v.publisher || "",
+      isbn13: ids.isbn13,
+      isbn10: ids.isbn10,
+      pages: v.pageCount || null,
+      lang: v.language || null,
+      thumb,
+      cover: thumb ? thumb.replace(/&edge=curl/, "").replace(/zoom=\d/, "zoom=2") : null
+    };
+  });
+}
+var ANILIST_QUERY = "query($s:String){Page(perPage:6){media(search:$s,type:MANGA,sort:SEARCH_MATCH){id format title{romaji english native} startDate{year} volumes siteUrl coverImage{extraLarge large} staff(perPage:6){edges{role node{name{full}}}}}}}";
+async function aniList(search) {
+  var data = await getJson("https://graphql.anilist.co", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ query: ANILIST_QUERY, variables: { s: search } })
+  });
+  var list = data.data && data.data.Page && data.data.Page.media || [];
+  return list.map(function(m) {
+    var t = m.title || {};
+    var authors = (m.staff && m.staff.edges || []).filter(function(e) {
+      return /story|original|author/i.test(e.role || "");
+    }).map(function(e) {
+      return e.node && e.node.name && e.node.name.full;
+    }).filter(Boolean);
+    var cover = m.coverImage && (m.coverImage.extraLarge || m.coverImage.large);
+    return {
+      source: "AniList",
+      kind: "series",
+      format: m.format === "NOVEL" ? "novel" : "manga",
+      title: t.english || t.romaji || t.native,
+      subtitle: "",
+      altTitles: [t.romaji, t.native].filter(Boolean),
+      authors: Array.from(new Set(authors)),
+      year: m.startDate && m.startDate.year || null,
+      publisher: "",
+      isbn13: null,
+      isbn10: null,
+      pages: null,
+      volumes: m.volumes || null,
+      lang: null,
+      url: m.siteUrl,
+      thumb: cover,
+      cover
+    };
+  });
+}
+function flipName(n) {
+  var p = String(n).split(", ");
+  return p.length === 2 ? p[1] + " " + p[0] : n;
+}
+async function jikan(search) {
+  var data = await getJson("https://api.jikan.moe/v4/manga?limit=6&q=" + encodeURIComponent(search));
+  return (data.data || []).map(function(m) {
+    var img = m.images && (m.images.jpg || m.images.webp) || {};
+    var from = m.published && m.published.prop && m.published.prop.from;
+    return {
+      source: "MyAnimeList",
+      kind: "series",
+      format: /novel/i.test(m.type || "") ? "novel" : "manga",
+      title: m.title_english || m.title,
+      subtitle: "",
+      altTitles: [m.title, m.title_japanese].filter(Boolean),
+      authors: (m.authors || []).map(function(a) {
+        return flipName(a.name);
+      }),
+      year: from && from.year || null,
+      publisher: "",
+      isbn13: null,
+      isbn10: null,
+      pages: null,
+      volumes: m.volumes || null,
+      lang: null,
+      url: m.url,
+      thumb: img.image_url || img.large_image_url || null,
+      cover: img.large_image_url || img.image_url || null
+    };
+  });
+}
+function hasNumber(text, n) {
+  return new RegExp("(^|\\D)0*" + String(n).replace(".", "\\.") + "(?!\\d)").test(text);
+}
+function score(r, o) {
+  var p = o.parsed || {};
+  var mine = p.keywords && p.keywords.length ? p.keywords : wordsOf(o.query || "");
+  var text = [r.title, r.subtitle].concat(r.altTitles || []).join(" ");
+  var theirs = new Set(wordsOf(text));
+  var common = mine.filter(function(w) {
+    return theirs.has(w);
+  }).length;
+  var s = mine.length ? 4 * common / mine.length : 1;
+  if (p.volume != null && r.kind === "book") {
+    var nums = (fold(r.title + " " + r.subtitle).match(/\d+(\.\d)?/g) || []).map(Number);
+    if (hasNumber(r.title + " " + r.subtitle, p.volume)) s += 1.5;
+    else if (nums.some(function(n) {
+      return n > 0 && n < 400;
+    })) s -= 1;
+  }
+  if (r.cover || r.thumb) s += 0.6;
+  if (r.authors && r.authors.length) s += 0.3;
+  if (o.lang && r.lang) s += r.lang === o.lang ? 1.2 : -0.8;
+  if (r.kind === "series") s += p.lnHint ? 0.8 : -0.5;
+  var isbn = o.isbn && String(o.isbn);
+  if (isbn && (r.isbn13 === isbn || r.isbn10 === isbn)) s += o.lang && r.lang && r.lang !== o.lang ? 0.3 : 2;
+  return Math.round(s * 100) / 100;
+}
+function mergeInto(out, seen, list) {
+  list.forEach(function(b) {
+    if (!b || !b.title) return;
+    var k = b.isbn13 || b.isbn10 || b.source + "|" + fold(b.title) + "|" + fold(b.authors[0] || "");
+    var k2 = fold(b.title) + "|" + fold(b.authors[0] || "") + "|" + (b.lang || "") + "|" + b.kind;
+    var had = seen[k] || seen[k2];
+    if (had) {
+      if (!had.thumb && b.thumb) Object.assign(had, { thumb: b.thumb, cover: b.cover });
+      if (!had.lang && b.lang) had.lang = b.lang;
+      return;
+    }
+    seen[k] = seen[k2] = b;
+    out.push(b);
+  });
+}
+async function searchBooks(o) {
+  var p = o.parsed || parseTitle(o.query || "");
+  var lang = o.lang || null;
+  var step = o.onStep || function() {
+  };
+  var out = [], seen = {}, tried = 0, failed = 0;
+  var opts = { parsed: p, isbn: o.isbn, lang, query: o.query };
+  async function run(jobs2) {
+    var settled = await Promise.allSettled(jobs2);
+    settled.forEach(function(r) {
+      tried++;
+      if (r.status === "fulfilled") mergeInto(out, seen, r.value);
+      else failed++;
+    });
+  }
+  function good() {
+    return out.filter(function(r) {
+      return score(r, opts) >= 3.2 && (!lang || !r.lang || r.lang === lang);
+    }).length;
+  }
+  var text = o.query || [p.series, p.volume != null ? p.volume : ""].join(" ").trim();
+  if (o.isbn) {
+    step("isbn");
+    await run([openLibrary({ isbn: o.isbn }), googleBooks("isbn:" + o.isbn)]);
+  }
+  if (text && good() < 3) {
+    step("title");
+    var jobs = [openLibrary({ q: text }), googleBooks(text)];
+    if (lang) jobs.push(openLibrary({ q: text }, lang), googleBooks(text, lang));
+    if (p.series && p.volume != null) jobs.push(googleBooks("intitle:" + p.series + " " + p.volume, lang));
+    await run(jobs);
+  }
+  if (good() < 3 && p.series) {
+    step("keywords");
+    var kw = p.keywords.join(" ");
+    var more = [googleBooks(p.series, lang), openLibrary({ title: p.series })];
+    if (kw && kw !== fold(p.series)) more.push(openLibrary({ q: kw }));
+    if (p.lnHint) more.push(googleBooks(p.series + " light novel" + (p.volume != null ? " " + p.volume : "")));
+    await run(more);
+  }
+  if ((p.lnHint || good() < 3) && (p.series || text)) {
+    step("series");
+    await run([aniList(p.series || text), jikan(p.series || text)]);
+  }
+  if (tried && failed === tried) throw new Error("offline");
+  out.forEach(function(r) {
+    r.score = score(r, opts);
+    r.otherLang = !!(lang && r.lang && r.lang !== lang);
+  });
+  out.sort(function(a, b) {
+    return b.score - a.score;
+  });
+  return out;
+}
+function coverUrlsForIsbn(isbn) {
+  if (!isbn) return [];
+  return ["https://covers.openlibrary.org/b/isbn/" + isbn + "-L.jpg"];
+}
+async function fetchCover(url) {
+  var resp = await fetch(url, { credentials: "omit" });
+  if (!resp.ok) throw new Error("HTTP " + resp.status);
+  var blob = await resp.blob();
+  if (blob.size < 1e3) throw new Error("no cover");
+  if (blob.type && !/^image\//.test(blob.type)) throw new Error("not an image");
+  return blob;
+}
+
 // src/books.js
 var KEY = "library";
-var DEFAULT_SETTINGS = { wood: "oak", sort: "recent", size: "m", keepCopies: true };
+var DEFAULT_SETTINGS = { wood: "oak", sort: "recent", size: "m", keepCopies: true, metaLang: "auto" };
+function seriesFields(name, title) {
+  var a = parseTitle(name || ""), b = parseTitle(title || "");
+  var series = a.series || b.series || title || name || "";
+  var volume = a.volume != null ? a.volume : b.volume;
+  return { series, volume: volume == null ? null : volume, sortKey: sortKeyOf(series, volume) };
+}
 function bookId(key) {
   var h = 2166136261;
   for (var i = 0; i < key.length; i++) {
@@ -15,8 +363,12 @@ async function loadLibrary() {
     got = (await browser.storage.local.get(KEY))[KEY] || {};
   } catch (_) {
   }
+  var books2 = got.books || {};
+  Object.values(books2).forEach(function(b) {
+    if (!b.sortKey && b.id && b.id.charAt(0) === "b") Object.assign(b, seriesFields(b.name, b.title));
+  });
   return {
-    books: got.books || {},
+    books: books2,
     tags: got.tags || [],
     settings: Object.assign({}, DEFAULT_SETTINGS, got.settings || {})
   };
@@ -21380,21 +21732,39 @@ function isbnIn(text) {
   }
   return null;
 }
+async function pageText(doc, n) {
+  try {
+    return (await (await doc.getPage(n)).getTextContent()).items.map(function(it) {
+      return it.str;
+    }).join(" ");
+  } catch (_) {
+    return "";
+  }
+}
 async function findIsbn(doc) {
   var pages = [];
   for (var n = 1; n <= Math.min(6, doc.numPages); n++) pages.push(n);
   for (var k = Math.max(7, doc.numPages - 1); k <= doc.numPages; k++) pages.push(k);
   for (var i = 0; i < pages.length; i++) {
-    try {
-      var tc = await (await doc.getPage(pages[i])).getTextContent();
-      var found = isbnIn(tc.items.map(function(it) {
-        return it.str;
-      }).join(" "));
-      if (found) return found;
-    } catch (_) {
-    }
+    var found = isbnIn(await pageText(doc, pages[i]));
+    if (found) return found;
   }
   return null;
+}
+async function findLanguage(doc, metaLang) {
+  var m = /^([a-z]{2})\b/i.exec(metaLang || "");
+  if (m) return m[1].toLowerCase();
+  var text = "";
+  for (var n = 1; n <= Math.min(12, doc.numPages) && text.length < 4e3; n++) text += " " + await pageText(doc, n);
+  text = text.replace(/\s+/g, " ").trim();
+  if (text.length < 80) return null;
+  try {
+    var r = await browser.i18n.detectLanguage(text.slice(0, 6e3));
+    var best = r && r.isReliable !== false && r.languages && r.languages[0];
+    return best && best.percentage >= 50 ? best.language.slice(0, 2) : null;
+  } catch (_) {
+    return null;
+  }
 }
 async function shelveDocument(doc, info2) {
   var hash = await sha256Hex(info2.data);
@@ -21414,6 +21784,7 @@ async function shelveDocument(doc, info2) {
     src: info2.src || prev.src || null,
     size: info2.data.byteLength
   };
+  if (!prev.sortKey) Object.assign(patch, seriesFields(prev.name || info2.name, patch.title));
   if (lib2.settings.keepCopies && !await readFile(id, "pdf")) {
     try {
       await writeFile(id, "pdf", new Blob([info2.data], { type: "application/pdf" }));
@@ -21442,6 +21813,10 @@ async function shelveDocument(doc, info2) {
       if (!book.isbnFound) {
         var isbn = await findIsbn(doc);
         if (isbn) await updateBook(id, { isbnFound: isbn });
+      }
+      if (!book.lang) {
+        var lang = await findLanguage(doc, info2.lang);
+        if (lang) await updateBook(id, { lang });
       }
     } catch (e) {
       console.error("[zenTTS] cover:", e.message || e);
@@ -21472,13 +21847,14 @@ async function importFile(file) {
       meta = await doc.getMetadata();
     } catch (_) {
     }
-    var title = meta && meta.info && meta.info.Title || file.name.replace(/\.pdf$/i, "");
+    var title = meta && meta.info && meta.info.Title || cleanTitle(file.name);
     var res = await shelveDocument(doc, {
       data,
       name: file.name,
       key: "pdf:" + file.name + ":" + file.size,
       title,
-      author: meta && meta.info && meta.info.Author
+      author: meta && meta.info && meta.info.Author,
+      lang: meta && meta.info && meta.info.Language
     });
     await res.done;
     var after = await loadLibrary();
@@ -21488,124 +21864,6 @@ async function importFile(file) {
   } finally {
     doc.destroy();
   }
-}
-
-// src/lookup.js
-var ORIGINS = [
-  "https://openlibrary.org/*",
-  "https://covers.openlibrary.org/*",
-  "https://www.googleapis.com/*",
-  "https://books.google.com/*"
-];
-function askAccess() {
-  try {
-    return browser.permissions.request({ origins: ORIGINS });
-  } catch (_) {
-    return Promise.resolve(false);
-  }
-}
-function cleanTitle(name) {
-  return String(name || "").replace(/\.pdf$/i, "").replace(/\[[^\]]*\]|\([^)]*(z-lib|libgen|epub|pdf|www\.|\.com|\.org)[^)]*\)/gi, " ").replace(/[_+.]+/g, " ").replace(/\s*-\s*$/, "").replace(/\s{2,}/g, " ").trim();
-}
-function https(url) {
-  return url ? url.replace(/^http:/, "https:") : null;
-}
-function pickIsbn(list) {
-  var all = (list || []).map(function(x) {
-    return String(x).replace(/[^\dX]/gi, "");
-  });
-  return { isbn13: all.find(function(x) {
-    return x.length === 13;
-  }) || null, isbn10: all.find(function(x) {
-    return x.length === 10;
-  }) || null };
-}
-async function getJson(url) {
-  var resp = await fetch(url, { credentials: "omit" });
-  if (!resp.ok) throw new Error("HTTP " + resp.status);
-  return resp.json();
-}
-async function openLibrary(query2, isbn) {
-  var fields = "key,title,subtitle,author_name,first_publish_year,publisher,isbn,cover_i,number_of_pages_median";
-  var url = "https://openlibrary.org/search.json?limit=8&fields=" + fields + "&" + (isbn ? "isbn=" + encodeURIComponent(isbn) : "q=" + encodeURIComponent(query2));
-  var data = await getJson(url);
-  return (data.docs || []).map(function(d) {
-    var ids = pickIsbn(d.isbn);
-    if (isbn) {
-      if (isbn.length === 13) ids.isbn13 = isbn;
-      else ids.isbn10 = isbn;
-    }
-    return {
-      source: "Open Library",
-      title: d.title,
-      subtitle: d.subtitle || "",
-      authors: d.author_name || [],
-      year: d.first_publish_year || null,
-      publisher: (d.publisher || [])[0] || "",
-      isbn13: ids.isbn13,
-      isbn10: ids.isbn10,
-      pages: d.number_of_pages_median || null,
-      thumb: d.cover_i ? "https://covers.openlibrary.org/b/id/" + d.cover_i + "-M.jpg" : null,
-      cover: d.cover_i ? "https://covers.openlibrary.org/b/id/" + d.cover_i + "-L.jpg" : null
-    };
-  });
-}
-async function googleBooks(query2, isbn) {
-  var q = isbn ? "isbn:" + isbn : query2;
-  var data = await getJson("https://www.googleapis.com/books/v1/volumes?maxResults=8&q=" + encodeURIComponent(q));
-  return (data.items || []).map(function(it) {
-    var v = it.volumeInfo || {};
-    var ids = pickIsbn((v.industryIdentifiers || []).map(function(x) {
-      return x.identifier;
-    }));
-    var img = v.imageLinks || {};
-    var thumb = https(img.thumbnail || img.smallThumbnail);
-    return {
-      source: "Google Books",
-      title: v.title,
-      subtitle: v.subtitle || "",
-      authors: v.authors || [],
-      year: v.publishedDate ? parseInt(v.publishedDate, 10) || null : null,
-      publisher: v.publisher || "",
-      isbn13: ids.isbn13,
-      isbn10: ids.isbn10,
-      pages: v.pageCount || null,
-      thumb,
-      cover: thumb ? thumb.replace(/&edge=curl/, "").replace(/zoom=\d/, "zoom=2") : null
-    };
-  });
-}
-async function searchBooks(query2, isbn) {
-  var jobs = [];
-  if (isbn) jobs.push(openLibrary(null, isbn), googleBooks(null, isbn));
-  if (query2) jobs.push(openLibrary(query2), googleBooks(query2));
-  var settled = await Promise.allSettled(jobs);
-  var out = [], seen = {};
-  settled.forEach(function(r) {
-    if (r.status !== "fulfilled") return;
-    r.value.forEach(function(b) {
-      if (!b.title) return;
-      var k = b.isbn13 || b.isbn10 || (b.title + "|" + (b.authors[0] || "")).toLowerCase();
-      if (seen[k]) {
-        if (!seen[k].thumb && b.thumb) Object.assign(seen[k], { thumb: b.thumb, cover: b.cover });
-        return;
-      }
-      seen[k] = b;
-      out.push(b);
-    });
-  });
-  var failed = settled.every(function(r) {
-    return r.status === "rejected";
-  });
-  if (failed && jobs.length) throw new Error(settled[0].reason && settled[0].reason.message || "offline");
-  return out;
-}
-async function fetchCover(url) {
-  var resp = await fetch(url, { credentials: "omit" });
-  if (!resp.ok) throw new Error("HTTP " + resp.status);
-  var blob = await resp.blob();
-  if (blob.size < 1e3) throw new Error("no cover");
-  return blob;
 }
 
 // src/library.js
@@ -21678,10 +21936,10 @@ var S = ES ? {
   lookupPick: "Elegir",
   lookupEmpty: "Sin resultados. Prueba con otro t\xEDtulo o con el ISBN.",
   lookupOffline: "No se pudo buscar (\xBFsin conexi\xF3n?).",
-  lookupDenied: "Hace falta permitir el acceso a Open Library y Google Books para buscar.",
+  lookupDenied: "Hace falta permitir el acceso a Open Library, Google Books, AniList y MyAnimeList para buscar. Puedes escribir los datos a mano.",
   lookupWait: "Buscando\u2026",
   lookupOf: "%s de %s",
-  lookupHint: "Elige el libro que corresponde a este PDF. Se aplican el t\xEDtulo, el autor, el ISBN y la portada.",
+  lookupHint: "Elige el libro que corresponde a este PDF. Antes de aplicar ver\xE1s qu\xE9 cambia y podr\xE1s quedarte solo con lo que quieras.",
   year: "A\xF1o",
   publisher: "Editorial",
   isbn: "ISBN",
@@ -21693,7 +21951,43 @@ var S = ES ? {
   openWork: "Abrir la obra",
   removeWorkQ: "\xBFQuitar \xAB%s\xBB de la biblioteca?",
   rememberWeb: "Recordar lo que leo en la web",
-  rememberHint: "Solo las p\xE1ginas que zenTTS lee en voz alta."
+  rememberHint: "Solo las p\xE1ginas que zenTTS lee en voz alta.",
+  byTitleSeries: "T\xEDtulo y serie",
+  series: "Serie",
+  volume: "Vol.",
+  volumeN: "Vol. %s",
+  lang: "Idioma",
+  metaLang: "Idioma de los datos",
+  langAuto: "El del libro",
+  lkLn: "Novela ligera / manga",
+  lkMore: "Ver m\xE1s resultados (%s)",
+  lkOther: "Otra b\xFAsqueda: t\xEDtulo, autor o ISBN",
+  lkResults: "Resultados",
+  lkManual: "Escribir a mano",
+  lkStep: { isbn: "Buscando por ISBN\u2026", title: "Buscando por t\xEDtulo\u2026", keywords: "Probando con palabras clave\u2026", series: "Buscando en AniList y MyAnimeList\u2026" },
+  lkSeries: "Serie \xB7 %s",
+  lkNovel: "novela ligera",
+  lkManga: "manga",
+  lkOtherEd: "Otra edici\xF3n \xB7 %s",
+  lkEdition: "Edici\xF3n en %s",
+  lkNoLang: "Idioma sin indicar",
+  lkSeriesSrc: "Datos de la serie (no del volumen)",
+  lkWarnLang: "Esta edici\xF3n est\xE1 en %s y tu libro en %s: su t\xEDtulo, autor e ISBN solo se marcan si a tu libro le faltan.",
+  lkBack: "Volver a resultados",
+  lkApply: "Aplicar lo marcado",
+  lkField: "Campo",
+  lkNow: "Ahora",
+  lkNew: "Propuesto",
+  lkCover: "Portada",
+  lkSame: "igual",
+  lkNothing: "Marca al menos un campo.",
+  lkManualHint: "Escribe los datos que quieras. La serie y el volumen deciden el orden en la estanter\xEDa.",
+  lkCoverUrl: "URL de la portada",
+  lkCoverFile: "Elegir imagen\u2026",
+  lkCoverWeb: "Buscar portada en la web",
+  lkCoverBad: "No se pudo descargar esa imagen.",
+  lkEmptyManual: "Nada encontrado. Puedes escribir los datos a mano.",
+  lkApplyManual: "Guardar"
 } : {
   title: "\xB7 Library",
   search: "Search by title or author",
@@ -21756,10 +22050,10 @@ var S = ES ? {
   lookupPick: "Choose",
   lookupEmpty: "No results. Try another title or the ISBN.",
   lookupOffline: "Could not search (offline?).",
-  lookupDenied: "Access to Open Library and Google Books is needed to search.",
+  lookupDenied: "Access to Open Library, Google Books, AniList and MyAnimeList is needed to search. You can type the details in.",
   lookupWait: "Searching\u2026",
   lookupOf: "%s of %s",
-  lookupHint: "Choose the book this PDF is. Its title, author, ISBN and cover are applied.",
+  lookupHint: "Choose the book this PDF is. Before anything is applied you see what changes and keep only what you want.",
   year: "Year",
   publisher: "Publisher",
   isbn: "ISBN",
@@ -21771,7 +22065,43 @@ var S = ES ? {
   openWork: "Open the work",
   removeWorkQ: "Remove \u201C%s\u201D from the library?",
   rememberWeb: "Remember what I read on the web",
-  rememberHint: "Only pages zenTTS reads aloud."
+  rememberHint: "Only pages zenTTS reads aloud.",
+  byTitleSeries: "Title and series",
+  series: "Series",
+  volume: "Vol.",
+  volumeN: "Vol. %s",
+  lang: "Language",
+  metaLang: "Language of the details",
+  langAuto: "The book\u2019s own",
+  lkLn: "Light novel / manga",
+  lkMore: "Show more results (%s)",
+  lkOther: "Another search: title, author or ISBN",
+  lkResults: "Results",
+  lkManual: "Type them in",
+  lkStep: { isbn: "Searching by ISBN\u2026", title: "Searching by title\u2026", keywords: "Trying keywords\u2026", series: "Searching AniList and MyAnimeList\u2026" },
+  lkSeries: "Series \xB7 %s",
+  lkNovel: "light novel",
+  lkManga: "manga",
+  lkOtherEd: "Other edition \xB7 %s",
+  lkEdition: "Edition in %s",
+  lkNoLang: "Language not given",
+  lkSeriesSrc: "Details of the series (not the volume)",
+  lkWarnLang: "This edition is in %s and your book in %s: its title, author and ISBN are only ticked where your book has none.",
+  lkBack: "Back to results",
+  lkApply: "Apply the ticked ones",
+  lkField: "Field",
+  lkNow: "Now",
+  lkNew: "Proposed",
+  lkCover: "Cover",
+  lkSame: "same",
+  lkNothing: "Tick at least one field.",
+  lkManualHint: "Type the details you want. Series and volume decide the order on the shelf.",
+  lkCoverUrl: "Cover URL",
+  lkCoverFile: "Choose image\u2026",
+  lkCoverWeb: "Search the web for a cover",
+  lkCoverBad: "That image could not be downloaded.",
+  lkEmptyManual: "Nothing found. You can type the details in.",
+  lkApplyManual: "Save"
 };
 function f(s) {
   var a = [].slice.call(arguments, 1);
@@ -21779,6 +22109,10 @@ function f(s) {
     s = s.replace("%s", x);
   });
   return s;
+}
+function cap(s) {
+  s = String(s || "");
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 function $(id) {
   return document.getElementById(id);
@@ -21834,10 +22168,13 @@ function progressOf(b) {
   var p = b.progress || (b.lastPage && b.pages ? b.lastPage / b.pages : 0);
   return Math.max(0, Math.min(1, p || 0));
 }
+function orderKey(b) {
+  return b.sortKey || wordsOf(b.title || b.name || "").join(" ");
+}
 function sorted(list) {
   var s = lib.settings.sort;
   return list.slice().sort(function(a, b) {
-    if (s === "title") return (a.title || "").localeCompare(b.title || "");
+    if (s === "title") return orderKey(a).localeCompare(orderKey(b), void 0, { numeric: true }) || (a.title || "").localeCompare(b.title || "", void 0, { numeric: true });
     if (s === "progress") return progressOf(b) - progressOf(a);
     return (b.openedAt || b.addedAt || 0) - (a.openedAt || a.addedAt || 0);
   });
@@ -21845,7 +22182,7 @@ function sorted(list) {
 function matches(b) {
   if (!query) return true;
   var q = query.toLowerCase();
-  return (b.title || "").toLowerCase().includes(q) || (b.author || "").toLowerCase().includes(q);
+  return (b.title || "").toLowerCase().includes(q) || (b.author || "").toLowerCase().includes(q) || (b.series || "").toLowerCase().includes(q);
 }
 async function loadCovers(b) {
   if (covers[b.id]) return covers[b.id];
@@ -21985,7 +22322,8 @@ function renderStage() {
     cs.append(row, el("div", "plank"));
     return;
   }
-  var width = Math.max(200, cs.clientWidth - 44 - 36);
+  var h = parseFloat(getComputedStyle(cs).getPropertyValue("--h")) || 210;
+  var width = Math.max(200, cs.clientWidth - 44 - 36 - h * 0.7 * 0.92 - 14);
   var k = 0;
   gs.forEach(function(g) {
     if (g.label) {
@@ -22026,10 +22364,20 @@ function wireBooks(root) {
       var left = r.left + r.width / 2 < row.left + row.width / 2;
       bk.style.setProperty("--turn", left ? "-68deg" : "-112deg");
     }
+    function room() {
+      var row = bk.parentElement, first = row && row.querySelector(".book");
+      if (!first) return;
+      var total = bk.offsetHeight * 0.7 * 0.92;
+      var left = first === bk ? total / 2 : Math.max(0, Math.min(total / 2, first.offsetLeft - 4));
+      row.style.setProperty("--push-l", left + "px");
+      row.style.setProperty("--push-r", total - left + "px");
+    }
     bk.addEventListener("pointerenter", function() {
       aim();
+      room();
       intend(bk, true);
     });
+    bk.addEventListener("focus", room);
     bk.addEventListener("pointerleave", function() {
       intend(bk, false);
     });
@@ -22357,6 +22705,29 @@ function renderCard(b) {
     await refresh();
   };
   card.append(title, author);
+  if (b.kind !== "web") {
+    var sv = el("div", "row2 series-row");
+    var series = el("input", "series");
+    series.value = b.series || "";
+    series.placeholder = S.series;
+    series.setAttribute("aria-label", S.series);
+    var vol = el("input", "vol");
+    vol.type = "number";
+    vol.min = "0";
+    vol.step = "any";
+    vol.value = b.volume != null ? b.volume : "";
+    vol.placeholder = S.volume;
+    vol.setAttribute("aria-label", S.volume);
+    var saveSeries = async function() {
+      var v = vol.value === "" ? null : Number(vol.value);
+      await updateBook(b.id, { series: series.value.trim(), volume: v, sortKey: sortKeyOf(series.value.trim() || b.title, v) });
+      await refresh();
+    };
+    series.onchange = saveSeries;
+    vol.onchange = saveSeries;
+    sv.append(el("span", "muted", S.series), series, el("span", "muted", S.volume), vol);
+    card.appendChild(sv);
+  }
   var p = progressOf(b);
   var where = b.lastPage ? f(S.page, b.lastPage, b.pages || "?") + " \xB7 " + f(S.percent, Math.round(p * 100)) : S.never;
   card.appendChild(el("div", null, where));
@@ -22367,7 +22738,12 @@ function renderCard(b) {
   card.appendChild(meter);
   var info2 = [b.pages ? f(S.pagesN, b.pages) : "", b.openedAt ? f(S.opened, timeAgo(b.openedAt)) : ""].filter(Boolean).join(" \xB7 ");
   card.appendChild(el("div", "muted", info2));
-  var details = [b.year ? S.year + " " + b.year : "", b.publisher || "", b.isbn || b.isbnFound ? S.isbn + " " + (b.isbn || b.isbnFound) : ""].filter(Boolean).join(" \xB7 ");
+  var details = [
+    b.year ? S.year + " " + b.year : "",
+    b.publisher || "",
+    b.isbn || b.isbnFound ? S.isbn + " " + (b.isbn || b.isbnFound) : "",
+    b.lang ? cap(langName(b.lang, ES)) : ""
+  ].filter(Boolean).join(" \xB7 ");
   if (details) card.appendChild(el("div", "muted details", details));
   if (!b.hasFile && b.src) card.appendChild(el("div", "muted", S.noCopy));
   var go = el("button", "btn main", b.lastPage ? S.cont : S.start);
@@ -22548,7 +22924,8 @@ function renderSettings() {
     box.appendChild(l);
   }
   select(S.wood, "wood", [["oak", S.oak], ["walnut", S.walnut], ["dark", S.dark], ["minimal", S.minimal]]);
-  select(S.sort, "sort", [["recent", S.recent], ["title", S.byTitle], ["progress", S.byProgress]]);
+  select(S.sort, "sort", [["recent", S.recent], ["title", S.byTitleSeries], ["progress", S.byProgress]]);
+  select(S.metaLang, "metaLang", [["auto", S.langAuto], ["es", "Espa\xF1ol"], ["en", "English"], ["ja", "\u65E5\u672C\u8A9E"], ["fr", "Fran\xE7ais"], ["pt", "Portugu\xEAs"]]);
   var sz = el("label");
   sz.appendChild(el("span", null, S.size));
   var seg = el("span", "seg");
@@ -22742,16 +23119,13 @@ async function showLookup(i, granted) {
   head.appendChild(el("h2", null, S.lookupTitle));
   if (lookupQueue.length > 1) head.appendChild(el("span", "muted", f(S.lookupOf, i + 1, lookupQueue.length)));
   box.appendChild(head);
-  box.appendChild(el("p", "muted", S.lookupHint));
-  var form = el("form", "lk-form");
-  var q = el("input");
-  q.type = "search";
-  q.value = cleanTitle(b.meta ? b.title : b.title || b.name);
-  var go = el("button", "btn", S.lookupSearch);
-  form.append(q, go);
-  box.appendChild(form);
-  var list = el("div", "lk-list");
-  box.appendChild(list);
+  var tabs = el("div", "seg lk-tabs");
+  var tRes = el("button", null, S.lkResults), tMan = el("button", null, S.lkManual);
+  tRes.type = tMan.type = "button";
+  tabs.append(tRes, tMan);
+  box.appendChild(tabs);
+  var pane = el("div", "lk-pane");
+  box.appendChild(pane);
   var foot = el("div", "row2 lk-foot");
   var none = el("button", "btn ghost", lookupQueue.length > 1 ? S.lookupSkip : S.lookupNone);
   none.type = "button";
@@ -22764,80 +23138,403 @@ async function showLookup(i, granted) {
     if (i + 1 < lookupQueue.length) showLookup(i + 1, granted);
     else closeLookup();
   }
-  async function run(useIsbn) {
-    list.replaceChildren(el("div", "muted", S.lookupWait));
-    if (!granted) {
-      list.replaceChildren(el("div", "bad", S.lookupDenied));
-      return;
-    }
-    var results;
-    try {
-      results = await searchBooks(q.value.trim(), useIsbn ? b.isbn || b.isbnFound : null);
-    } catch (_) {
-      list.replaceChildren(el("div", "bad", S.lookupOffline));
-      return;
-    }
-    list.replaceChildren();
-    if (!results.length) {
-      list.appendChild(el("div", "muted", S.lookupEmpty));
-      return;
-    }
-    results.slice(0, 12).forEach(function(r) {
-      var item = el("div", "lk-item");
-      var img = el("div", "lk-thumb");
-      if (r.thumb) {
-        var im = el("img");
-        im.src = r.thumb;
-        im.alt = "";
-        im.loading = "lazy";
-        img.appendChild(im);
-      }
-      var txt = el("div", "lk-text");
-      txt.appendChild(el("b", null, r.title + (r.subtitle ? ": " + r.subtitle : "")));
-      if (r.authors.length) txt.appendChild(el("div", null, r.authors.join(", ")));
-      var bits = [r.year, r.publisher, r.isbn13 || r.isbn10 ? S.isbn + " " + (r.isbn13 || r.isbn10) : "", r.pages ? f(S.pagesN, r.pages) : ""].filter(Boolean).join(" \xB7 ");
-      if (bits) txt.appendChild(el("div", "muted", bits));
-      txt.appendChild(el("span", "lk-src", r.source));
-      var pick = el("button", "btn main", S.lookupPick);
-      pick.type = "button";
-      pick.onclick = async function() {
-        pick.disabled = true;
-        await applyDetails(b, r);
-        next();
-      };
-      item.append(img, txt, pick);
-      list.appendChild(item);
-    });
+  function tab(which) {
+    tRes.setAttribute("aria-pressed", String(which === "results"));
+    tMan.setAttribute("aria-pressed", String(which === "manual"));
   }
-  form.onsubmit = function(e) {
-    e.preventDefault();
-    run(false);
-  };
-  run(!!(b.isbn || b.isbnFound));
-}
-async function applyDetails(b, r) {
-  await updateBook(b.id, {
-    title: r.title + (r.subtitle ? ": " + r.subtitle : ""),
-    author: r.authors.join(", "),
-    year: r.year || null,
-    publisher: r.publisher || "",
-    isbn: r.isbn13 || r.isbn10 || b.isbnFound || null,
-    meta: { source: r.source, at: Date.now() }
-  });
-  if (r.cover || r.thumb) {
-    try {
-      var blob;
-      try {
-        blob = await fetchCover(r.cover || r.thumb);
-      } catch (_) {
-        blob = await fetchCover(r.thumb);
+  var parsed = parseTitle(b.name || b.title);
+  var want = wantLang(b);
+  var chips = el("div", "lk-chips");
+  var seriesIn = chipInput(S.series, b.series || parsed.series, "lk-series");
+  var volIn = chipInput(S.volume, b.volume != null ? b.volume : parsed.volume != null ? parsed.volume : "", "lk-vol");
+  volIn.type = "number";
+  volIn.min = "0";
+  volIn.step = "any";
+  var lnChip = el("label", "lk-chip lk-ln");
+  var lnIn = el("input");
+  lnIn.type = "checkbox";
+  lnIn.checked = parsed.lnHint;
+  lnChip.append(lnIn, el("span", null, S.lkLn));
+  chips.append(seriesIn.parentNode, volIn.parentNode, lnChip);
+  if (want) chips.appendChild(el("span", "lk-chip lk-lang", S.lang + ": " + cap(langName(want, ES))));
+  function chipInput(label, value, cls) {
+    var l = el("label", "lk-chip " + cls);
+    l.appendChild(el("span", null, label));
+    var inp = el("input");
+    inp.value = value;
+    l.appendChild(inp);
+    return inp;
+  }
+  var results = [], shownAll = false;
+  function showResults() {
+    tab("results");
+    pane.replaceChildren();
+    pane.appendChild(el("p", "muted", S.lookupHint));
+    pane.appendChild(chips);
+    var form = el("form", "lk-form");
+    var q = el("input");
+    q.type = "search";
+    q.placeholder = S.lkOther;
+    q.className = "lk-q";
+    var go = el("button", "btn", S.lookupSearch);
+    form.append(q, go);
+    pane.appendChild(form);
+    var status = el("div", "muted lk-status");
+    var list = el("div", "lk-list");
+    pane.append(status, list);
+    form.onsubmit = function(e) {
+      e.preventDefault();
+      run(q.value.trim());
+    };
+    chips.onchange = function() {
+      run(q.value.trim());
+    };
+    if (results.length) draw(list, status);
+    else run("");
+    async function run(other) {
+      list.replaceChildren();
+      status.textContent = S.lookupWait;
+      if (!granted) {
+        status.textContent = "";
+        list.appendChild(el("div", "bad", S.lookupDenied));
+        return;
       }
-      await writeFile(b.id, "cover-meta", blob);
+      var isbn = /^[\d\s-]{10,17}X?$/i.test(other) ? other.replace(/[\s-]/g, "") : b.isbn || b.isbnFound || null;
+      var p = {
+        series: seriesIn.value.trim(),
+        volume: volIn.value === "" ? null : Number(volIn.value),
+        chapter: null,
+        keywords: wordsOf(seriesIn.value),
+        lnHint: lnIn.checked
+      };
+      if (other && isbn !== other.replace(/[\s-]/g, "")) p = Object.assign(parseTitle(other), { lnHint: lnIn.checked });
+      try {
+        results = await searchBooks({
+          parsed: p,
+          isbn,
+          query: other && !/^[\d\s-]+X?$/i.test(other) ? other : null,
+          lang: want,
+          onStep: function(st) {
+            status.textContent = S.lkStep[st] || S.lookupWait;
+          }
+        });
+      } catch (_) {
+        status.textContent = "";
+        list.appendChild(el("div", "bad", S.lookupOffline));
+        return;
+      }
+      shownAll = false;
+      if (!results.length) {
+        showManual(S.lkEmptyManual);
+        return;
+      }
+      draw(list, status);
+    }
+  }
+  function draw(list, status) {
+    status.textContent = "";
+    list.replaceChildren();
+    var top = shownAll ? results.slice(0, 16) : results.slice(0, 4);
+    top.forEach(function(r) {
+      list.appendChild(resultItem(r));
+    });
+    if (!shownAll && results.length > 4) {
+      var more = el("button", "btn ghost lk-more", f(S.lkMore, Math.min(results.length, 16) - 4));
+      more.type = "button";
+      more.onclick = function() {
+        shownAll = true;
+        draw(list, status);
+      };
+      list.appendChild(more);
+    }
+  }
+  function resultItem(r) {
+    var item = el("div", "lk-item" + (r.otherLang ? " other" : ""));
+    var img = el("div", "lk-thumb");
+    if (r.thumb) {
+      var im = el("img");
+      im.src = r.thumb;
+      im.alt = "";
+      im.loading = "lazy";
+      img.appendChild(im);
+    }
+    var txt = el("div", "lk-text");
+    txt.appendChild(el("b", null, r.title + (r.subtitle ? ": " + r.subtitle : "")));
+    if (r.authors.length) txt.appendChild(el("div", null, r.authors.join(", ")));
+    var bits = [
+      r.year,
+      r.publisher,
+      r.isbn13 || r.isbn10 ? S.isbn + " " + (r.isbn13 || r.isbn10) : "",
+      r.pages ? f(S.pagesN, r.pages) : "",
+      r.volumes ? r.volumes + " vols." : ""
+    ].filter(Boolean).join(" \xB7 ");
+    if (bits) txt.appendChild(el("div", "muted", bits));
+    var tags = el("div", "lk-tags");
+    tags.appendChild(el("span", "lk-src", r.source));
+    if (r.kind === "series") tags.appendChild(el("span", "lk-src", f(S.lkSeries, r.format === "novel" ? S.lkNovel : S.lkManga)));
+    else if (r.otherLang) tags.appendChild(el("span", "lk-src warn", f(S.lkOtherEd, cap(langName(r.lang, ES)))));
+    else if (r.lang) tags.appendChild(el("span", "lk-src", cap(langName(r.lang, ES))));
+    txt.appendChild(tags);
+    var pick = el("button", "btn main", S.lookupPick);
+    pick.type = "button";
+    pick.onclick = function() {
+      showPreview(r);
+    };
+    item.append(img, txt, pick);
+    return item;
+  }
+  async function showPreview(r) {
+    pane.replaceChildren();
+    var vol = b.volume != null ? b.volume : volIn.value === "" ? null : Number(volIn.value);
+    var newTitle = r.title + (r.subtitle ? ": " + r.subtitle : "");
+    if (r.kind === "series" && vol != null) newTitle = r.title + ", " + f(S.volumeN, vol);
+    var sameLang = !r.otherLang;
+    var coverTry = [r.cover, r.thumb].concat(coverUrlsForIsbn(r.isbn13 || r.isbn10)).filter(Boolean);
+    var top = el("div", "lk-compare");
+    var now = el("div", "lk-thumb big");
+    var nowUrl = await coverUrl(b.id, "cover");
+    if (nowUrl) {
+      var ni = el("img");
+      ni.src = nowUrl;
+      ni.alt = "";
+      now.appendChild(ni);
+    }
+    var then = el("div", "lk-thumb big");
+    if (coverTry[0]) {
+      var ti = el("img");
+      ti.src = r.thumb || coverTry[0];
+      ti.alt = "";
+      then.appendChild(ti);
+    }
+    var info2 = el("div", "lk-text");
+    info2.appendChild(el("b", null, newTitle));
+    var ed = r.kind === "series" ? S.lkSeriesSrc : r.lang ? f(S.lkEdition, langName(r.lang, ES)) : S.lkNoLang;
+    info2.appendChild(el("div", "muted", ed + " \xB7 " + r.source));
+    if (r.otherLang) info2.appendChild(el("div", "lk-warn", f(S.lkWarnLang, langName(r.lang, ES), langName(want, ES))));
+    top.append(now, el("span", "lk-arrow", "\u2192"), then, info2);
+    pane.appendChild(top);
+    var rows = [
+      ["title", ES ? "T\xEDtulo" : "Title", b.title, newTitle, sameLang && r.kind !== "series"],
+      ["author", ES ? "Autor" : "Author", b.author, r.authors.join(", "), sameLang],
+      ["year", S.year, b.year, r.year, true],
+      ["publisher", S.publisher, b.publisher, r.publisher, true],
+      ["isbn", S.isbn, b.isbn || b.isbnFound, r.isbn13 || r.isbn10, sameLang],
+      ["cover", S.lkCover, nowUrl ? "\u2713" : "", coverTry.length ? "\u2713" : "", true]
+    ];
+    var table = el("div", "lk-fields");
+    table.append(el("span", "muted"), el("span", "muted", S.lkField), el("span", "muted", S.lkNow), el("span", "muted", S.lkNew));
+    var boxes = {};
+    rows.forEach(function(row) {
+      var key = row[0], proposed = row[3];
+      if (proposed == null || proposed === "") return;
+      var current = row[2] == null ? "" : String(row[2]);
+      var same = current === String(proposed) && key !== "cover";
+      var cb = el("input");
+      cb.type = "checkbox";
+      cb.dataset.field = key;
+      cb.checked = !same && (row[4] || !current);
+      cb.disabled = same;
+      boxes[key] = cb;
+      var label = el("label", null, row[1]);
+      table.append(
+        cb,
+        label,
+        el("span", "lk-now", key === "cover" ? nowUrl ? "\u25A3" : "\u2014" : current || "\u2014"),
+        el("span", "lk-new", key === "cover" ? "\u25A3" : same ? S.lkSame : String(proposed))
+      );
+      label.onclick = function() {
+        if (!cb.disabled) cb.checked = !cb.checked;
+      };
+    });
+    pane.appendChild(table);
+    var msg = el("div", "bad");
+    pane.appendChild(msg);
+    var row2 = el("div", "row2 lk-actions");
+    var back = el("button", "btn ghost", S.lkBack);
+    back.type = "button";
+    back.onclick = showResults;
+    var apply = el("button", "btn main", S.lkApply);
+    apply.type = "button";
+    apply.onclick = async function() {
+      var on = function(k) {
+        return boxes[k] && boxes[k].checked;
+      };
+      if (!Object.keys(boxes).some(on)) {
+        msg.textContent = S.lkNothing;
+        return;
+      }
+      apply.disabled = true;
+      var patch = { meta: { source: r.source, at: Date.now(), title: newTitle, authors: r.authors, lang: r.lang, year: r.year, publisher: r.publisher, isbn: r.isbn13 || r.isbn10 || null, url: r.url || null } };
+      if (on("title")) patch.title = newTitle;
+      if (on("author")) patch.author = r.authors.join(", ");
+      if (on("year")) patch.year = r.year;
+      if (on("publisher")) patch.publisher = r.publisher;
+      if (on("isbn")) patch.isbn = r.isbn13 || r.isbn10;
+      await applyDetails(b, patch, on("cover") ? coverTry : null);
+      next();
+    };
+    row2.append(back, apply);
+    pane.appendChild(row2);
+  }
+  function showManual(note) {
+    tab("manual");
+    pane.replaceChildren();
+    if (note) pane.appendChild(el("div", "muted lk-note", note));
+    pane.appendChild(el("p", "muted", S.lkManualHint));
+    var form = el("div", "lk-manual");
+    function field(label, value, type) {
+      var l = el("label");
+      l.appendChild(el("span", null, label));
+      var inp = el("input");
+      if (type) inp.type = type;
+      inp.value = value == null ? "" : value;
+      l.appendChild(inp);
+      form.appendChild(l);
+      return inp;
+    }
+    var fTitle = field(ES ? "T\xEDtulo" : "Title", b.title);
+    var fAuthor = field(ES ? "Autor" : "Author", b.author);
+    var fSeries = field(S.series, b.series || seriesIn.value);
+    var fVol = field(S.volume, b.volume != null ? b.volume : volIn.value, "number");
+    var fYear = field(S.year, b.year, "number");
+    var fPub = field(S.publisher, b.publisher);
+    var fIsbn = field(S.isbn, b.isbn || b.isbnFound);
+    var fCover = field(S.lkCoverUrl, "", "url");
+    fCover.placeholder = "https://\u2026";
+    fCover.parentNode.classList.add("wide");
+    pane.appendChild(form);
+    var prev = el("div", "lk-thumb big lk-cover-prev");
+    var file = null;
+    fCover.oninput = function() {
+      file = null;
+      prev.replaceChildren();
+      if (/^https?:\/\//.test(fCover.value.trim())) {
+        var im = el("img");
+        im.src = fCover.value.trim();
+        im.alt = "";
+        prev.appendChild(im);
+      }
+    };
+    var tools = el("div", "row2");
+    var pickFile = el("button", "btn", S.lkCoverFile);
+    pickFile.type = "button";
+    pickFile.onclick = function() {
+      var inp = el("input");
+      inp.type = "file";
+      inp.accept = "image/*";
+      inp.onchange = function() {
+        file = inp.files[0] || null;
+        if (!file) return;
+        fCover.value = "";
+        prev.replaceChildren();
+        var im = el("img");
+        im.src = URL.createObjectURL(file);
+        im.alt = "";
+        prev.appendChild(im);
+      };
+      inp.click();
+    };
+    var web2 = el("button", "btn ghost", S.lkCoverWeb);
+    web2.type = "button";
+    web2.onclick = function() {
+      var q = [fSeries.value || fTitle.value, fVol.value ? "vol " + fVol.value : "", "cover"].filter(Boolean).join(" ");
+      var url = "https://duckduckgo.com/?iax=images&ia=images&q=" + encodeURIComponent(q);
+      try {
+        browser.tabs.create({ url });
+      } catch (_) {
+        window.open(url, "_blank", "noopener");
+      }
+    };
+    tools.append(prev, pickFile, web2);
+    pane.appendChild(tools);
+    var msg = el("div", "bad");
+    pane.appendChild(msg);
+    var save = el("button", "btn main", S.lkApplyManual);
+    save.type = "button";
+    save.onclick = async function() {
+      var url = fCover.value.trim();
+      var access = Promise.resolve(true);
+      if (/^https?:\/\//.test(url)) {
+        try {
+          access = browser.permissions.request({ origins: [new URL(url).origin + "/*"] });
+        } catch (_) {
+        }
+      }
+      save.disabled = true;
+      var v = fVol.value === "" ? null : Number(fVol.value);
+      var series = fSeries.value.trim();
+      var patch = {
+        title: fTitle.value.trim() || b.title,
+        titleEdited: true,
+        author: fAuthor.value.trim(),
+        authorEdited: true,
+        year: fYear.value ? Number(fYear.value) : null,
+        publisher: fPub.value.trim(),
+        isbn: fIsbn.value.replace(/[^\dX]/gi, "") || null,
+        series,
+        volume: v,
+        sortKey: sortKeyOf(series || fTitle.value.trim() || b.title, v),
+        meta: { source: "manual", at: Date.now() }
+      };
+      var ok = true;
+      try {
+        ok = await access;
+      } catch (_) {
+        ok = false;
+      }
+      if (file) {
+        await writeFile(b.id, "cover-meta", file);
+        await applyDetails(b, patch, null);
+      } else if (url && ok) {
+        var got = await applyDetails(b, patch, [url]);
+        if (!got) {
+          msg.textContent = S.lkCoverBad;
+          save.disabled = false;
+          return;
+        }
+      } else {
+        await applyDetails(b, patch, null);
+        if (url && !ok) {
+          msg.textContent = S.lkCoverBad;
+          save.disabled = false;
+          return;
+        }
+      }
+      next();
+    };
+    var row2 = el("div", "row2 lk-actions");
+    row2.appendChild(save);
+    pane.appendChild(row2);
+  }
+  tRes.onclick = showResults;
+  tMan.onclick = function() {
+    showManual();
+  };
+  showResults();
+}
+function wantLang(b) {
+  var st = lib.settings.metaLang;
+  if (st && st !== "auto") return st;
+  if (b.lang) return b.lang;
+  try {
+    return browser.i18n.getUILanguage().slice(0, 2).toLowerCase();
+  } catch (_) {
+    return ES ? "es" : "en";
+  }
+}
+async function applyDetails(b, patch, covers2) {
+  await updateBook(b.id, patch);
+  var saved = !covers2;
+  for (var k = 0; covers2 && k < covers2.length && !saved; k++) {
+    try {
+      await writeFile(b.id, "cover-meta", await fetchCover(covers2[k]));
+      saved = true;
     } catch (_) {
     }
   }
   dropCovers(b.id);
   await refresh(true);
+  return saved;
 }
 $("lookup").addEventListener("click", function(e) {
   if (e.target === $("lookup")) closeLookup();

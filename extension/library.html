@@ -7,6 +7,8 @@
 <link rel="icon" href="icons/icon-32.png">
 <style>
   :root {
+    /* Matte finish: faint paper/cloth grain, multiplied over spines and covers */
+    --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='-.16 0 0 0 1 -.16 0 0 0 1 -.16 0 0 0 1 0 0 0 0 1'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
     --paper: #efe9dc; --sheet: #fbf8f1; --ink: #2a2622; --ink-soft: #6d655a; --rule: #ddd4c3; --accent: #9a3b25;
     --serif: "Iowan Old Style", "Charter", "Source Serif 4", Georgia, serif;
     --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
@@ -86,7 +88,7 @@
     box-shadow: 0 1px 2px rgba(0,0,0,.35);
   }
   [data-wood="minimal"] .group-label { background: none; box-shadow: none; color: var(--ink-soft); padding: 0; margin-left: 4px; }
-  .row { --w: calc(var(--h) * .7); position: relative; display: flex; align-items: flex-end; gap: 3px; padding: 0 18px; min-height: calc(var(--h) + 20px); perspective: 1400px; }
+  .row { --w: calc(var(--h) * .7); position: relative; display: flex; align-items: flex-end; gap: 3px; padding: 0 18px; min-height: calc(var(--h) + 20px); }
   .plank {
     height: 20px; margin: 0 -2px 22px; border-radius: 2px;
     background: linear-gradient(180deg, var(--wood-1) 0, var(--wood-2) 55%, var(--wood-3) 100%);
@@ -102,6 +104,10 @@
     --d: 30px; --w: calc(var(--h) * .7); --turn: -78deg;
     position: relative; flex: none; width: var(--d); height: var(--h); margin: 0; padding: 0;
     border: none; background: none; cursor: pointer; transform-style: preserve-3d;
+    /* Each book is seen from straight in front: with one perspective for the
+       whole row, books away from its middle showed a side (a cover as deep as
+       the book) painted over their neighbour */
+    perspective: 1400px; perspective-origin: 50% 50%;
     transition: transform .4s cubic-bezier(.2,.8,.2,1);
   }
   /* Only books that just arrived on the shelf slide in (re-renders don't replay it) */
@@ -119,26 +125,35 @@
   .face { position: absolute; top: 0; left: 50%; height: var(--h); backface-visibility: hidden; overflow: hidden; }
   .spine {
     width: var(--d); margin-left: calc(var(--d) / -2); transform: translateZ(calc(var(--w) / 2));
-    background: linear-gradient(90deg, rgba(0,0,0,.28), rgba(255,255,255,.14) 28%, rgba(0,0,0,.05) 60%, rgba(0,0,0,.3)), var(--spine, #6b4a32);
-    color: #f6ecd8; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 12px 0;
+    /* Matte cloth: a rounded spine from soft shadows only (no white sheen) and a faint weave */
+    background: var(--grain), linear-gradient(90deg, rgba(0,0,0,.34), rgba(0,0,0,.06) 22%, rgba(0,0,0,0) 45%, rgba(0,0,0,.08) 72%, rgba(0,0,0,.36)), var(--spine, #6b4a32);
+    background-blend-mode: multiply, normal, normal;
+    color: #efe4cc; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 12px 0;
     border-radius: 2px 2px 1px 1px;
   }
-  .spine::before, .spine::after { content: ""; width: 70%; height: 2px; background: rgba(233, 196, 106, .75); box-shadow: 0 4px 0 rgba(233, 196, 106, .45); }
+  .spine::before, .spine::after { content: ""; width: 70%; height: 2px; background: rgba(196, 164, 98, .6); box-shadow: 0 4px 0 rgba(196, 164, 98, .35); }
   .spine .t {
     flex: 1; min-height: 0; overflow: hidden; writing-mode: vertical-rl; text-orientation: mixed;
-    font: 600 12px/1.1 var(--serif); letter-spacing: .03em; text-shadow: 0 1px 1px rgba(0,0,0,.4);
+    font: 600 12px/1.1 var(--serif); letter-spacing: .03em; text-shadow: 0 1px 0 rgba(0,0,0,.25);
     padding: 8px 0; white-space: nowrap; text-overflow: ellipsis; max-height: 100%;
   }
   .front, .back {
-    width: var(--w); margin-left: calc(var(--w) / -2); background: var(--spine, #6b4a32);
+    width: var(--w); margin-left: calc(var(--w) / -2); background: var(--grain), var(--spine, #6b4a32);
+    background-blend-mode: multiply, normal;
     box-shadow: inset 4px 0 8px rgba(0,0,0,.25);
   }
+  /* A book standing on the shelf shows only its spine; the covers appear as it turns */
+  .row .book .front, .row .book .back { visibility: hidden; transition: visibility 0s .5s; }
+  .row .book.lifted .front, .row .book.lifted .back,
+  .row .book:focus-visible .front, .row .book:focus-visible .back { visibility: visible; transition: visibility 0s; }
   .front { transform: rotateY(90deg) translateZ(calc(var(--d) / 2)); border-radius: 1px 3px 3px 1px; }
   .back { transform: rotateY(-90deg) translateZ(calc(var(--d) / 2)); border-radius: 3px 1px 1px 3px; }
   .front img, .back img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .front::after, .back::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0,0,0,.22), transparent 8%, transparent 92%, rgba(255,255,255,.12)); pointer-events: none; }
+  /* Paper, not plastic: the hinge's shadow and a faint grain over the printed cover, no sheen */
+  .front::after, .back::after { content: ""; position: absolute; inset: 0; background: var(--grain), linear-gradient(90deg, rgba(0,0,0,.24), rgba(0,0,0,.06) 7%, transparent 14%, transparent 96%, rgba(0,0,0,.1)); mix-blend-mode: multiply; opacity: .9; pointer-events: none; }
+  .front img, .back img { filter: saturate(.94) contrast(.97); }
   .plain {
-    position: absolute; inset: 10px; border: 1.5px solid rgba(233, 196, 106, .7); display: flex; flex-direction: column;
+    position: absolute; inset: 10px; border: 1.5px solid rgba(196, 164, 98, .6); display: flex; flex-direction: column;
     align-items: center; justify-content: center; gap: 8px; padding: 10px; text-align: center; color: #f6ecd8;
   }
   .plain b { font: 600 15px/1.2 var(--serif); }
@@ -153,8 +168,10 @@
      put; the neighbours slide aside with transforms. */
   .book.lifted, .book:focus-visible { z-index: 2; }
   .book.lifted .b3, .book:focus-visible .b3 { transform: translateZ(calc(var(--w) / -2 + 70px)) translateY(-10px) rotateY(var(--turn)); }
-  .row .book.lifted ~ .book, .row .book:focus-visible ~ .book, .row .book.lifted ~ .bookend { transform: translateX(calc(var(--w) * .46)); }
-  .row .book:has(~ .book.lifted), .row .book:has(~ .book:focus-visible) { transform: translateX(calc(var(--w) * -.46)); }
+  /* How far each side moves is set per row by JS (--push-l / --push-r): the
+     left side only as far as there is room, the rest goes to the right */
+  .row .book.lifted ~ .book, .row .book:focus-visible ~ .book, .row .book.lifted ~ .bookend, .row .book:focus-visible ~ .bookend { transform: translateX(var(--push-r, calc(var(--w) * .46))); }
+  .row .book:has(~ .book.lifted), .row .book:has(~ .book:focus-visible) { transform: translateX(calc(-1 * var(--push-l, calc(var(--w) * .46)))); }
   .book:focus-visible .spine { box-shadow: 0 0 0 2px var(--accent); }
   .book.dragging { opacity: .4; }
   /* A brass bookend closing each row */
@@ -272,6 +289,39 @@
   .lk-text b { display: block; font: 600 15px/1.25 var(--serif); }
   .lk-src { display: inline-block; margin-top: 3px; padding: 0 6px; border-radius: 8px; font-size: 11px; background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink-soft); }
   .lk-foot { justify-content: flex-end; margin-top: 12px; }
+  .lk-tabs { margin: 10px 0 4px; }
+  .lk-tabs button { padding: 5px 12px; }
+  .lk-pane { min-height: 120px; }
+  .lk-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+  .lk-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 10px; border-radius: 16px; border: 1px solid var(--rule); background: var(--paper); font-size: 12px; color: var(--ink-soft); }
+  .lk-chip input:not([type=checkbox]) { border: none; background: transparent; font: 13px var(--sans); color: var(--ink); padding: 3px 6px; border-radius: 10px; }
+  .lk-series input { width: 190px; } .lk-vol input { width: 56px; }
+  .lk-chip.lk-ln { padding-right: 10px; cursor: pointer; } .lk-chip.lk-lang { padding-right: 10px; }
+  .lk-status { min-height: 18px; font-size: 12px; }
+  .lk-more { align-self: center; }
+  .lk-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+  .lk-src.warn { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+  .lk-item.other { opacity: .82; }
+  .lk-compare { display: grid; grid-template-columns: auto auto auto 1fr; gap: 12px; align-items: center; margin: 12px 0; }
+  .lk-thumb.big { width: 66px; height: 98px; }
+  .lk-arrow { color: var(--ink-soft); font-size: 18px; }
+  .lk-warn { margin-top: 6px; padding: 6px 8px; border-radius: 6px; font-size: 12px; background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--ink); }
+  .lk-fields { display: grid; grid-template-columns: auto auto 1fr 1fr; gap: 6px 10px; align-items: center; font-size: 13px; }
+  .lk-fields label { cursor: pointer; font-weight: 600; }
+  .lk-fields .lk-now, .lk-fields .lk-new { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lk-fields .lk-now { color: var(--ink-soft); }
+  .lk-fields input:disabled + label { opacity: .5; }
+  .lk-actions { justify-content: flex-end; margin-top: 12px; }
+  .lk-manual { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
+  .lk-manual label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--ink-soft); }
+  .lk-manual label.wide { grid-column: 1 / -1; }
+  .lk-manual input { padding: 6px 9px; border-radius: 6px; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); font: 14px var(--sans); }
+  .lk-cover-prev:empty { display: none; }
+  .lk-note { margin-top: 10px; }
+  .card .series-row { gap: 6px; font-size: 13px; }
+  .card .series-row input { padding: 4px 8px; border-radius: 6px; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); font: 13px var(--sans); }
+  .card .series-row .series { flex: 1; min-width: 120px; } .card .series-row .vol { width: 64px; }
+  @media (max-width: 560px) { .lk-manual { grid-template-columns: 1fr; } .lk-compare { grid-template-columns: auto auto auto; } .lk-compare .lk-text { grid-column: 1 / -1; } }
   .muted { color: var(--ink-soft); }
 
   [hidden] { display: none !important; }
