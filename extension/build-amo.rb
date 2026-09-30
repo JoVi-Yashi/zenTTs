@@ -17,6 +17,10 @@ FILES = %w[
   manifest.json
   content.js
   background.js
+  reader.js
+  reader.html
+  library.js
+  library.html
   icons/icon-16.png
   icons/icon-32.png
   icons/icon-48.png
@@ -31,6 +35,10 @@ FILES = %w[
   vendor/ort/ort-wasm-simd-threaded.mjs
   vendor/piper/piper_phonemize.wasm
   vendor/piper/piper_phonemize.data
+  vendor/pdfjs/pdf.worker.min.mjs
+  worker/translator-worker.js
+  worker/bergamot-translator-worker.js
+  worker/bergamot-translator-worker.wasm
 ]
 
 # Files NOT included (source only):
