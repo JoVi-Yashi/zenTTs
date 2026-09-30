@@ -100,8 +100,17 @@ On a tab with a PDF, the button opens the zenTTS reader in a new tab next to it:
 
 The **Contents** button shows the document's table of contents (with sub-levels) and takes you to each section; while reading, the reading jumps there. The reader remembers the page you were on and reads two-column documents in order.
 
-### PDF library
-The PDFs you open are placed on a 3D bookshelf (**Library** button in the reader, or ⚙ → Reading → "Open the PDF library"). Each book shows its spine (color and thickness from the PDF); hovering pulls it out and turns its cover to you, and choosing it brings it to the middle, turning, with the shelf blurred behind. From there you continue at your page, change the cover, back cover and spine color, and add tags, which work as shelves of their own. In ⚙ you choose the wood, the order and the size, and whether a copy of each PDF is kept (which lets PDFs from your computer open without choosing them again).
+### The library
+A 3D bookshelf with what you read (**Library** button in the PDF reader, or ⚙ → Reading → "Open the library"). At the top right you choose what to show:
+
+- **PDF:** the PDFs you open or add. **Add PDFs** takes several at once (or drop them on the shelf); each file is compared by its content (SHA-256), so a repeated PDF is not duplicated: you're told, and the one already there is highlighted. A copy is kept, so PDFs from your computer open from here without choosing them again.
+- **Web:** the works zenTTS has read to you on web pages, one shelf per site (AO3, FanFiction, Wattpad, Webnovel and the rest by domain), with the chapter you're on. **Keep reading** opens that chapter. It can be turned off in ⚙ ("Remember what I read on the web").
+
+Each book shows its spine (color and thickness from the book); hovering pulls it out and turns its cover to you, and choosing it brings it to the middle, turning, with the shelf blurred behind. From its card you continue reading, change the cover, back cover and spine color, and add tags, which work as shelves of their own.
+
+**Book details:** "Find details…" (or "Review details" after adding PDFs) looks the book up by its title, or by the ISBN if it's printed in the PDF, in Open Library and Google Books, and shows you the matches to choose the right one. Title, author, year, publisher, ISBN and cover are applied. The first time it asks for access to those two sites; nothing is sent unless you use it.
+
+In ⚙ you choose the wood, the order and the size of the books.
 
 ### Voice performance and which translation to pick
 - **High-quality** Local voices do much more work per second of audio, and Piper runs on a single thread inside the browser: on modest computers they can fall behind the reading and leave pauses between sentences. zenTTS loads the voice ahead of time, cuts long sentences and generates several ahead; if it still can't keep up, ⚙ → Voice says so. **Standard** quality is the best balance.
@@ -196,3 +205,5 @@ zenTTs/
 ## License
 
 MIT
+
+Site logos are trademarks of their owners and are used only to show which sites zenTTS works with. The AO3 and Wattpad ones come from [Simple Icons](https://simpleicons.org) (CC0); the FanFiction.net and Webnovel ones are based on [Arcticons](https://github.com/Arcticons-Team/Arcticons) (CC BY-SA 4.0).

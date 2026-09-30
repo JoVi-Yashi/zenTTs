@@ -391,6 +391,52 @@ function highlightPreview(i) {
   if (el) { el.classList.add('active'); el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
 }
 
+// ---- Web shelf: remember the works read on the web ----
+// Only pages zenTTS actually reads. Saved in storage.local "webWorks" for the
+// library's Web view, at most every 15 s (and on each new chapter).
+
+var SITE_NAMES = { ao3: 'Archive of Our Own', ffn: 'FanFiction.net', wattpad: 'Wattpad', webnovel: 'Webnovel' };
+var lastWorkSave = 0;
+var lastWorkChapter = null;
+
+function workInfo() {
+  var url = new URL(window.location.href);
+  var host = url.hostname.replace(/^www\./, '');
+  var w = null;
+  try { w = site.work ? site.work(document, url) : null; } catch (_) {}
+  if (!w) {
+    var parts = (document.title || host).split(/\s+[-|–—]\s+/);
+    w = { key: 'web:' + host + url.pathname, title: parts[0], workUrl: url.href, chapterTitle: '' };
+  }
+  var og = document.querySelector('meta[property="og:image"][content]');
+  return Object.assign({
+    kind: 'web', site: site.id, siteName: SITE_NAMES[site.id] || host, host: host,
+    image: og ? og.getAttribute('content') : null
+  }, w);
+}
+
+async function recordWork(force) {
+  if (embed || !chapterKey) return;
+  var now = Date.now();
+  if (!force && now - lastWorkSave < 15000 && lastWorkChapter === chapterKey) return;
+  lastWorkSave = now;
+  lastWorkChapter = chapterKey;
+  try {
+    var got = await browser.storage.local.get(['webWorks', 'rememberWeb']);
+    if (got.rememberWeb === false) return;
+    var info = workInfo();
+    if (!info.title) return;
+    var store = got.webWorks || { works: {} };
+    var prev = store.works[info.key] || { addedAt: now, tags: [] };
+    store.works[info.key] = Object.assign(prev, info, {
+      chapterUrl: window.location.href, chapterKey: chapterKey,
+      chapterProgress: sentences.length && player.index >= 0 ? +((player.index + 1) / sentences.length).toFixed(3) : prev.chapterProgress || 0,
+      openedAt: now
+    });
+    await browser.storage.local.set({ webWorks: store });
+  } catch (e) { console.error('[zenTTS] web shelf:', e.message || e); }
+}
+
 // ---- Reading session ----
 
 var paragraphs = [];
@@ -424,6 +470,7 @@ var player = createPlayer({
     else marker.hideCaption();
     highlightPreview(i);
     saveProgress(chapterKey, { index: i, total: sentences.length, hash: chapterHash, title: document.title });
+    recordWork(false);
     if (i >= sentences.length * 0.8) prefetchNextChapter();
   },
   onWord: function(i, offset) {

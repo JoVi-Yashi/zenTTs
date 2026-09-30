@@ -12,11 +12,9 @@
 // through window.__zentts_embed. The document outline becomes the table of
 // contents, and the page you were on is remembered.
 
-import * as pdfjsLib from 'pdfjs-dist';
 import { setHighlightTheme } from './highlight.js';
-import { bookId, loadLibrary, updateBook, writeFile, readFile, dominantColor, clothColor, realAuthor, canvasBlob } from './books.js';
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = browser.runtime.getURL('vendor/pdfjs/pdf.worker.min.mjs');
+import { loadLibrary, updateBook, readFile, realAuthor } from './books.js';
+import { pdfjsLib, shelveDocument } from './pdfimport.js';
 
 var ES = (function() { try { return browser.i18n.getUILanguage().toLowerCase().startsWith('es'); } catch (_) { return true; } })();
 var S = ES ? {
@@ -380,54 +378,17 @@ async function renderDocument(doc) {
   return pages;
 }
 
-// ---- Covers for the library ----
+// ---- On the shelf ----
 
-async function renderThumb(doc, n) {
-  var page = await doc.getPage(n);
-  var base = page.getViewport({ scale: 1 });
-  var vp = page.getViewport({ scale: 360 / base.width });
-  var canvas = document.createElement('canvas');
-  canvas.width = Math.floor(vp.width); canvas.height = Math.floor(vp.height);
-  var ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  await page.render({ canvasContext: ctx, viewport: vp }).promise;
-  return canvas;
-}
-
-// Adds (or updates) the book on the shelf: metadata, a copy of the PDF and covers
+// Adds (or updates) the book in the library. The same PDF already on the
+// shelf (same bytes) keeps its entry and its progress key.
 async function shelve(doc, got, title, author) {
-  var id = bookId(got.key);
-  var lib = await loadLibrary();
-  var prev = lib.books[id] || {};
-  var patch = {
-    key: got.key, title: prev.titleEdited ? prev.title : title, author: prev.authorEdited ? prev.author : (author || prev.author || ''),
-    name: got.name, pages: doc.numPages, openedAt: Date.now(),
-    src: src && /^https?:/i.test(src) ? src : prev.src || null, size: got.data.byteLength
-  };
-  if (lib.settings.keepCopies && !(await readFile(id, 'pdf'))) {
-    try { await writeFile(id, 'pdf', new Blob([got.data], { type: 'application/pdf' })); patch.hasFile = true; } catch (_) {}
-  }
-  var book = await updateBook(id, patch);
-  // The front cover right away (one small render), the back cover afterwards
-  try {
-    if (!(await readFile(id, 'cover'))) {
-      var c = await renderThumb(doc, 1);
-      await writeFile(id, 'cover', await canvasBlob(c));
-      if (!book.color) await updateBook(id, { color: dominantColor(c) || clothColor(id) });
-      c.width = c.height = 0;
-    }
-  } catch (e) { console.error('[zenTTS] cover:', e.message || e); }
-  (async function() {
-    try {
-      if (doc.numPages > 1 && !(await readFile(id, 'back'))) {
-        var b = await renderThumb(doc, doc.numPages);
-        await writeFile(id, 'back', await canvasBlob(b));
-        b.width = b.height = 0;
-      }
-    } catch (e) { console.error('[zenTTS] cover:', e.message || e); }
-  })();
-  return id;
+  var res = await shelveDocument(doc, {
+    data: got.data, name: got.name, key: got.key,
+    src: src && /^https?:/i.test(src) ? src : null, title: title, author: author
+  });
+  got.key = res.key;
+  return res.id;
 }
 
 // ---- Where you are: page indicator, remembered page ----

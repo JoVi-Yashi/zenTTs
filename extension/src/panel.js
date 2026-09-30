@@ -136,7 +136,7 @@ const PANEL_HTML = `
           <span id="tts-zen-inline-tr-label">Mostrar la traducción junto al texto</span>
         </label>
         <div class="setting-row">
-          <button type="button" class="link-btn" id="tts-zen-open-library">Abrir la biblioteca de PDF</button>
+          <button type="button" class="link-btn" id="tts-zen-open-library">Abrir la biblioteca</button>
         </div>
        </section>
        <section class="tab-page" data-page="tr" role="tabpanel">
@@ -812,7 +812,7 @@ var T = {
     infoNative: 'Voz del navegador · al instante', infoNativeRobotic: 'Voz del sistema (espeak) · suena robótica',
     infoServer: 'Neural · la más natural; necesita el servidor',
     slowVoice: 'En tu equipo esta voz se genera más despacio de lo que suena (x%s), por eso hay pausas entre frases. Prueba una de calidad Normal o Ligera.',
-    openLibrary: 'Abrir la biblioteca de PDF',
+    openLibrary: 'Abrir la biblioteca',
     autoOpen: 'Abrir siempre en este sitio', presetsTitle: 'Sitios con extractor propio',
     presetNext: 'solo la historia · capítulo siguiente en la misma página', presetScroll: 'solo la historia · sigue el scroll infinito',
     presetGeneric: 'cualquier otra página · extractor de artículos', autoTitle: 'Abrir siempre en',
@@ -857,7 +857,7 @@ var T = {
     infoNative: 'Browser voice · instant', infoNativeRobotic: 'System voice (espeak) · sounds robotic',
     infoServer: 'Neural · the most natural; needs the server',
     slowVoice: 'On your computer this voice takes longer to generate than to play (x%s), hence the pauses between sentences. Try a Standard or Light one.',
-    openLibrary: 'Open the PDF library',
+    openLibrary: 'Open the library',
     autoOpen: 'Always open on this site', presetsTitle: 'Sites with their own extractor',
     presetNext: 'just the story · next chapter in the same page', presetScroll: 'just the story · follows infinite scroll',
     presetGeneric: 'any other page · article extractor', autoTitle: 'Always open on',

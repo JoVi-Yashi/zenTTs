@@ -2658,7 +2658,7 @@
           <span id="tts-zen-inline-tr-label">Mostrar la traducci\xF3n junto al texto</span>
         </label>
         <div class="setting-row">
-          <button type="button" class="link-btn" id="tts-zen-open-library">Abrir la biblioteca de PDF</button>
+          <button type="button" class="link-btn" id="tts-zen-open-library">Abrir la biblioteca</button>
         </div>
        </section>
        <section class="tab-page" data-page="tr" role="tabpanel">
@@ -3393,7 +3393,7 @@ button:active:not(:disabled) { transform: scale(.96); }
       infoNativeRobotic: "Voz del sistema (espeak) \xB7 suena rob\xF3tica",
       infoServer: "Neural \xB7 la m\xE1s natural; necesita el servidor",
       slowVoice: "En tu equipo esta voz se genera m\xE1s despacio de lo que suena (x%s), por eso hay pausas entre frases. Prueba una de calidad Normal o Ligera.",
-      openLibrary: "Abrir la biblioteca de PDF",
+      openLibrary: "Abrir la biblioteca",
       autoOpen: "Abrir siempre en este sitio",
       presetsTitle: "Sitios con extractor propio",
       presetNext: "solo la historia \xB7 cap\xEDtulo siguiente en la misma p\xE1gina",
@@ -3501,7 +3501,7 @@ button:active:not(:disabled) { transform: scale(.96); }
       infoNativeRobotic: "System voice (espeak) \xB7 sounds robotic",
       infoServer: "Neural \xB7 the most natural; needs the server",
       slowVoice: "On your computer this voice takes longer to generate than to play (x%s), hence the pauses between sentences. Try a Standard or Light one.",
-      openLibrary: "Open the PDF library",
+      openLibrary: "Open the library",
       autoOpen: "Always open on this site",
       presetsTitle: "Sites with their own extractor",
       presetNext: "just the story \xB7 next chapter in the same page",
@@ -4990,6 +4990,15 @@ button:active:not(:disabled) { transform: scale(.96); }
     return link ? absolute(link.getAttribute("href"), url) : null;
   }
   var BLOCKS = "p, h1, h2, h3, h4, h5, h6, li, blockquote, pre";
+  function textOf(doc, sel) {
+    var el = doc.querySelector(sel);
+    return el ? visibleText(el) : "";
+  }
+  function titleParts(doc) {
+    return (doc.title || "").split(/\s+[-|–—]\s+/).map(function(x) {
+      return x.trim();
+    }).filter(Boolean);
+  }
   var SITES = [
     {
       id: "ao3",
@@ -5011,6 +5020,22 @@ button:active:not(:disabled) { transform: scale(.96); }
       nextUrl: function(doc, url) {
         var a = doc.querySelector("li.chapter.next a[href], .chapter.next a[href]");
         return a ? absolute(a.getAttribute("href"), url) : null;
+      },
+      // The work this chapter belongs to, for the library's Web shelf
+      work: function(doc, url) {
+        var m = url.pathname.match(/\/works\/(\d+)/);
+        if (!m) return null;
+        var total = (textOf(doc, "dd.chapters").split("/")[1] || "").trim();
+        var sel = doc.querySelector("#selected_id");
+        return {
+          key: "ao3:" + m[1],
+          title: textOf(doc, "h2.title") || titleParts(doc)[0],
+          author: textOf(doc, 'a[rel="author"]'),
+          workUrl: url.origin + "/works/" + m[1],
+          chapterTitle: textOf(doc, ".chapter.preface h3.title, .chapter h3.title"),
+          chapterNum: sel ? sel.selectedIndex + 1 : 1,
+          chapters: /^\d+$/.test(total) ? +total : null
+        };
       }
     },
     {
@@ -5035,6 +5060,21 @@ button:active:not(:disabled) { transform: scale(.96); }
         var sel = doc.querySelector("#chap_select");
         if (!sel || !sel.querySelector('option[value="' + n + '"]')) return null;
         return absolute("/s/" + m[1] + "/" + n + (m[3] || "/"), url);
+      },
+      work: function(doc, url) {
+        var m = url.pathname.match(/\/s\/(\d+)(?:\/(\d+))?/);
+        if (!m) return null;
+        var sel = doc.querySelector("#chap_select");
+        var opt = sel && sel.options[sel.selectedIndex];
+        return {
+          key: "ffn:" + m[1],
+          title: textOf(doc, "#profile_top b.xcontrast_txt") || titleParts(doc)[0],
+          author: textOf(doc, '#profile_top a.xcontrast_txt[href^="/u/"]'),
+          workUrl: url.origin + "/s/" + m[1],
+          chapterTitle: opt ? opt.textContent.trim() : "",
+          chapterNum: parseInt(m[2] || "1", 10),
+          chapters: sel ? sel.options.length : 1
+        };
       }
     },
     {
@@ -5059,6 +5099,18 @@ button:active:not(:disabled) { transform: scale(.96); }
       nextUrl: function(doc, url) {
         var a = doc.querySelector("a.next-part-link[href], .next-part a[href]");
         return a ? absolute(a.getAttribute("href"), url) : relNext(doc, url);
+      },
+      work: function(doc, url) {
+        var link = doc.querySelector('a[href*="/story/"]');
+        var m = link && link.getAttribute("href").match(/\/story\/(\d+)/);
+        var parts = titleParts(doc);
+        var title = link && visibleText(link) || parts[1] || parts[0];
+        return {
+          key: "wattpad:" + (m ? m[1] : title.toLowerCase()),
+          title,
+          workUrl: m ? absolute(link.getAttribute("href"), url) : url.href,
+          chapterTitle: textOf(doc, "h1.h2, .part-title, h1") || parts[0]
+        };
       }
     },
     {
@@ -5081,6 +5133,18 @@ button:active:not(:disabled) { transform: scale(.96); }
       },
       nextUrl: function() {
         return null;
+      },
+      work: function(doc, url) {
+        var m = url.pathname.match(/\/book\/(?:[^/]*?_)?(\d{6,})/);
+        if (!m) return null;
+        var parts = titleParts(doc);
+        var chapter = active && active.querySelector("h3, h2, .cha-tit");
+        return {
+          key: "webnovel:" + m[1],
+          title: textOf(doc, ".det-hd h1, .cha-hd-mn-text a, .j_bookName") || parts[1] || parts[0],
+          workUrl: url.origin + "/book/" + m[1],
+          chapterTitle: chapter ? visibleText(chapter) : parts[0]
+        };
       },
       nextContainer: function(doc, current2) {
         return chapterAfter(doc, current2);
@@ -6353,6 +6417,54 @@ button:active:not(:disabled) { transform: scale(.96); }
       el.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   }
+  var SITE_NAMES = { ao3: "Archive of Our Own", ffn: "FanFiction.net", wattpad: "Wattpad", webnovel: "Webnovel" };
+  var lastWorkSave = 0;
+  var lastWorkChapter = null;
+  function workInfo() {
+    var url = new URL(window.location.href);
+    var host = url.hostname.replace(/^www\./, "");
+    var w = null;
+    try {
+      w = site.work ? site.work(document, url) : null;
+    } catch (_) {
+    }
+    if (!w) {
+      var parts = (document.title || host).split(/\s+[-|–—]\s+/);
+      w = { key: "web:" + host + url.pathname, title: parts[0], workUrl: url.href, chapterTitle: "" };
+    }
+    var og = document.querySelector('meta[property="og:image"][content]');
+    return Object.assign({
+      kind: "web",
+      site: site.id,
+      siteName: SITE_NAMES[site.id] || host,
+      host,
+      image: og ? og.getAttribute("content") : null
+    }, w);
+  }
+  async function recordWork(force) {
+    if (embed || !chapterKey) return;
+    var now = Date.now();
+    if (!force && now - lastWorkSave < 15e3 && lastWorkChapter === chapterKey) return;
+    lastWorkSave = now;
+    lastWorkChapter = chapterKey;
+    try {
+      var got = await browser.storage.local.get(["webWorks", "rememberWeb"]);
+      if (got.rememberWeb === false) return;
+      var info = workInfo();
+      if (!info.title) return;
+      var store = got.webWorks || { works: {} };
+      var prev = store.works[info.key] || { addedAt: now, tags: [] };
+      store.works[info.key] = Object.assign(prev, info, {
+        chapterUrl: window.location.href,
+        chapterKey,
+        chapterProgress: sentences.length && player.index >= 0 ? +((player.index + 1) / sentences.length).toFixed(3) : prev.chapterProgress || 0,
+        openedAt: now
+      });
+      await browser.storage.local.set({ webWorks: store });
+    } catch (e) {
+      console.error("[zenTTS] web shelf:", e.message || e);
+    }
+  }
   var paragraphs = [];
   var sentences = [];
   var chapterKey = null;
@@ -6384,6 +6496,7 @@ button:active:not(:disabled) { transform: scale(.96); }
       else hideCaption();
       highlightPreview(i);
       saveProgress(chapterKey, { index: i, total: sentences.length, hash: chapterHash, title: document.title });
+      recordWork(false);
       if (i >= sentences.length * 0.8) prefetchNextChapter();
     },
     onWord: function(i, offset) {
