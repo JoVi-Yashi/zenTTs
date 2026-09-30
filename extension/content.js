@@ -1647,8 +1647,8 @@
               table._readabilityDataTable = true;
               continue;
             }
-            var caption = table.getElementsByTagName("caption")[0];
-            if (caption && caption.childNodes.length) {
+            var caption2 = table.getElementsByTagName("caption")[0];
+            if (caption2 && caption2.childNodes.length) {
               table._readabilityDataTable = true;
               continue;
             }
@@ -2125,10 +2125,10 @@
     var la = luminance(a), lb = luminance(b);
     return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
   }
-  function fitAccent(accent, background) {
-    var target = luminance(background) > 0.4 ? [0, 0, 0] : [255, 255, 255];
+  function fitAccent(accent, background2) {
+    var target = luminance(background2) > 0.4 ? [0, 0, 0] : [255, 255, 255];
     var out = accent;
-    for (var t2 = 0.1; contrast(out, background) < 3.2 && t2 <= 1; t2 += 0.1) out = mix(accent, target, t2);
+    for (var t2 = 0.1; contrast(out, background2) < 3.2 && t2 <= 1; t2 += 0.1) out = mix(accent, target, t2);
     return out;
   }
   function themeTokens(theme) {
@@ -2202,8 +2202,9 @@
         </svg>
       </button>
       <button id="tts-zen-minimize" title="Minimizar">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <line x1="5" y1="12" x2="19" y2="12"></line>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="7" y1="7" x2="17" y2="17"></line>
+          <polyline points="17 9 17 17 9 17"></polyline>
         </svg>
       </button>
     </div>
@@ -2212,107 +2213,139 @@
   <div id="tts-zen-body">
     <div id="tts-zen-settings" class="collapsed">
      <div class="settings-inner">
-      <div class="setting-row">
-        <label id="tts-zen-voice-label">Voz</label>
-        <div class="select-wrap">
-          <select id="tts-zen-voice"></select>
+      <div class="tabs" role="tablist" id="tts-zen-tabs">
+        <button type="button" role="tab" data-tab="voice" id="tts-zen-tab-voice">Voz</button>
+        <button type="button" role="tab" data-tab="read" id="tts-zen-tab-read">Lectura</button>
+        <button type="button" role="tab" data-tab="tr" id="tts-zen-tab-tr">Traducir</button>
+        <button type="button" role="tab" data-tab="look" id="tts-zen-tab-look">Aspecto</button>
+        <i class="tab-ink"></i>
+      </div>
+      <div class="tab-pages">
+       <section class="tab-page" data-page="voice" role="tabpanel">
+        <div class="setting-row">
+          <label id="tts-zen-engine-label">Motor</label>
+          <div class="select-wrap">
+            <select id="tts-zen-engine">
+              <option value="native">Nativo (Browser)</option>
+              <option value="server">Neural (edge-tts)</option>
+              <option value="local">Local (Piper)</option>
+            </select>
+          </div>
         </div>
-      </div>
-      <div class="setting-row">
-        <label id="tts-zen-engine-label">Motor</label>
-        <div class="select-wrap">
-          <select id="tts-zen-engine">
-            <option value="native">Nativo (Browser)</option>
-            <option value="server">Neural (edge-tts)</option>
-            <option value="local">Local (Piper)</option>
-          </select>
+        <div class="setting-row">
+          <label id="tts-zen-voice-label">Voz</label>
+          <div class="select-wrap">
+            <select id="tts-zen-voice"></select>
+          </div>
         </div>
-      </div>
-      <div class="setting-row" id="tts-zen-voice-hint" hidden>
-        <label></label>
-        <div class="hint-text"><span id="tts-zen-voice-hint-text">Las voces del sistema suenan rob\xF3ticas.</span>
-          <button type="button" class="link-btn" id="tts-zen-try-local">Probar voz Local</button></div>
-      </div>
-      <div class="setting-row" id="tts-zen-local-row" hidden>
-        <label></label>
-        <div class="local-dl">
-          <button id="tts-zen-local-dl" type="button">Descargar voz</button>
-          <span id="tts-zen-local-progress"></span>
+        <div class="setting-row" id="tts-zen-voice-hint" hidden>
+          <label></label>
+          <div class="hint-text"><span id="tts-zen-voice-hint-text">Las voces del sistema suenan rob\xF3ticas.</span>
+            <button type="button" class="link-btn" id="tts-zen-try-local">Probar voz Local</button></div>
         </div>
-      </div>
-      <div class="setting-row">
-        <label id="tts-zen-lang-label">Idioma</label>
-        <div class="select-wrap">
-          <select id="tts-zen-lang">
-            <option value="es">Espa\xF1ol</option>
-            <option value="en">English</option>
-          </select>
+        <div class="setting-row" id="tts-zen-local-row" hidden>
+          <label></label>
+          <button id="tts-zen-local-dl" type="button" class="fill-btn"><span class="fill-label"></span><span class="water" aria-hidden="true"><span class="fill-label"></span></span><i class="wave" aria-hidden="true"></i></button>
         </div>
-      </div>
-      <div class="setting-row">
-        <label id="tts-zen-readlang-label">Leer en</label>
-        <div class="select-wrap">
-          <select id="tts-zen-readlang">
-            <option value="auto">Auto</option>
-            <option value="original">Idioma original</option>
-            <option value="es">Espa\xF1ol</option>
-            <option value="en">English</option>
-            <option value="fr">Fran\xE7ais</option>
-            <option value="de">Deutsch</option>
-            <option value="it">Italiano</option>
-            <option value="pt">Portugu\xEAs</option>
-            <option value="ja">\u65E5\u672C\u8A9E</option>
-            <option value="ko">\uD55C\uAD6D\uC5B4</option>
-            <option value="zh">\u4E2D\u6587</option>
-            <option value="ru">\u0420\u0443\u0441\u0441\u043A\u0438\u0439</option>
-          </select>
+        <div class="setting-row" id="tts-zen-neural-hint" hidden>
+          <label></label>
+          <div class="hint-text"><span id="tts-zen-neural-hint-text">\xBFA\xFAn m\xE1s natural? El motor Neural usa voces de Microsoft.</span>
+            <button type="button" class="link-btn" id="tts-zen-try-neural">Usar Neural</button></div>
         </div>
-      </div>
-      <div class="setting-row" id="tts-zen-detected-row" hidden>
-        <label></label>
-        <div class="hint-text" id="tts-zen-detected"></div>
-      </div>
-      <div class="setting-row">
-        <label id="tts-zen-speed-text">Velocidad</label>
-        <div class="speed-group">
-          <input type="range" id="tts-zen-speed" min="50" max="300" value="100" step="10">
-          <span id="tts-zen-speed-label">1.0x</span>
+        <div class="setting-row">
+          <label id="tts-zen-speed-text">Velocidad</label>
+          <div class="speed-group">
+            <input type="range" id="tts-zen-speed" min="50" max="300" value="100" step="10">
+            <span id="tts-zen-speed-label">1.0x</span>
+          </div>
         </div>
-      </div>
-      <label class="check-row">
-        <input type="checkbox" id="tts-zen-autonext">
-        <span id="tts-zen-autonext-label">Seguir con el siguiente cap\xEDtulo</span>
-      </label>
-      <div class="setting-row section-header">
-        <span id="tts-zen-look-title">Aspecto</span>
-      </div>
-      <label class="check-row">
-        <input type="checkbox" id="tts-zen-follow-theme">
-        <span id="tts-zen-follow-label">Usar los colores del tema del navegador</span>
-      </label>
-      <label class="check-row">
-        <input type="checkbox" id="tts-zen-word-hl">
-        <span id="tts-zen-word-hl-label">Resaltar la palabra que suena</span>
-      </label>
-      <div class="setting-row">
-        <label id="tts-zen-accent-label">Acento</label>
-        <div class="accent-group" id="tts-zen-accent-group">
-          <button type="button" class="swatch swatch-auto" data-accent="" title="Auto">A</button>
-          ${ACCENT_PRESETS.map(function(c) {
+       </section>
+       <section class="tab-page" data-page="read" role="tabpanel">
+        <div class="setting-row">
+          <label id="tts-zen-readlang-label">Leer en</label>
+          <div class="select-wrap">
+            <select id="tts-zen-readlang">
+              <option value="auto">Auto</option>
+              <option value="original">Idioma original</option>
+              <option value="es">Espa\xF1ol</option>
+              <option value="en">English</option>
+              <option value="fr">Fran\xE7ais</option>
+              <option value="de">Deutsch</option>
+              <option value="it">Italiano</option>
+              <option value="pt">Portugu\xEAs</option>
+              <option value="ja">\u65E5\u672C\u8A9E</option>
+              <option value="ko">\uD55C\uAD6D\uC5B4</option>
+              <option value="zh">\u4E2D\u6587</option>
+              <option value="ru">\u0420\u0443\u0441\u0441\u043A\u0438\u0439</option>
+            </select>
+          </div>
+        </div>
+        <div class="setting-row" id="tts-zen-detected-row" hidden>
+          <label></label>
+          <div class="hint-text" id="tts-zen-detected"></div>
+        </div>
+        <label class="check-row">
+          <input type="checkbox" id="tts-zen-autonext">
+          <span id="tts-zen-autonext-label">Seguir con el siguiente cap\xEDtulo</span>
+        </label>
+        <label class="check-row">
+          <input type="checkbox" id="tts-zen-inline-tr">
+          <span id="tts-zen-inline-tr-label">Mostrar la traducci\xF3n junto al texto</span>
+        </label>
+       </section>
+       <section class="tab-page" data-page="tr" role="tabpanel">
+        <div class="setting-row">
+          <label id="tts-zen-trmode-label">Traducir con</label>
+          <div class="select-wrap">
+            <select id="tts-zen-trmode">
+              <option value="ask">Preguntar</option>
+              <option value="offline">Paquete sin conexi\xF3n</option>
+              <option value="online">En l\xEDnea</option>
+              <option value="never">No traducir</option>
+            </select>
+          </div>
+        </div>
+        <div id="tts-zen-trchoices" class="packs"></div>
+        <div class="setting-row section-header">
+          <span id="tts-zen-packs-title">Paquetes de traducci\xF3n</span>
+        </div>
+        <div id="tts-zen-packs" class="packs"></div>
+       </section>
+       <section class="tab-page" data-page="look" role="tabpanel">
+        <div class="setting-row">
+          <label id="tts-zen-lang-label">Interfaz</label>
+          <div class="select-wrap">
+            <select id="tts-zen-lang">
+              <option value="es">Espa\xF1ol</option>
+              <option value="en">English</option>
+            </select>
+          </div>
+        </div>
+        <label class="check-row">
+          <input type="checkbox" id="tts-zen-follow-theme">
+          <span id="tts-zen-follow-label">Usar los colores del tema del navegador</span>
+        </label>
+        <label class="check-row">
+          <input type="checkbox" id="tts-zen-word-hl">
+          <span id="tts-zen-word-hl-label">Resaltar la palabra que suena</span>
+        </label>
+        <div class="setting-row">
+          <label id="tts-zen-accent-label">Acento</label>
+          <div class="accent-group" id="tts-zen-accent-group">
+            <button type="button" class="swatch swatch-auto" data-accent="" title="Auto">A</button>
+            ${ACCENT_PRESETS.map(function(c) {
     return '<button type="button" class="swatch" data-accent="' + c + '" style="--c:' + c + '" title="' + c + '"></button>';
   }).join("")}
-          <span class="swatch swatch-custom" id="tts-zen-accent-custom" title="Otro color">+<input type="color" id="tts-zen-accent-picker"></span>
+            <span class="swatch swatch-custom" id="tts-zen-accent-custom" title="Otro color">+<input type="color" id="tts-zen-accent-picker"></span>
+          </div>
         </div>
+        <div class="setting-row">
+          <label></label>
+          <input type="text" id="tts-zen-accent-hex" placeholder="Pegar color de Zen" spellcheck="false" autocomplete="off">
+        </div>
+        <div class="accent-hint" id="tts-zen-accent-hint" title="about:config \u2192 zen.theme.accent-color">zen.theme.accent-color</div>
+       </section>
       </div>
-      <div class="setting-row">
-        <label></label>
-        <input type="text" id="tts-zen-accent-hex" placeholder="Pegar color de Zen" spellcheck="false" autocomplete="off">
-      </div>
-      <div class="accent-hint" id="tts-zen-accent-hint" title="about:config \u2192 zen.theme.accent-color">zen.theme.accent-color</div>
-      <div class="setting-row section-header">
-        <span id="tts-zen-packs-title">Paquetes de traducci\xF3n</span>
-      </div>
-      <div id="tts-zen-packs" class="packs"></div>
      </div>
     </div>
 
@@ -2332,13 +2365,14 @@
     </div>
 
     <div id="tts-zen-translate-bar" hidden>
+     <div class="tb-inner">
       <div id="tts-zen-translate-msg"></div>
       <div class="tb-actions">
-        <button type="button" id="tts-zen-tr-download" class="tb-main"></button>
+        <button type="button" id="tts-zen-tr-download" class="fill-btn tb-main"><span class="fill-label"></span><span class="water" aria-hidden="true"><span class="fill-label"></span></span><i class="wave" aria-hidden="true"></i></button>
         <button type="button" id="tts-zen-tr-online" hidden></button>
         <button type="button" id="tts-zen-tr-original"></button>
       </div>
-      <div class="tb-progress" hidden><i id="tts-zen-tr-progress"></i></div>
+     </div>
     </div>
 
     <div id="tts-zen-controls">
@@ -2484,7 +2518,22 @@ button:focus-visible, select:focus-visible, input:focus-visible {
   transform: scale(.35); opacity: 0; visibility: hidden; pointer-events: none;
   transition: transform .2s cubic-bezier(.4,0,.6,1), opacity .16s ease, visibility 0s .2s;
 }
-#tts-zen-body { overflow-y: auto; min-height: 0; }
+#tts-zen-body { overflow-y: auto; min-height: 0; display: flex; flex-direction: column; }
+
+/* The panel turns towards its corner: in a bottom corner the header (and the
+   settings it opens) sit at the bottom; in a left corner the header buttons
+   are mirrored, so "minimize" is always the button nearest the corner. */
+#tts-zen-panel[data-corner^="b"] { flex-direction: column-reverse; }
+#tts-zen-panel[data-corner^="b"] #tts-zen-header { border-bottom: none; border-top: 1px solid var(--rule); }
+#tts-zen-panel[data-corner^="b"] #tts-zen-settings { order: 99; border-bottom: none; border-top: 1px solid var(--rule); }
+#tts-zen-panel[data-corner^="b"] #tts-zen-settings.collapsed { border-top-color: transparent; }
+#tts-zen-panel[data-corner$="l"] #tts-zen-header,
+#tts-zen-panel[data-corner$="l"] #tts-zen-header-right { flex-direction: row-reverse; }
+#tts-zen-panel[data-corner$="l"] #tts-zen-header { padding: 8px 14px 8px 8px; }
+#tts-zen-minimize svg { transition: transform .3s cubic-bezier(.2,.8,.2,1); }
+#tts-zen-panel[data-corner="bl"] #tts-zen-minimize svg { transform: rotate(90deg); }
+#tts-zen-panel[data-corner="tl"] #tts-zen-minimize svg { transform: rotate(180deg); }
+#tts-zen-panel[data-corner="tr"] #tts-zen-minimize svg { transform: rotate(270deg); }
 
 button { transition: transform .08s ease, background-color .15s ease, color .15s ease, opacity .15s ease; }
 button:active:not(:disabled) { transform: scale(.96); }
@@ -2519,10 +2568,37 @@ button:active:not(:disabled) { transform: scale(.96); }
 #tts-zen-settings.collapsed { grid-template-rows: 0fr; border-bottom-color: transparent; }
 .settings-inner {
   min-height: 0; overflow: hidden;
-  padding: 12px 14px; display: flex; flex-direction: column; gap: 8px;
+  padding: 10px 14px 12px; display: flex; flex-direction: column; gap: 10px;
   transition: padding .26s cubic-bezier(.2,.8,.2,1), opacity .2s ease;
 }
 #tts-zen-settings.collapsed .settings-inner { padding-top: 0; padding-bottom: 0; opacity: 0; }
+
+/* Settings tabs: a segmented control with a sliding marker */
+.tabs {
+  position: relative; display: grid; grid-template-columns: repeat(4, 1fr);
+  padding: 2px; border-radius: 6px; background: var(--paper); border: 1px solid var(--rule);
+}
+.tabs button {
+  position: relative; z-index: 1; min-width: 0; padding: 4px 2px; border: none; border-radius: 4px;
+  background: transparent; color: var(--ink-soft); font: 11.5px var(--sans); cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tabs button:hover { color: var(--ink); }
+.tabs button[aria-selected="true"] { color: var(--ink); font-weight: 600; }
+.tab-ink {
+  position: absolute; top: 2px; bottom: 2px; left: 2px; width: calc((100% - 4px) / 4);
+  border-radius: 4px; background: var(--sheet); box-shadow: 0 1px 2px rgba(0,0,0,.12);
+  transform: translateX(calc(var(--tab, 0) * 100%));
+  transition: transform .28s cubic-bezier(.2,.8,.2,1);
+}
+/* All pages share one grid cell; the area's height follows the active page
+   with a transition, so short tabs leave no gap and switching never jumps */
+.tab-pages { display: grid; overflow: hidden; transition: height .26s cubic-bezier(.2,.8,.2,1); }
+.tab-page {
+  grid-area: 1 / 1; align-self: start; min-width: 0; display: flex; flex-direction: column; gap: 8px;
+  transition: opacity .2s ease, transform .24s cubic-bezier(.2,.8,.2,1), visibility 0s;
+}
+.tab-page:not(.active) { opacity: 0; visibility: hidden; pointer-events: none; transform: translateX(var(--from, 12px)); transition: opacity .12s ease, transform .2s ease, visibility 0s .2s; }
 
 .setting-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .setting-row label { flex-shrink: 0; min-width: 64px; max-width: 40%; font-size: 12px; color: var(--ink-soft); }
@@ -2586,14 +2662,38 @@ button:active:not(:disabled) { transform: scale(.96); }
 }
 #tts-zen-controls button.primary:hover:not(:disabled) { background: var(--ink); opacity: 0.88; }
 
-.local-dl { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; }
-#tts-zen-local-dl {
-  white-space: nowrap; padding: 4px 10px; border-radius: 4px; border: 1px solid var(--ink);
+/* Download buttons fill up like water while downloading: the "water" layer is
+   a copy of the label in inverted colors, clipped to the progress, with a
+   rippling edge. */
+.fill-btn {
+  position: relative; overflow: hidden; flex: 1; min-width: 0;
+  padding: 5px 10px; border-radius: 4px; border: 1px solid var(--ink);
   background: transparent; color: var(--ink); font: 12px var(--sans); cursor: pointer;
+  text-align: center; white-space: nowrap; --p: 0%;
+  transition: opacity .25s ease, transform .08s ease, background-color .15s ease;
 }
-#tts-zen-local-dl:hover:not(:disabled) { background: var(--hover); }
-#tts-zen-local-dl:disabled { opacity: 0.5; cursor: default; }
-#tts-zen-local-progress { font-size: 12px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.fill-btn:hover:not(:disabled) { background: var(--hover); }
+.fill-btn .fill-label { display: block; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.fill-btn .water {
+  position: absolute; inset: 0; padding: inherit; display: flex; align-items: center; justify-content: center;
+  background: var(--ink); color: var(--sheet);
+  clip-path: inset(0 calc(100% - var(--p)) 0 0);
+  transition: clip-path .3s ease;
+}
+.fill-btn .water .fill-label { width: 100%; }
+.fill-btn .wave {
+  position: absolute; top: 0; bottom: 0; left: calc(var(--p) - 1px); width: 7px; display: none;
+  background: var(--ink);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='7' height='12'%3E%3Cpath d='M0 0 Q7 3 0 6 Q7 9 0 12Z'/%3E%3C/svg%3E") 0 0 / 7px 12px repeat-y;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='7' height='12'%3E%3Cpath d='M0 0 Q7 3 0 6 Q7 9 0 12Z'/%3E%3C/svg%3E") 0 0 / 7px 12px repeat-y;
+  animation: ripple .9s linear infinite;
+  transition: left .3s ease;
+}
+.fill-btn.filling { cursor: progress; }
+.fill-btn.filling .wave { display: block; }
+.fill-btn.filling:hover { background: transparent; }
+.fill-btn.done { opacity: 0; }
+@keyframes ripple { to { -webkit-mask-position: 0 12px; mask-position: 0 12px; } }
 .check-row { display: flex; align-items: flex-start; gap: 8px; font-size: 12px; line-height: 1.35; color: var(--ink-soft); cursor: pointer; }
 .check-row input { accent-color: var(--ink); margin: 1px 0 0; flex-shrink: 0; }
 
@@ -2605,22 +2705,26 @@ button:active:not(:disabled) { transform: scale(.96); }
 
 /* Translation offer */
 #tts-zen-translate-bar {
-  margin: 10px 14px 0; padding: 10px 12px; border-radius: 6px;
+  display: grid; grid-template-rows: 1fr; margin: 4px 14px 12px;
+  animation: bar-in .24s cubic-bezier(.2,.8,.2,1);
+  transition: grid-template-rows .28s cubic-bezier(.4,0,.2,1), margin .28s cubic-bezier(.4,0,.2,1), opacity .2s ease;
+}
+#tts-zen-translate-bar.closing { grid-template-rows: 0fr; margin-top: 0; margin-bottom: 0; opacity: 0; }
+.tb-inner {
+  min-height: 0; overflow: hidden; padding: 10px 12px; border-radius: 6px;
   background: var(--paper); border: 1px solid var(--rule);
   font-size: 12px; line-height: 1.4; color: var(--ink);
-  animation: bar-in .24s cubic-bezier(.2,.8,.2,1);
 }
+#tts-zen-translate-bar.closing .tb-inner { padding-top: 0; padding-bottom: 0; border-width: 0; transition: padding .28s ease; }
 @keyframes bar-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 .tb-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.tb-actions button {
+.tb-actions .fill-btn { flex: 1 1 100%; font-weight: 600; }
+.tb-actions button:not(.fill-btn) {
   padding: 4px 10px; border-radius: 4px; border: 1px solid var(--rule);
   background: transparent; color: var(--ink); font: 12px var(--sans); cursor: pointer;
 }
-.tb-actions button.tb-main { background: var(--ink); border-color: var(--ink); color: var(--sheet); font-weight: 600; }
-.tb-actions button:hover:not(:disabled) { opacity: .88; }
-.tb-actions button:disabled { opacity: .5; cursor: default; }
-.tb-progress { height: 3px; margin-top: 8px; border-radius: 2px; background: var(--rule); overflow: hidden; }
-.tb-progress i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s ease; }
+.tb-actions button:not(.fill-btn):hover:not(:disabled) { background: var(--hover); }
+.tb-actions button:disabled:not(.filling) { opacity: .5; cursor: default; }
 
 .packs { display: flex; flex-direction: column; gap: 4px; }
 .pack-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--ink); }
@@ -2631,6 +2735,7 @@ button:active:not(:disabled) { transform: scale(.96); }
 }
 .pack-row button:hover { background: var(--hover); color: var(--ink); }
 .packs-empty { font-size: 12px; color: var(--ink-soft); }
+.pack-row .muted { color: var(--ink-soft); }
 
 #tts-zen-pick.active { background: var(--ink); border-color: var(--ink); color: var(--sheet); }
 [hidden] { display: none !important; }
@@ -2657,7 +2762,7 @@ button:active:not(:disabled) { transform: scale(.96); }
 }
 #tts-zen-accent-hex:focus { border-color: var(--ink-soft); }
 #tts-zen-accent-hex.invalid { border-color: var(--accent); }
-.accent-hint { margin: -4px 0 0 74px; font: 10px var(--mono); color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.accent-hint { margin: -2px 0 0 74px; font: 10px var(--mono); color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 #tts-zen-resume-row { text-align: center; padding: 0 14px 6px; }
 #tts-zen-restart {
@@ -2873,11 +2978,31 @@ button:active:not(:disabled) { transform: scale(.96); }
       tryLocal: "Probar voz Local",
       trFound: "Texto en %s.",
       trNeedsTwo: "Hacen falta dos paquetes (%s).",
-      trDownload: "Descargar traducci\xF3n %s (%s MB)",
+      trDownload: "Descargar %s \xB7 %s MB",
       trOnline: "Traducir en l\xEDnea",
       trOriginal: "Leer en %s",
-      trDownloading: "Descargando traducci\xF3n\u2026 %s",
-      trFailed: "No se pudo descargar la traducci\xF3n"
+      trDownloading: "Descargando\u2026 %s",
+      trFailed: "No se pudo descargar la traducci\xF3n",
+      tabVoice: "Voz",
+      tabRead: "Lectura",
+      tabTr: "Traducir",
+      tabLook: "Aspecto",
+      uiLang: "Interfaz",
+      inlineTr: "Mostrar la traducci\xF3n junto al texto",
+      trMode: "Traducir con",
+      trAsk: "Preguntar",
+      trOffline: "Paquete sin conexi\xF3n",
+      trOnlineMode: "En l\xEDnea",
+      trNever: "No traducir",
+      remembered: "Elecciones recordadas",
+      forget: "Olvidar",
+      neuralHint: "\xBFA\xFAn m\xE1s natural? El motor Neural usa voces de Microsoft.",
+      tryNeural: "Usar Neural",
+      qHigh: "Alta calidad",
+      qMedium: "Normal",
+      qLow: "Ligera",
+      retry: "No se pudo descargar \xB7 Reintentar",
+      downloadPct: "Descargando\u2026 %s"
     },
     en: {
       minimize: "Minimize",
@@ -2943,11 +3068,31 @@ button:active:not(:disabled) { transform: scale(.96); }
       tryLocal: "Try the Local voice",
       trFound: "Text in %s.",
       trNeedsTwo: "Needs two packs (%s).",
-      trDownload: "Download %s translation (%s MB)",
+      trDownload: "Download %s \xB7 %s MB",
       trOnline: "Translate online",
       trOriginal: "Read in %s",
-      trDownloading: "Downloading translation\u2026 %s",
-      trFailed: "Could not download the translation"
+      trDownloading: "Downloading\u2026 %s",
+      trFailed: "Could not download the translation",
+      tabVoice: "Voice",
+      tabRead: "Reading",
+      tabTr: "Translate",
+      tabLook: "Look",
+      uiLang: "Interface",
+      inlineTr: "Show the translation next to the text",
+      trMode: "Translate with",
+      trAsk: "Ask",
+      trOffline: "Offline pack",
+      trOnlineMode: "Online",
+      trNever: "Don't translate",
+      remembered: "Remembered choices",
+      forget: "Forget",
+      neuralHint: "Even more natural? The Neural engine uses Microsoft voices.",
+      tryNeural: "Use Neural",
+      qHigh: "High quality",
+      qMedium: "Standard",
+      qLow: "Light",
+      retry: "Download failed \xB7 Retry",
+      downloadPct: "Downloading\u2026 %s"
     }
   };
   function t(key) {
@@ -2980,14 +3125,20 @@ button:active:not(:disabled) { transform: scale(.96); }
     followTheme: true,
     wordHighlight: true,
     readLang: "auto",
+    trMode: "ask",
+    inlineTr: true,
+    tab: "voice",
     corner: "br",
     lang: "es"
   };
   async function loadSettings() {
     try {
-      const stored = await browser.storage.local.get(["voice", "rate", "engine", "lang", "readLang", "localVoice", "autoNext", "accent", "followTheme", "wordHighlight", "corner"]);
+      const stored = await browser.storage.local.get(["voice", "rate", "engine", "lang", "readLang", "localVoice", "autoNext", "accent", "followTheme", "wordHighlight", "corner", "trMode", "inlineTr", "tab"]);
       if (stored.readLang) state.readLang = stored.readLang;
       if (stored.corner) state.corner = stored.corner;
+      if (stored.trMode) state.trMode = stored.trMode;
+      if (typeof stored.inlineTr === "boolean") state.inlineTr = stored.inlineTr;
+      if (stored.tab) state.tab = stored.tab;
       if (typeof stored.wordHighlight === "boolean") state.wordHighlight = stored.wordHighlight;
       if (typeof stored.accent === "string") state.accent = stored.accent;
       if (typeof stored.followTheme === "boolean") state.followTheme = stored.followTheme;
@@ -3010,12 +3161,14 @@ button:active:not(:disabled) { transform: scale(.96); }
     shared.currentEngine = state.currentEngine;
     shared.lang = state.lang;
     shared.readLang = state.readLang;
+    shared.trMode = state.trMode;
+    shared.inlineTr = state.inlineTr;
     shared.autoNext = state.autoNext;
     shared.wordHighlight = state.wordHighlight;
   }
   async function saveSettings() {
     try {
-      await browser.storage.local.set({ voice: state.currentVoice, rate: state.currentRate, engine: state.currentEngine, lang: state.lang, readLang: state.readLang, corner: state.corner, localVoice: state.localVoice, autoNext: state.autoNext, accent: state.accent, followTheme: state.followTheme, wordHighlight: state.wordHighlight });
+      await browser.storage.local.set({ voice: state.currentVoice, rate: state.currentRate, engine: state.currentEngine, lang: state.lang, readLang: state.readLang, corner: state.corner, trMode: state.trMode, inlineTr: state.inlineTr, tab: state.tab, localVoice: state.localVoice, autoNext: state.autoNext, accent: state.accent, followTheme: state.followTheme, wordHighlight: state.wordHighlight });
     } catch (_) {
     }
   }
@@ -3029,7 +3182,8 @@ button:active:not(:disabled) { transform: scale(.96); }
   function outLang() {
     var shared = window.__tts_zen_state;
     if (shared && shared.speechLang) return shared.speechLang;
-    if (state.readLang && state.readLang !== "auto" && state.readLang !== "original") return state.readLang;
+    if (state.readLang === "original") return detectedLang || uiLang();
+    if (state.readLang && state.readLang !== "auto") return state.readLang;
     return uiLang();
   }
   function isRobotic(v) {
@@ -3043,6 +3197,8 @@ button:active:not(:disabled) { transform: scale(.96); }
   async function loadVoices() {
     var localRow = getEl("tts-zen-local-row");
     if (localRow) localRow.hidden = state.currentEngine !== "local";
+    var neural = getEl("tts-zen-neural-hint");
+    if (neural) neural.hidden = state.currentEngine !== "local";
     var hint = getEl("tts-zen-voice-hint");
     if (hint) hint.hidden = true;
     if (state.currentEngine === "server") return loadServerVoices();
@@ -3097,6 +3253,8 @@ button:active:not(:disabled) { transform: scale(.96); }
     setVoicePlaceholder(t("serverUnavailable"));
   }
   var localStored = [];
+  var localDownload = null;
+  var QUALITY = { high: "qHigh", medium: "qMedium", low: "qLow", x_low: "qLow" };
   async function loadLocalVoices() {
     setVoicePlaceholder(t("loadingVoices"));
     var resp;
@@ -3107,13 +3265,24 @@ button:active:not(:disabled) { transform: scale(.96); }
     if (state.currentEngine !== "local") return;
     localStored = resp && resp.stored || [];
     var prefix = outLang().toLowerCase() + "_";
-    var catalog = (resp && resp.catalog || []).filter(function(v) {
+    var all = resp && resp.catalog || [];
+    var catalog = all.filter(function(v) {
       return v.key.toLowerCase().startsWith(prefix) || localStored.includes(v.key);
     });
-    if (!catalog.length) catalog = resp && resp.catalog || [];
+    if (!catalog.length) catalog = all;
     state.voices = catalog.map(function(v) {
-      var have = localStored.includes(v.key) ? " \xB7 " + t("downloaded") : "";
-      return { name: v.key, label: v.name + " (" + v.quality + ")" + have, lang: v.language, size: v.size };
+      var region = (v.language || "").split("_")[1];
+      var parts = [v.name.replace(/_/g, " ")];
+      if (region) parts.push(region);
+      if (localStored.includes(v.key)) parts.push(t("downloaded"));
+      else if (v.size) parts.push(Math.round(v.size / 1048576) + " MB");
+      return {
+        name: v.key,
+        label: parts.join(" \xB7 "),
+        lang: v.language,
+        size: v.size,
+        group: v.key.toLowerCase().startsWith(prefix) ? QUALITY[v.quality] || "qMedium" : null
+      };
     });
     if (!state.voices.some(function(v) {
       return v.name === state.localVoice;
@@ -3121,47 +3290,76 @@ button:active:not(:disabled) { transform: scale(.96); }
       var firstStored = state.voices.find(function(v) {
         return localStored.includes(v.name);
       });
-      if (firstStored) state.localVoice = firstStored.name;
-      else if (state.voices.length) state.localVoice = state.voices[0].name;
+      var standard = state.voices.find(function(v) {
+        return v.group === "qMedium";
+      });
+      state.localVoice = (firstStored || standard || state.voices[0] || {}).name || state.localVoice;
+      syncShared();
     }
     populateVoiceDropdown("localVoice");
     updateLocalRow();
   }
+  function setFill(btn, text, fraction) {
+    if (!btn) return;
+    btn.querySelectorAll(".fill-label").forEach(function(l) {
+      l.textContent = text;
+    });
+    btn.title = text;
+    var filling = fraction != null;
+    btn.classList.toggle("filling", filling);
+    btn.disabled = filling;
+    btn.style.setProperty("--p", filling ? Math.round(Math.max(0, Math.min(1, fraction)) * 100) + "%" : "0%");
+  }
   function updateLocalRow() {
     var btn = getEl("tts-zen-local-dl");
-    var progress = getEl("tts-zen-local-progress");
-    if (!btn || !progress) return;
+    if (!btn) return;
     var have = localStored.includes(state.localVoice);
+    var row = getEl("tts-zen-local-row");
+    if (row && state.currentEngine === "local") row.hidden = have && !localDownload;
+    if (!localDownload) btn.classList.remove("done");
+    if (localDownload && localDownload.voiceId === state.localVoice) {
+      setFill(btn, tf("downloadPct", Math.round(localDownload.fraction * 100) + " %"), localDownload.fraction);
+      return;
+    }
     var voice = (state.voices || []).find(function(v) {
       return v.name === state.localVoice;
     });
     var mb = voice && voice.size ? " \xB7 " + Math.round(voice.size / 1048576) + " MB" : "";
-    btn.hidden = have;
-    btn.disabled = false;
-    btn.textContent = t("downloadVoice") + mb;
-    progress.textContent = "";
+    setFill(btn, btn.dataset.failed === state.localVoice ? t("retry") : t("downloadVoice") + mb, null);
   }
   async function downloadLocalVoice() {
     var btn = getEl("tts-zen-local-dl");
-    var progress = getEl("tts-zen-local-progress");
     var voiceId = state.localVoice;
-    if (btn) btn.disabled = true;
-    if (progress) progress.textContent = t("downloading");
+    if (localDownload) return;
+    localDownload = { voiceId, fraction: 0 };
+    if (btn) delete btn.dataset.failed;
+    updateLocalRow();
     try {
       var resp = await browser.runtime.sendMessage({ action: "local_download", voiceId });
       if (!resp || !resp.success) throw new Error(resp && resp.error || "download");
+      localDownload.fraction = 1;
+      updateLocalRow();
+      await new Promise(function(r) {
+        setTimeout(r, 350);
+      });
+      if (btn) btn.classList.add("done");
+      await new Promise(function(r) {
+        setTimeout(r, 260);
+      });
+      localDownload = null;
       await loadLocalVoices();
     } catch (e) {
       console.error("[zenTTS] download voice:", e.message || e);
-      if (btn) btn.disabled = false;
-      if (progress) progress.textContent = t("downloadFailed");
+      localDownload = null;
+      if (btn) btn.dataset.failed = voiceId;
+      updateLocalRow();
     }
   }
   if (typeof browser !== "undefined" && browser.runtime && browser.runtime.onMessage) {
     browser.runtime.onMessage.addListener(function(msg) {
-      if (!msg || msg.action !== "local_progress" || msg.voiceId !== state.localVoice) return;
-      var progress = getEl("tts-zen-local-progress");
-      if (progress && msg.total) progress.textContent = Math.round(msg.loaded * 100 / msg.total) + " %";
+      if (!msg || msg.action !== "local_progress" || !localDownload || msg.voiceId !== localDownload.voiceId) return;
+      if (msg.total) localDownload.fraction = Math.min(0.99, msg.loaded / msg.total);
+      updateLocalRow();
     });
   }
   var LANG_NAMES = {
@@ -3204,11 +3402,16 @@ button:active:not(:disabled) { transform: scale(.96); }
     var want = outLang().toLowerCase();
     var groups = {};
     var others = [];
+    var byQuality = key === "localVoice";
     state.voices.forEach(function(v) {
       var lang = v.lang || "";
-      if (lang.toLowerCase().replace("_", "-").startsWith(want)) (groups[lang] = groups[lang] || []).push(v);
+      var g = byQuality ? v.group : lang.toLowerCase().replace("_", "-").startsWith(want) ? lang : null;
+      if (g) (groups[g] = groups[g] || []).push(v);
       else others.push(v);
     });
+    var order = byQuality ? ["qHigh", "qMedium", "qLow"].filter(function(g) {
+      return groups[g];
+    }) : Object.keys(groups).sort();
     function option(v, withLang) {
       var opt = document.createElement("option");
       opt.value = v.name;
@@ -3217,10 +3420,10 @@ button:active:not(:disabled) { transform: scale(.96); }
       opt.selected = v.name === state[key];
       return opt;
     }
-    Object.keys(groups).sort().forEach(function(lang) {
+    order.forEach(function(g) {
       var optgroup = document.createElement("optgroup");
-      optgroup.label = langLabel(lang);
-      groups[lang].forEach(function(v) {
+      optgroup.label = byQuality ? t(g) : langLabel(g);
+      groups[g].forEach(function(v) {
         optgroup.appendChild(option(v, false));
       });
       select.appendChild(optgroup);
@@ -3245,7 +3448,15 @@ button:active:not(:disabled) { transform: scale(.96); }
     [
       ["tts-zen-voice-label", "voice"],
       ["tts-zen-engine-label", "engine"],
-      ["tts-zen-lang-label", "langLabel"],
+      ["tts-zen-lang-label", "uiLang"],
+      ["tts-zen-tab-voice", "tabVoice"],
+      ["tts-zen-tab-read", "tabRead"],
+      ["tts-zen-tab-tr", "tabTr"],
+      ["tts-zen-tab-look", "tabLook"],
+      ["tts-zen-inline-tr-label", "inlineTr"],
+      ["tts-zen-trmode-label", "trMode"],
+      ["tts-zen-neural-hint-text", "neuralHint"],
+      ["tts-zen-try-neural", "tryNeural"],
       ["tts-zen-translate-title", "translateTitle"],
       ["tts-zen-speed-text", "speed"],
       ["tts-zen-autonext-label", "autoNext"],
@@ -3264,6 +3475,13 @@ button:active:not(:disabled) { transform: scale(.96); }
     });
     renderReadLabel();
     updateLocalRow();
+    var trModeSel = shadow.getElementById("tts-zen-trmode");
+    if (trModeSel) ["trAsk", "trOffline", "trOnlineMode", "trNever"].forEach(function(k, i2) {
+      trModeSel.options[i2].textContent = T[lang][k];
+    });
+    shadow.querySelectorAll(".tabs button").forEach(function(b) {
+      b.title = b.textContent;
+    });
     renderReadLangOptions();
     renderDetected();
     renderTranslateBar();
@@ -3493,6 +3711,7 @@ button:active:not(:disabled) { transform: scale(.96); }
     settingsBtn.addEventListener("click", function() {
       settingsPanel.classList.toggle("collapsed");
     });
+    setupTabs(shadow);
     const voiceSelect = shadow.getElementById("tts-zen-voice");
     voiceSelect.addEventListener("change", function() {
       if (state.currentEngine === "local") {
@@ -3543,6 +3762,25 @@ button:active:not(:disabled) { transform: scale(.96); }
     shadow.getElementById("tts-zen-try-local").addEventListener("click", function() {
       engineSelect.value = "local";
       engineSelect.dispatchEvent(new Event("change"));
+    });
+    shadow.getElementById("tts-zen-try-neural").addEventListener("click", function() {
+      engineSelect.value = "server";
+      engineSelect.dispatchEvent(new Event("change"));
+    });
+    var inlineTr = shadow.getElementById("tts-zen-inline-tr");
+    inlineTr.checked = state.inlineTr;
+    inlineTr.addEventListener("change", function() {
+      state.inlineTr = inlineTr.checked;
+      syncShared();
+      saveSettings();
+      if (handlers.onInlineTr) handlers.onInlineTr(state.inlineTr);
+    });
+    var trMode = shadow.getElementById("tts-zen-trmode");
+    trMode.value = state.trMode;
+    trMode.addEventListener("change", function() {
+      state.trMode = trMode.value;
+      syncShared();
+      saveSettings();
     });
     shadow.getElementById("tts-zen-pick").addEventListener("click", function() {
       if (handlers.onPick) handlers.onPick();
@@ -3609,21 +3847,35 @@ button:active:not(:disabled) { transform: scale(.96); }
   function renderTranslateBar() {
     var bar = getEl("tts-zen-translate-bar");
     if (!bar) return;
-    bar.hidden = !offer;
-    if (!offer) return;
+    if (!offer) {
+      closeTranslateBar(bar);
+      return;
+    }
+    clearTimeout(bar._closing);
+    bar.classList.remove("closing");
+    bar.hidden = false;
     var msg = tf("trFound", languageName(offer.from));
     if (offer.pivot) msg += " " + tf("trNeedsTwo", offer.pivot.join(" + "));
     getEl("tts-zen-translate-msg").textContent = msg;
     var dl = getEl("tts-zen-tr-download");
     var pair = offer.from.toUpperCase() + "\u2192" + offer.to.toUpperCase();
-    dl.textContent = offer.progress != null ? tf("trDownloading", Math.round(offer.progress * 100) + " %") : tf("trDownload", pair, offer.sizeMB);
-    dl.disabled = offer.progress != null;
+    if (offer.progress != null) setFill(dl, tf("trDownloading", Math.round(offer.progress * 100) + " %"), offer.progress);
+    else setFill(dl, tf("trDownload", pair, offer.sizeMB), null);
     dl.hidden = offer.supported === false;
-    getEl("tts-zen-tr-online").hidden = !offer.online;
+    var busy = offer.progress != null;
+    getEl("tts-zen-tr-online").hidden = !offer.online || busy;
     getEl("tts-zen-tr-online").textContent = t("trOnline");
+    getEl("tts-zen-tr-original").hidden = busy;
     getEl("tts-zen-tr-original").textContent = tf("trOriginal", languageName(offer.from));
-    bar.querySelector(".tb-progress").hidden = offer.progress == null;
-    getEl("tts-zen-tr-progress").style.width = Math.round((offer.progress || 0) * 100) + "%";
+  }
+  function closeTranslateBar(bar) {
+    if (bar.hidden || bar.classList.contains("closing")) return;
+    bar.classList.add("closing");
+    var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    bar._closing = setTimeout(function() {
+      bar.hidden = true;
+      bar.classList.remove("closing");
+    }, reduce ? 0 : 300);
   }
   function setTranslateOffer(info) {
     offer = info;
@@ -3634,8 +3886,25 @@ button:active:not(:disabled) { transform: scale(.96); }
     offer.progress = fraction;
     renderTranslateBar();
   }
+  function packRow(label, detail, title, onRemove) {
+    var row = document.createElement("div");
+    row.className = "pack-row";
+    var name = document.createElement("span");
+    name.textContent = label;
+    var info = document.createElement("span");
+    info.textContent = detail;
+    var del = document.createElement("button");
+    del.type = "button";
+    del.title = title;
+    del.textContent = "\u2715";
+    del.addEventListener("click", onRemove);
+    row.append(name, info, del);
+    return row;
+  }
+  var CHOICE_LABEL = { offline: "trOffline", online: "trOnlineMode", original: "trNever" };
   async function refreshPacks() {
     var box = getEl("tts-zen-packs");
+    var choices = getEl("tts-zen-trchoices");
     if (!box) return;
     var list = [];
     try {
@@ -3649,29 +3918,91 @@ button:active:not(:disabled) { transform: scale(.96); }
       empty.className = "packs-empty";
       empty.textContent = t("noPacks");
       box.appendChild(empty);
-      return;
     }
     list.forEach(function(pk) {
-      var row = document.createElement("div");
-      row.className = "pack-row";
-      var name = document.createElement("span");
-      name.textContent = languageName(pk.from) + " \u2192 " + languageName(pk.to);
-      var size = document.createElement("span");
-      size.textContent = Math.round(pk.bytes / 1048576) + " MB";
-      var del = document.createElement("button");
-      del.type = "button";
-      del.title = t("remove");
-      del.textContent = "\u2715";
-      del.addEventListener("click", async function() {
+      box.appendChild(packRow(languageName(pk.from) + " \u2192 " + languageName(pk.to), Math.round(pk.bytes / 1048576) + " MB", t("remove"), async function() {
         try {
           await browser.runtime.sendMessage({ action: "tr_remove", pair: pk.from + "-" + pk.to });
         } catch (_) {
         }
         refreshPacks();
-      });
-      row.append(name, size, del);
-      box.appendChild(row);
+      }));
     });
+    if (!choices) return;
+    var stored = {};
+    try {
+      stored = await browser.storage.local.get(null);
+    } catch (_) {
+    }
+    choices.replaceChildren();
+    Object.keys(stored).filter(function(k) {
+      return k.indexOf("trChoice:") === 0;
+    }).sort().forEach(function(k) {
+      var pair = k.slice(9).split("-");
+      choices.appendChild(packRow(languageName(pair[0]) + " \u2192 " + languageName(pair[1]), t(CHOICE_LABEL[stored[k]] || "trAsk"), t("forget"), async function() {
+        try {
+          await browser.storage.local.remove(k);
+        } catch (_) {
+        }
+        refreshPacks();
+      }));
+    });
+    choices.hidden = !choices.childElementCount;
+  }
+  var TABS = ["voice", "read", "tr", "look"];
+  function selectTab(shadow, name, focus) {
+    var i = Math.max(0, TABS.indexOf(name));
+    var prev = TABS.indexOf(state.tab);
+    state.tab = TABS[i];
+    var tabs = shadow.getElementById("tts-zen-tabs");
+    tabs.style.setProperty("--tab", i);
+    tabs.querySelectorAll("button").forEach(function(b) {
+      var on = b.dataset.tab === state.tab;
+      b.setAttribute("aria-selected", String(on));
+      b.tabIndex = on ? 0 : -1;
+      if (on && focus) b.focus();
+    });
+    shadow.querySelectorAll(".tab-page").forEach(function(pg) {
+      var on = pg.dataset.page === state.tab;
+      if (on) pg.style.setProperty("--from", (i >= prev ? 12 : -12) + "px");
+      else pg.style.setProperty("--from", (TABS.indexOf(pg.dataset.page) < i ? -12 : 12) + "px");
+      pg.classList.toggle("active", on);
+      pg.setAttribute("aria-hidden", String(!on));
+    });
+    fitTabHeight(shadow);
+    if (state.tab === "tr") refreshPacks();
+  }
+  function fitTabHeight(shadow) {
+    var pages = shadow.querySelector(".tab-pages");
+    var active = shadow.querySelector(".tab-page.active");
+    if (pages && active) pages.style.height = active.offsetHeight + "px";
+  }
+  function setupTabs(shadow) {
+    var tabs = shadow.getElementById("tts-zen-tabs");
+    tabs.addEventListener("click", function(e) {
+      var b = e.target.closest("button[data-tab]");
+      if (!b) return;
+      selectTab(shadow, b.dataset.tab);
+      saveSettings();
+    });
+    tabs.addEventListener("keydown", function(e) {
+      var i = TABS.indexOf(state.tab);
+      if (e.key === "ArrowRight") i = (i + 1) % TABS.length;
+      else if (e.key === "ArrowLeft") i = (i + TABS.length - 1) % TABS.length;
+      else return;
+      e.preventDefault();
+      selectTab(shadow, TABS[i], true);
+      saveSettings();
+    });
+    selectTab(shadow, state.tab);
+    if (typeof ResizeObserver !== "undefined") {
+      var ro = new ResizeObserver(function() {
+        fitTabHeight(shadow);
+      });
+      shadow.querySelectorAll(".tab-page").forEach(function(pg) {
+        ro.observe(pg);
+      });
+    }
   }
   function setPickActive(on) {
     var b = getEl("tts-zen-pick");
@@ -4242,29 +4573,61 @@ button:active:not(:disabled) { transform: scale(.96); }
         speechSynthesis.speak(u);
       });
     }
+    function wordStart(text, at) {
+      while (at > 0 && !/\s/.test(text[at - 1])) at--;
+      return at;
+    }
     return {
       name: "native",
       available: function() {
         return Promise.resolve(typeof speechSynthesis !== "undefined");
       },
       // Speaks sentences[start..]; calls ctx.onSentence(i) as each begins.
+      // Pausing cancels the utterance (speech-dispatcher on Linux ignores
+      // speechSynthesis.pause()) and resuming speaks again from the last word.
       play: async function(start, ctx) {
-        var run = { cancelled: false };
+        var run = { cancelled: false, paused: null, word: 0 };
         running = run;
         for (var i = start; i < ctx.sentences.length; i++) {
           if (run.cancelled) return;
           ctx.onSentence(i);
-          await speak(ctx.sentences[i].text, ctx, ctx.onWord.bind(null, i));
+          var text = ctx.sentences[i].text;
+          var from = 0;
+          for (; ; ) {
+            run.word = from;
+            var base = from;
+            await speak(text.slice(from), ctx, function(k, off) {
+              run.word = base + off;
+              ctx.onWord(k, base + off);
+            }.bind(null, i));
+            if (run.cancelled) return;
+            if (!run.paused) break;
+            await run.paused.promise;
+            if (run.cancelled) return;
+            from = wordStart(text, Math.min(run.word, text.length - 1));
+          }
         }
       },
       pause: function() {
-        speechSynthesis.pause();
+        if (!running || running.paused) return;
+        var p = {};
+        p.promise = new Promise(function(r) {
+          p.resolve = r;
+        });
+        running.paused = p;
+        speechSynthesis.cancel();
       },
       resume: function() {
-        speechSynthesis.resume();
+        if (!running || !running.paused) return;
+        var p = running.paused;
+        running.paused = null;
+        p.resolve();
       },
       stop: function() {
-        if (running) running.cancelled = true;
+        if (running) {
+          running.cancelled = true;
+          if (running.paused) running.paused.resolve();
+        }
         speechSynthesis.cancel();
       }
     };
@@ -4971,6 +5334,81 @@ button:active:not(:disabled) { transform: scale(.96); }
   function clearPick() {
     if (supported) CSS.highlights.delete(PICK);
   }
+  var caption = null;
+  var CAPTION_CSS = ":host { all: initial; }\n.cap { box-sizing: border-box; max-width: 680px; padding: 8px 12px; border-radius: 6px; background: #fbf8f1; color: " + INK + '; border: 1px solid #ddd4c3; border-left: 3px solid #9a3b25; box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 8px 22px rgba(0,0,0,.14); font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; transition: opacity .18s ease, transform .22s cubic-bezier(.2,.8,.2,1); }\n.cap.enter { opacity: 0; transform: translateY(-4px); }\n.w { border-radius: 2px; transition: background-color .12s ease; }\n.w.on { background: ' + WORD_MARK + "; }\n@media (prefers-color-scheme: dark) { .cap { background: #23201c; color: #e9e2d4; border-color: #3a352e; border-left-color: #d9785c; } .w.on { color: " + INK + "; } }\n@media (prefers-reduced-motion: reduce) { .cap, .w { transition: none; } }";
+  function captionHost() {
+    if (caption && caption.host.isConnected) return caption;
+    var host = document.createElement("div");
+    host.id = "zentts-caption";
+    host.style.cssText = "position:absolute;top:0;left:0;z-index:2147483000;pointer-events:none;display:none;";
+    var root = host.attachShadow({ mode: "open" });
+    var style = document.createElement("style");
+    style.textContent = CAPTION_CSS;
+    var box = document.createElement("div");
+    box.className = "cap";
+    root.append(style, box);
+    document.documentElement.appendChild(host);
+    caption = { host, box, text: null, words: [], el: null };
+    window.addEventListener("resize", placeCaption, { passive: true });
+    return caption;
+  }
+  function placeCaption() {
+    if (!caption || !caption.el || caption.host.style.display === "none") return;
+    if (!caption.el.isConnected) {
+      hideCaption();
+      return;
+    }
+    var r = caption.el.getBoundingClientRect();
+    var width = Math.min(Math.max(r.width, 260), 680, window.innerWidth - 16);
+    var left = Math.max(8, Math.min(r.left, window.innerWidth - width - 8));
+    caption.host.style.width = width + "px";
+    var h = caption.box.offsetHeight;
+    var below = r.bottom + 8;
+    var top = below + h > window.innerHeight - 8 && r.top - h - 8 > 8 ? r.top - h - 8 : below;
+    caption.host.style.left = left + window.scrollX + "px";
+    caption.host.style.top = top + window.scrollY + "px";
+  }
+  function showCaption(el, text, words) {
+    if (!el || !el.isConnected) {
+      hideCaption();
+      return;
+    }
+    var c = captionHost();
+    c.el = el;
+    c.host.style.display = "block";
+    if (c.text !== text) {
+      c.text = text;
+      c.box.replaceChildren();
+      c.words = [];
+      var last = 0;
+      (words || []).forEach(function(w) {
+        if (w.start > last) c.box.appendChild(document.createTextNode(text.slice(last, w.start)));
+        var span = document.createElement("span");
+        span.className = "w";
+        span.textContent = w.text;
+        c.box.appendChild(span);
+        c.words.push(span);
+        last = w.start + w.text.length;
+      });
+      if (last < text.length) c.box.appendChild(document.createTextNode(text.slice(last)));
+      c.box.classList.add("enter");
+      void c.box.offsetWidth;
+      c.box.classList.remove("enter");
+    }
+    placeCaption();
+  }
+  function showCaptionWord(i) {
+    if (!caption || caption.host.style.display === "none") return;
+    caption.words.forEach(function(span, k) {
+      span.classList.toggle("on", k === i);
+    });
+  }
+  function hideCaption() {
+    if (!caption) return;
+    caption.host.style.display = "none";
+    caption.text = null;
+    caption.el = null;
+  }
 
   // src/content.js
   var RESTRICTED_PROTOCOLS = ["edge:", "about:", "file:", "chrome:", "moz-extension:"];
@@ -4995,7 +5433,9 @@ button:active:not(:disabled) { transform: scale(.96); }
     readLang: "auto",
     speechLang: null,
     autoNext: true,
-    wordHighlight: true
+    wordHighlight: true,
+    trMode: "ask",
+    inlineTr: true
   };
   function st() {
     return window.__tts_zen_state;
@@ -5010,6 +5450,8 @@ button:active:not(:disabled) { transform: scale(.96); }
         starting: "Preparando lectura\u2026",
         translating: "Traduciendo\u2026",
         trChoose: "Elige c\xF3mo leer este texto",
+        trDownloadingPack: "Descargando paquete de traducci\xF3n\u2026",
+        trProgress: "traduciendo %s",
         trFailed: "No se pudo traducir \u2014 leyendo en el idioma original",
         picking: "Haz clic en la frase por la que quieres empezar \xB7 Esc para cancelar",
         noTextFound: "No se encontr\xF3 texto en esta p\xE1gina",
@@ -5029,6 +5471,8 @@ button:active:not(:disabled) { transform: scale(.96); }
         starting: "Getting ready\u2026",
         translating: "Translating\u2026",
         trChoose: "Choose how to read this text",
+        trDownloadingPack: "Downloading translation pack\u2026",
+        trProgress: "translating %s",
         trFailed: "Could not translate \u2014 reading in the original language",
         picking: "Click the sentence you want to start from \xB7 Esc to cancel",
         noTextFound: "No text found on this page",
@@ -5146,7 +5590,6 @@ button:active:not(:disabled) { transform: scale(.96); }
     });
   }
   async function translateWith(mode, paras, from, to) {
-    setStatus(ts("translating"));
     var texts = paras.map(function(p) {
       return p.text;
     });
@@ -5179,64 +5622,167 @@ button:active:not(:disabled) { transform: scale(.96); }
       r(choice);
     }
   }
-  async function resolveLanguage(paras) {
-    chapterTranslation = null;
+  async function remember(from, to, choice) {
+    try {
+      await browser.storage.local.set({ [choiceKey(from, to)]: choice });
+    } catch (_) {
+    }
+    refreshPacks();
+  }
+  async function downloadPack(info) {
+    setTranslateOffer(Object.assign({}, info, { progress: 0 }));
+    setStatus(ts("trDownloadingPack"));
+    try {
+      var dl = await browser.runtime.sendMessage({ action: "tr_download", from: info.from, to: info.to });
+      if (!dl || !dl.success) throw new Error(dl && dl.error || "download");
+      setTranslateProgress(1);
+      await new Promise(function(r) {
+        setTimeout(r, 300);
+      });
+    } finally {
+      setTranslateOffer(null);
+      refreshPacks();
+    }
+  }
+  async function decideLanguage(paras) {
     var sample = paras.map(function(p) {
       return p.text;
     }).join("\n").slice(0, 2500);
     var from = await detectLanguage(sample);
     var to = targetLanguage();
-    st().speechLang = from;
+    var none = { mode: null, from, to };
     setDetectedLanguage(from);
+    if (!from || !to || from === to) return none;
+    var mode = st().trMode || "ask";
+    if (mode === "never") return none;
+    var status = await browser.runtime.sendMessage({ action: "tr_status", from, to }).catch(function() {
+      return null;
+    });
+    if (status && status.needed === false) return none;
+    var ready = !!(status && status.ready);
+    var supported2 = !!(status && status.supported);
+    var info = {
+      from,
+      to,
+      supported: supported2,
+      sizeMB: status && status.sizeMB,
+      pivot: status && status.pairs && status.pairs.length > 1 ? status.pairs : null
+    };
+    var online = await serverUp();
+    info.online = online;
     try {
-      if (!from || !to || from === to) return paras;
-      var status = await browser.runtime.sendMessage({ action: "tr_status", from, to }).catch(function() {
-        return null;
-      });
-      if (status && status.needed === false) return paras;
-      if (status && status.ready) return await useTranslation("offline", paras, from, to);
+      if (mode === "offline") {
+        if (ready) return { mode: "offline", from, to };
+        if (supported2) {
+          await downloadPack(info);
+          return { mode: "offline", from, to };
+        }
+        return online ? { mode: "online", from, to } : none;
+      }
+      if (mode === "online") {
+        if (online) return { mode: "online", from, to };
+        return ready ? { mode: "offline", from, to } : none;
+      }
+      if (ready) return { mode: "offline", from, to };
       var remembered = (await browser.storage.local.get(choiceKey(from, to)))[choiceKey(from, to)];
-      if (remembered === "original") return paras;
-      var online = await serverUp();
-      if (remembered === "online" && online) return await useTranslation("online", paras, from, to);
-      var supported2 = !!(status && status.supported);
-      if (!supported2 && !online) return paras;
-      var choice = await askTranslation({
-        from,
-        to,
-        supported: supported2,
-        online,
-        sizeMB: status && status.sizeMB,
-        pivot: status && status.pairs && status.pairs.length > 1 ? status.pairs : null
-      });
+      if (remembered === "original") return none;
+      if (remembered === "online" && online) return { mode: "online", from, to };
+      if (remembered === "offline" && supported2) {
+        await downloadPack(info);
+        return { mode: "offline", from, to };
+      }
+      if (!supported2 && !online) return none;
+      var choice = await askTranslation(info);
       if (choice === "original") {
-        await browser.storage.local.set({ [choiceKey(from, to)]: "original" });
-        return paras;
+        setTranslateOffer(null);
+        await remember(from, to, "original");
+        return none;
       }
       if (choice === "online") {
-        await browser.storage.local.set({ [choiceKey(from, to)]: "online" });
-        return await useTranslation("online", paras, from, to);
+        setTranslateOffer(null);
+        await remember(from, to, "online");
+        return { mode: "online", from, to };
       }
-      setTranslateProgress(0);
-      var dl = await browser.runtime.sendMessage({ action: "tr_download", from, to });
-      if (!dl || !dl.success) throw new Error(dl && dl.error || "download");
-      refreshPacks();
-      return await useTranslation("offline", paras, from, to);
+      await remember(from, to, "offline");
+      await downloadPack(info);
+      return { mode: "offline", from, to };
     } catch (e) {
       console.error("[zenTTS] translation:", e.message || e);
-      setStatus(ts("trFailed"), true);
-      st().speechLang = from;
-      return paras;
-    } finally {
       setTranslateOffer(null);
-      setDetectedLanguage(st().speechLang ? from : null);
+      setStatus(ts("trFailed"), true);
+      return none;
     }
   }
-  async function useTranslation(mode, paras, from, to) {
-    var out = await translateWith(mode, paras, from, to);
-    chapterTranslation = { mode, from, to };
-    st().speechLang = to;
-    return out;
+  var FIRST_CHARS = 1200;
+  var BATCH = 8;
+  var background = null;
+  var chapterGen = 0;
+  var chapterEls = /* @__PURE__ */ new Set();
+  function leadCount(paras) {
+    var n = 0, chars = 0;
+    while (n < paras.length && (n === 0 || chars < FIRST_CHARS)) {
+      chars += paras[n].text.length;
+      n++;
+    }
+    return n;
+  }
+  function notifyWaiters() {
+    if (!background) return;
+    var w = background.waiters;
+    background.waiters = [];
+    w.forEach(function(fn) {
+      fn();
+    });
+  }
+  function moreSentences() {
+    if (!background || background.done) return Promise.resolve();
+    return new Promise(function(r) {
+      background.waiters.push(r);
+    });
+  }
+  async function translateRest(rest, gen) {
+    var plan = chapterTranslation;
+    var total = rest.length;
+    var bg = background = { gen, done: false, progress: 0, waiters: [] };
+    try {
+      for (var k = 0; k < rest.length; k += BATCH) {
+        var batch = rest.slice(k, k + BATCH);
+        var out;
+        try {
+          out = await translateWith(plan.mode, batch, plan.from, plan.to);
+        } catch (e) {
+          console.error("[zenTTS] translation:", e.message || e);
+          out = batch;
+        }
+        if (gen !== chapterGen) return;
+        var base = paragraphs.length;
+        paragraphs.push.apply(paragraphs, out);
+        var more = [];
+        out.forEach(function(p, i) {
+          more.push.apply(more, sentencesOf(p.text, base + i));
+        });
+        player.append(more);
+        window.__tts_zen_last_text = paragraphs.map(function(p) {
+          return p.text;
+        }).join("\n\n");
+        bg.progress = Math.min(1, (k + batch.length) / total);
+        if (player.state === "playing") setStatus(playingStatus());
+        if (player.index >= 0) setCounter(player.index + 1, sentences.length);
+        updatePreviewSentences();
+        notifyWaiters();
+      }
+    } finally {
+      bg.done = true;
+      notifyWaiters();
+      if (gen === chapterGen && player.state === "playing") setStatus(playingStatus());
+    }
+  }
+  function playingStatus() {
+    var base = engineNote || ts("playing");
+    if (background && !background.done && background.gen === chapterGen) {
+      return base + " \xB7 " + ts("trProgress", Math.round(background.progress * 100) + " %");
+    }
+    return base;
   }
   async function translateMore(paras) {
     if (!chapterTranslation) return paras;
@@ -5248,6 +5794,7 @@ button:active:not(:disabled) { transform: scale(.96); }
   }
   function clearHighlight() {
     clear();
+    hideCaption();
   }
   var currentWord = -1;
   function highlightPreview(i) {
@@ -5286,7 +5833,10 @@ button:active:not(:disabled) { transform: scale(.96); }
       var s = sentences[i];
       setCounter(i + 1, sentences.length);
       currentWord = -1;
-      showSentence(s && paragraphs[s.refIdx] ? paragraphs[s.refIdx].el : null, s ? s.text : "", s ? s.words : [], s ? s.hint : 0);
+      var el = s && paragraphs[s.refIdx] ? paragraphs[s.refIdx].el : null;
+      showSentence(el, s ? s.text : "", s ? s.words : [], s ? s.hint : 0);
+      if (chapterTranslation && st().inlineTr !== false && s && el) showCaption(el, s.text, s.words);
+      else hideCaption();
       highlightPreview(i);
       saveProgress(chapterKey, { index: i, total: sentences.length, hash: chapterHash, title: document.title });
       if (i >= sentences.length * 0.8) prefetchNextChapter();
@@ -5300,16 +5850,26 @@ button:active:not(:disabled) { transform: scale(.96); }
       if (k === currentWord) return;
       currentWord = k;
       showWord(k);
+      showCaptionWord(k);
     },
     onState: function(state2) {
       var playing = state2 === "playing";
       var active = state2 !== "idle";
       setButtonsEnabled({ read: !active, pause: active, stop: active, prev: active, next: active });
       setPauseIcon(playing);
-      if (state2 === "playing") setStatus(engineNote || ts("playing"));
+      if (state2 === "playing") setStatus(playingStatus());
       if (state2 === "paused") setStatus(ts("paused"));
     },
-    onEnd: function() {
+    onEnd: async function() {
+      if (background && !background.done && background.gen === chapterGen) {
+        var at = sentences.length;
+        setStatus(ts("translating"));
+        await moreSentences();
+        if (sentences.length > at) {
+          player.start(at, st().currentEngine || "native");
+          return;
+        }
+      }
       clearHighlight();
       clearProgress(chapterKey);
       resumeAt = null;
@@ -5336,11 +5896,38 @@ button:active:not(:disabled) { transform: scale(.96); }
       paras = extractParagraphs();
     }
     if (!paras.length) return false;
+    var gen = ++chapterGen;
+    chapterEls = new Set(paras.map(function(p) {
+      return p.el;
+    }));
+    background = null;
+    chapterTranslation = null;
+    st().speechLang = null;
     chapterKey = site.chapterKey(chapterUrl);
     chapterHash = textHash(paras.map(function(p) {
       return p.text;
     }).join("\n"));
-    paragraphs = await resolveLanguage(paras);
+    var plan = await decideLanguage(paras);
+    if (gen !== chapterGen) return false;
+    var rest = [];
+    if (plan.mode) {
+      var n = leadCount(paras);
+      setStatus(ts("translating"));
+      try {
+        paragraphs = await translateWith(plan.mode, paras.slice(0, n), plan.from, plan.to);
+        chapterTranslation = plan;
+        rest = paras.slice(n);
+      } catch (e) {
+        console.error("[zenTTS] translation:", e.message || e);
+        setStatus(ts("trFailed"), true);
+        paragraphs = paras;
+      }
+    } else {
+      paragraphs = paras;
+    }
+    if (gen !== chapterGen) return false;
+    st().speechLang = chapterTranslation ? plan.to : plan.from;
+    setDetectedLanguage(plan.from);
     sentences = buildSentences(paragraphs);
     window.__tts_zen_sentences = sentences;
     window.__tts_zen_last_text = paragraphs.map(function(p) {
@@ -5348,16 +5935,21 @@ button:active:not(:disabled) { transform: scale(.96); }
     }).join("\n\n");
     player.load(sentences);
     prepared = true;
+    if (rest.length) translateRest(rest, gen);
     return true;
   }
   async function startReading(fromIndex) {
     setStatus(ts("starting"));
     if (!prepared && !await prepareChapter()) {
-      setStatus(ts("noTextFound"), true);
+      if (!prepared) setStatus(ts("noTextFound"), true);
       return;
     }
     startContentObserver();
     engineNote = null;
+    while (fromIndex >= sentences.length && background && !background.done) {
+      setStatus(ts("translating"));
+      await moreSentences();
+    }
     player.start(fromIndex || 0, st().currentEngine || "native");
   }
   async function offerResume() {
@@ -5377,7 +5969,7 @@ button:active:not(:disabled) { transform: scale(.96); }
         setStatus(ts("noTextFound"), true);
         return;
       }
-      if (resumeAt.hash === chapterHash && resumeAt.index < sentences.length) from = resumeAt.index;
+      if (resumeAt.hash === chapterHash && resumeAt.index < Math.max(sentences.length, resumeAt.total)) from = resumeAt.index;
     }
     resumeAt = null;
     setResume(null);
@@ -5487,9 +6079,10 @@ button:active:not(:disabled) { transform: scale(.96); }
     if (checking) return;
     checking = true;
     try {
-      var known = new Set(paragraphs.map(function(p) {
-        return p.el;
-      }));
+      var known = new Set(chapterEls);
+      paragraphs.forEach(function(p) {
+        known.add(p.el);
+      });
       var fresh = [];
       root.querySelectorAll("p").forEach(function(el) {
         if (known.has(el) || isHidden(el)) return;
@@ -5497,6 +6090,9 @@ button:active:not(:disabled) { transform: scale(.96); }
         if (text.length >= 20) fresh.push({ el, text });
       });
       if (!fresh.length) return;
+      fresh.forEach(function(p) {
+        chapterEls.add(p.el);
+      });
       fresh = await translateMore(fresh);
       var base = paragraphs.length;
       paragraphs.push.apply(paragraphs, fresh);
@@ -5634,9 +6230,20 @@ button:active:not(:disabled) { transform: scale(.96); }
       },
       onPick: togglePick,
       onTranslate: onTranslateChoice,
+      onInlineTr: function(on) {
+        if (!on) {
+          hideCaption();
+          return;
+        }
+        var s = sentences[player.index];
+        if (chapterTranslation && s && player.state !== "idle" && paragraphs[s.refIdx]) showCaption(paragraphs[s.refIdx].el, s.text, s.words);
+      },
       // A different "read in" language applies from the next reading
       onReadLang: function() {
-        if (player.state === "idle") prepared = false;
+        if (player.state === "idle") {
+          prepared = false;
+          st().speechLang = null;
+        }
       }
     }).then(function() {
       offerResume();

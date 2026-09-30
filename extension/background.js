@@ -13303,6 +13303,21 @@ var WASM_PATHS = {
   piperData: browser.runtime.getURL("vendor/piper/piper_phonemize.data"),
   piperWasm: browser.runtime.getURL("vendor/piper/piper_phonemize.wasm")
 };
+var RHASSPY = "https://huggingface.co/rhasspy/piper-voices/resolve/main";
+var EXTRA_VOICES = [
+  {
+    key: "es_AR-daniela-high",
+    name: "daniela",
+    quality: "high",
+    language: "es_AR",
+    path: "es/es_AR/daniela/high/es_AR-daniela-high.onnx",
+    size: 114199011
+  }
+];
+for (const v of EXTRA_VOICES) if (!PATH_MAP[v.key]) PATH_MAP[v.key] = v.path;
+function voiceBase(voiceId) {
+  return EXTRA_VOICES.some((v) => v.key === voiceId) ? RHASSPY : HF_BASE;
+}
 async function modelDir() {
   const root = await navigator.storage.getDirectory();
   return root.getDirectoryHandle("piper", { create: true });
@@ -13330,6 +13345,9 @@ async function handleLocalVoices() {
         size: onnx ? v.files[onnx].size_bytes : 0
       };
     });
+    for (const v of EXTRA_VOICES) {
+      if (!catalog.some((c) => c.key === v.key)) catalog.push({ key: v.key, name: v.name, quality: v.quality, language: v.language, size: v.size });
+    }
   }
   return { success: true, stored: await storedVoices(), catalog };
 }
@@ -13363,12 +13381,14 @@ async function handleLocalDownload(voiceId, tabId) {
     downloads2[voiceId] = (async () => {
       const dir = await modelDir();
       const file = path.split("/").pop();
-      const config = await fetchWithProgress(`${HF_BASE}/${path}.json`);
+      const base = voiceBase(voiceId);
+      const config = await fetchWithProgress(`${base}/${path}.json`);
       let last = 0;
-      const model = await fetchWithProgress(`${HF_BASE}/${path}`, (loaded, total) => {
+      const model = await fetchWithProgress(`${base}/${path}`, (loaded, total) => {
         if (tabId === void 0 || Date.now() - last < 250) return;
         last = Date.now();
-        browser.tabs.sendMessage(tabId, { action: "local_progress", voiceId, loaded, total }).catch(() => {
+        const known = total || ((catalog || []).find((c) => c.key === voiceId) || {}).size || 0;
+        browser.tabs.sendMessage(tabId, { action: "local_progress", voiceId, loaded, total: known }).catch(() => {
         });
       });
       await saveFile(dir, file, model);

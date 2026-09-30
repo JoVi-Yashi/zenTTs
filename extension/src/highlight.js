@@ -242,3 +242,96 @@ export function showPick(el, sentence, hint) {
 export function clearPick() {
   if (supported) CSS.highlights.delete(PICK);
 }
+
+// ---- Translation caption ----
+// When the text is read translated, the sentence being spoken is shown in a
+// small card right under the original paragraph (above it if there is no room),
+// with the spoken word marked. It lives in its own shadow root, so the site's
+// styles and DOM are untouched.
+
+var caption = null;   // { host, box, text, words: [span], el }
+
+var CAPTION_CSS =
+  ':host { all: initial; }\n' +
+  '.cap { box-sizing: border-box; max-width: 680px; padding: 8px 12px; border-radius: 6px;' +
+  ' background: #fbf8f1; color: ' + INK + '; border: 1px solid #ddd4c3; border-left: 3px solid #9a3b25;' +
+  ' box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 8px 22px rgba(0,0,0,.14);' +
+  ' font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;' +
+  ' transition: opacity .18s ease, transform .22s cubic-bezier(.2,.8,.2,1); }\n' +
+  '.cap.enter { opacity: 0; transform: translateY(-4px); }\n' +
+  '.w { border-radius: 2px; transition: background-color .12s ease; }\n' +
+  '.w.on { background: ' + WORD_MARK + '; }\n' +
+  '@media (prefers-color-scheme: dark) { .cap { background: #23201c; color: #e9e2d4; border-color: #3a352e; border-left-color: #d9785c; }' +
+  ' .w.on { color: ' + INK + '; } }\n' +
+  '@media (prefers-reduced-motion: reduce) { .cap, .w { transition: none; } }';
+
+function captionHost() {
+  if (caption && caption.host.isConnected) return caption;
+  var host = document.createElement('div');
+  host.id = 'zentts-caption';
+  // Child of <html>: absolute positions are page coordinates, whatever <body> does
+  host.style.cssText = 'position:absolute;top:0;left:0;z-index:2147483000;pointer-events:none;display:none;';
+  var root = host.attachShadow({ mode: 'open' });
+  var style = document.createElement('style');
+  style.textContent = CAPTION_CSS;
+  var box = document.createElement('div');
+  box.className = 'cap';
+  root.append(style, box);
+  document.documentElement.appendChild(host);
+  caption = { host: host, box: box, text: null, words: [], el: null };
+  window.addEventListener('resize', placeCaption, { passive: true });
+  return caption;
+}
+
+function placeCaption() {
+  if (!caption || !caption.el || caption.host.style.display === 'none') return;
+  if (!caption.el.isConnected) { hideCaption(); return; }
+  var r = caption.el.getBoundingClientRect();
+  var width = Math.min(Math.max(r.width, 260), 680, window.innerWidth - 16);
+  var left = Math.max(8, Math.min(r.left, window.innerWidth - width - 8));
+  caption.host.style.width = width + 'px';
+  var h = caption.box.offsetHeight;
+  var below = r.bottom + 8;
+  var top = below + h > window.innerHeight - 8 && r.top - h - 8 > 8 ? r.top - h - 8 : below;
+  caption.host.style.left = (left + window.scrollX) + 'px';
+  caption.host.style.top = (top + window.scrollY) + 'px';
+}
+
+export function showCaption(el, text, words) {
+  if (!el || !el.isConnected) { hideCaption(); return; }
+  var c = captionHost();
+  c.el = el;
+  c.host.style.display = 'block';
+  if (c.text !== text) {
+    c.text = text;
+    c.box.replaceChildren();
+    c.words = [];
+    var last = 0;
+    (words || []).forEach(function(w) {
+      if (w.start > last) c.box.appendChild(document.createTextNode(text.slice(last, w.start)));
+      var span = document.createElement('span');
+      span.className = 'w';
+      span.textContent = w.text;
+      c.box.appendChild(span);
+      c.words.push(span);
+      last = w.start + w.text.length;
+    });
+    if (last < text.length) c.box.appendChild(document.createTextNode(text.slice(last)));
+    c.box.classList.add('enter');
+    void c.box.offsetWidth;
+    c.box.classList.remove('enter');
+  }
+  placeCaption();
+}
+
+export function showCaptionWord(i) {
+  if (!caption || caption.host.style.display === 'none') return;
+  caption.words.forEach(function(span, k) { span.classList.toggle('on', k === i); });
+}
+
+export function hideCaption() {
+  if (!caption) return;
+  caption.host.style.display = 'none';
+  caption.text = null;
+  caption.el = null;
+}
