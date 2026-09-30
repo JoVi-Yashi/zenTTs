@@ -317,7 +317,14 @@
   .lk-manual label.wide { grid-column: 1 / -1; }
   .lk-manual input { padding: 6px 9px; border-radius: 6px; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); font: 14px var(--sans); }
   .lk-cover-prev:empty { display: none; }
-  .lk-note { margin-top: 10px; }
+  .lk-src.ok { background: color-mix(in srgb, #3f7a4a 18%, transparent); color: #3f7a4a; }
+  .lk-gal-title { margin: 14px 0 6px; font-size: 12px; }
+  .lk-gallery { display: flex; gap: 10px; overflow-x: auto; padding: 2px 2px 8px; }
+  .lk-cand { flex: none; display: flex; flex-direction: column; align-items: center; gap: 4px; width: 84px; padding: 6px 4px; border: 1px solid var(--rule); border-radius: 8px; background: none; color: var(--ink); font: 11px/1.25 var(--sans); text-align: center; cursor: pointer; }
+  .lk-cand:hover { border-color: var(--ink-soft); }
+  .lk-cand.on { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); }
+  .lk-cand .lk-used { color: var(--accent); font-size: 10px; }
+  .lk-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 10px 2px; }
   .card .series-row { gap: 6px; font-size: 13px; }
   .card .series-row input { padding: 4px 8px; border-radius: 6px; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); font: 13px var(--sans); }
   .card .series-row .series { flex: 1; min-width: 120px; } .card .series-row .vol { width: 64px; }

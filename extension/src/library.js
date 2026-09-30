@@ -6,9 +6,9 @@
 // back cover, with the shelf set aside and blurred. Tags make sub-libraries.
 // Data and files come from books.js (storage.local + OPFS).
 
-import { loadLibrary, saveLibrary, updateBook, removeBook, coverUrl, writeFile, removeFile, clothColor, bookId, DEFAULT_SETTINGS } from './books.js';
+import { loadLibrary, saveLibrary, updateBook, removeBook, coverUrl, writeFile, readFile, removeFile, clothColor, bookId, DEFAULT_SETTINGS } from './books.js';
 import { importFile } from './pdfimport.js';
-import { askAccess, searchBooks, parseTitle, wordsOf, sortKeyOf, fetchCover, coverUrlsForIsbn, langName } from './lookup.js';
+import { askAccess, searchBooks, parseTitle, wordsOf, sortKeyOf, fetchCover, coverUrlsForIsbn, langName, volumeOf } from './lookup.js';
 
 var ES = (function() { try { return browser.i18n.getUILanguage().toLowerCase().startsWith('es'); } catch (_) { return true; } })();
 var S = ES ? {
@@ -48,7 +48,13 @@ var S = ES ? {
   lkCover: 'Portada', lkSame: 'igual', lkNothing: 'Marca al menos un campo.',
   lkManualHint: 'Escribe los datos que quieras. La serie y el volumen deciden el orden en la estantería.',
   lkCoverUrl: 'URL de la portada', lkCoverFile: 'Elegir imagen…', lkCoverWeb: 'Buscar portada en la web',
-  lkCoverBad: 'No se pudo descargar esa imagen.', lkEmptyManual: 'Nada encontrado. Puedes escribir los datos a mano.',
+  lkCoverBad: 'No se pudo descargar esa imagen.', lkEmpty: 'Nada encontrado. Corrige la serie o el volumen, prueba otra búsqueda o escribe los datos a mano.', lkToManual: 'Escribir a mano',
+  lkVolOk: 'Vol. %s', lkOtherVol: 'Otro volumen (%s)', lkSeriesCover: 'Portada de la serie',
+  lkPickCover: 'Portada del vol. %s: elige la de este tomo', lkPickCoverAny: 'Portada: elige la correcta',
+  lkPdfPage: 'Página 1 del PDF', lkUsedBy: 'Ya en el vol. %s', lkThisOne: 'La del resultado',
+  lkCoverWarnSeries: 'Esta portada es la de la serie (suele ser la del vol. 1). Elige abajo la del vol. %s.',
+  lkCoverWarnOther: 'Esta portada es la de otro volumen (%s). Elige abajo la del vol. %s.',
+  lkCoverWarnUsed: 'Esta portada ya la tiene el vol. %s. Elige abajo la del vol. %s.',
   lkApplyManual: 'Guardar'
 } : {
   title: '· Library', search: 'Search by title or author', open: 'Open PDF', settings: 'Library settings',
@@ -87,7 +93,13 @@ var S = ES ? {
   lkCover: 'Cover', lkSame: 'same', lkNothing: 'Tick at least one field.',
   lkManualHint: 'Type the details you want. Series and volume decide the order on the shelf.',
   lkCoverUrl: 'Cover URL', lkCoverFile: 'Choose image…', lkCoverWeb: 'Search the web for a cover',
-  lkCoverBad: 'That image could not be downloaded.', lkEmptyManual: 'Nothing found. You can type the details in.',
+  lkCoverBad: 'That image could not be downloaded.', lkEmpty: 'Nothing found. Correct the series or volume, try another search or type the details in.', lkToManual: 'Type them in',
+  lkVolOk: 'Vol. %s', lkOtherVol: 'Another volume (%s)', lkSeriesCover: 'Series cover',
+  lkPickCover: 'Cover of vol. %s: choose this volume’s', lkPickCoverAny: 'Cover: choose the right one',
+  lkPdfPage: 'Page 1 of the PDF', lkUsedBy: 'Already on vol. %s', lkThisOne: 'The match’s own',
+  lkCoverWarnSeries: 'This is the series’ cover (usually volume 1’s). Choose vol. %s’s below.',
+  lkCoverWarnOther: 'This cover is another volume’s (%s). Choose vol. %s’s below.',
+  lkCoverWarnUsed: 'Vol. %s already has this cover. Choose vol. %s’s below.',
   lkApplyManual: 'Save'
 };
 function f(s) { var a = [].slice.call(arguments, 1); a.forEach(function(x) { s = s.replace('%s', x); }); return s; }
@@ -964,49 +976,66 @@ async function showLookup(i, granted) {
     return inp;
   }
 
-  var results = [], shownAll = false;
+  // The search form, its status and its list live across both tabs: going to
+  // "Type them in" and back keeps what you typed and what was found, and never
+  // searches again by itself
+  var results = [], shownAll = false, searched = false, runs = 0;
+  var hint = el('p', 'muted', S.lookupHint);
+  var form = el('form', 'lk-form');
+  var q = el('input');
+  q.type = 'search';
+  q.placeholder = S.lkOther;
+  q.className = 'lk-q';
+  var go = el('button', 'btn', S.lookupSearch);
+  form.append(q, go);
+  var status = el('div', 'muted lk-status');
+  var list = el('div', 'lk-list');
+  form.onsubmit = function(e) { e.preventDefault(); run(q.value.trim()); };
+  chips.onchange = function() { run(q.value.trim()); };
 
   function showResults() {
     tab('results');
-    pane.replaceChildren();
-    pane.appendChild(el('p', 'muted', S.lookupHint));
-    pane.appendChild(chips);
-    var form = el('form', 'lk-form');
-    var q = el('input');
-    q.type = 'search';
-    q.placeholder = S.lkOther;
-    q.className = 'lk-q';
-    var go = el('button', 'btn', S.lookupSearch);
-    form.append(q, go);
-    pane.appendChild(form);
-    var status = el('div', 'muted lk-status');
-    var list = el('div', 'lk-list');
-    pane.append(status, list);
-    form.onsubmit = function(e) { e.preventDefault(); run(q.value.trim()); };
-    chips.onchange = function() { run(q.value.trim()); };
-    if (results.length) draw(list, status); else run('');
-
-    async function run(other) {
-      list.replaceChildren();
-      status.textContent = S.lookupWait;
-      if (!granted) { status.textContent = ''; list.appendChild(el('div', 'bad', S.lookupDenied)); return; }
-      var isbn = /^[\d\s-]{10,17}X?$/i.test(other) ? other.replace(/[\s-]/g, '') : (b.isbn || b.isbnFound || null);
-      var p = {
-        series: seriesIn.value.trim(), volume: volIn.value === '' ? null : Number(volIn.value), chapter: null,
-        keywords: wordsOf(seriesIn.value), lnHint: lnIn.checked
-      };
-      if (other && isbn !== other.replace(/[\s-]/g, '')) p = Object.assign(parseTitle(other), { lnHint: lnIn.checked });
-      try {
-        results = await searchBooks({ parsed: p, isbn: isbn, query: other && !/^[\d\s-]+X?$/i.test(other) ? other : null, lang: want,
-          onStep: function(st) { status.textContent = S.lkStep[st] || S.lookupWait; } });
-      } catch (_) { status.textContent = ''; list.appendChild(el('div', 'bad', S.lookupOffline)); return; }
-      shownAll = false;
-      if (!results.length) { showManual(S.lkEmptyManual); return; }
-      draw(list, status);
-    }
+    pane.replaceChildren(hint, chips, form, status, list);
+    if (!searched) run('');
   }
 
-  function draw(list, status) {
+  // Nothing found, offline or no access: say so here, with a way to type them in
+  function problem(text) {
+    status.textContent = '';
+    list.replaceChildren();
+    var box = el('div', 'lk-empty');
+    box.appendChild(el('div', text === S.lkEmpty ? 'muted' : 'bad', text));
+    var man = el('button', 'btn', S.lkToManual);
+    man.type = 'button';
+    man.onclick = function() { showManual(); };
+    box.appendChild(man);
+    list.appendChild(box);
+  }
+
+  async function run(other) {
+    searched = true;
+    var mine = ++runs;   // an older search that answers late is ignored
+    list.replaceChildren();
+    status.textContent = S.lookupWait;
+    if (!granted) { problem(S.lookupDenied); return; }
+    var isbn = /^[\d\s-]{10,17}X?$/i.test(other) ? other.replace(/[\s-]/g, '') : (b.isbn || b.isbnFound || null);
+    var found, p = {
+      series: seriesIn.value.trim(), volume: volIn.value === '' ? null : Number(volIn.value), chapter: null,
+      keywords: wordsOf(seriesIn.value), lnHint: lnIn.checked
+    };
+    if (other && isbn !== other.replace(/[\s-]/g, '')) p = Object.assign(parseTitle(other), { lnHint: lnIn.checked });
+    try {
+      found = await searchBooks({ parsed: p, isbn: isbn, query: other && !/^[\d\s-]+X?$/i.test(other) ? other : null, lang: want,
+        onStep: function(st) { status.textContent = S.lkStep[st] || S.lookupWait; } });
+    } catch (_) { if (mine === runs) { results = []; problem(S.lookupOffline); } return; }
+    if (mine !== runs) return;
+    results = found;
+    shownAll = false;
+    if (!results.length) { problem(S.lkEmpty); return; }
+    draw();
+  }
+
+  function draw() {
     status.textContent = '';
     list.replaceChildren();
     var top = shownAll ? results.slice(0, 16) : results.slice(0, 4);
@@ -1014,7 +1043,7 @@ async function showLookup(i, granted) {
     if (!shownAll && results.length > 4) {
       var more = el('button', 'btn ghost lk-more', f(S.lkMore, Math.min(results.length, 16) - 4));
       more.type = 'button';
-      more.onclick = function() { shownAll = true; draw(list, status); };
+      more.onclick = function() { shownAll = true; draw(); };
       list.appendChild(more);
     }
   }
@@ -1031,6 +1060,9 @@ async function showLookup(i, granted) {
     if (bits) txt.appendChild(el('div', 'muted', bits));
     var tags = el('div', 'lk-tags');
     tags.appendChild(el('span', 'lk-src', r.source));
+    if (r.volMatch === true) tags.appendChild(el('span', 'lk-src ok', f(S.lkVolOk, volIn.value)));
+    else if (r.volMatch === false) tags.appendChild(el('span', 'lk-src warn', f(S.lkOtherVol, r.volume != null ? r.volume : '?')));
+    else if (r.kind === 'series' && volIn.value !== '' && Number(volIn.value) !== 1) tags.appendChild(el('span', 'lk-src warn', S.lkSeriesCover));
     if (r.kind === 'series') tags.appendChild(el('span', 'lk-src', f(S.lkSeries, r.format === 'novel' ? S.lkNovel : S.lkManga)));
     else if (r.otherLang) tags.appendChild(el('span', 'lk-src warn', f(S.lkOtherEd, cap(langName(r.lang, ES)))));
     else if (r.lang) tags.appendChild(el('span', 'lk-src', cap(langName(r.lang, ES))));
@@ -1050,19 +1082,56 @@ async function showLookup(i, granted) {
     if (r.kind === 'series' && vol != null) newTitle = r.title + ', ' + f(S.volumeN, vol);
     // A series (AniList, MyAnimeList) names it in English or romaji: its title is left unticked
     var sameLang = !r.otherLang;
-    var coverTry = [r.cover, r.thumb].concat(coverUrlsForIsbn(r.isbn13 || r.isbn10)).filter(Boolean);
+    // Covers to choose from: this match's, the other matches for this very
+    // volume, the PDF's own first page, then the rest. A series' cover (volume
+    // 1's, usually), another volume's, or one another volume already has, is
+    // never taken by default for a book with a volume.
+    var used = {};
+    var mySeries = (b.sortKey || '').split('|')[0];
+    Object.values(lib.books).forEach(function(x) {
+      if (x.id !== b.id && x.meta && x.meta.coverSrc && mySeries && (x.sortKey || '').split('|')[0] === mySeries) used[x.meta.coverSrc] = x.volume != null ? x.volume : '?';
+    });
+    var cands = [], seenUrl = {};
+    function addCand(c) {
+      if (!c.full.length) return;
+      var key = c.full[0];
+      if (seenUrl[key]) return;
+      seenUrl[key] = true;
+      c.src = key;
+      c.usedBy = used[key];
+      cands.push(c);
+    }
+    function coversOf(x) { return [x.cover, x.thumb].concat(coverUrlsForIsbn(x.isbn13 || x.isbn10)).filter(Boolean); }
+    addCand({ kind: 'match', full: coversOf(r), thumb: r.thumb || r.cover, label: S.lkThisOne, ok: vol == null || r.volMatch === true || (r.kind !== 'series' && r.volMatch == null) || (r.kind === 'series' && vol === 1) });
+    results.forEach(function(x) { if (x !== r && x.volMatch === true && (x.thumb || x.cover)) addCand({ kind: 'match', full: coversOf(x), thumb: x.thumb || x.cover, label: x.source + ' · ' + f(S.lkVolOk, vol), ok: true }); });
+    var pdfFile = await readFile(b.id, 'cover');
+    if (pdfFile) cands.push({ kind: 'pdf', full: [], src: 'pdf', thumb: URL.createObjectURL(pdfFile), label: S.lkPdfPage, ok: true });
+    results.forEach(function(x) { if (x !== r && x.volMatch !== true && (x.thumb || x.cover) && cands.length < 9) addCand({ kind: 'match', full: coversOf(x), thumb: x.thumb || x.cover, label: x.source + (x.volume != null ? ' · ' + f(S.lkVolOk, x.volume) : x.kind === 'series' ? ' · ' + S.lkSeriesCover : ''), ok: x.volMatch !== false && x.kind !== 'series' }); });
+    var first = cands[0] && cands[0].kind === 'match' && cands[0].src === coversOf(r)[0] ? cands[0] : null;
+    var pick = first && first.ok && !first.usedBy ? first
+      : cands.find(function(c) { return c.kind === 'match' && c.ok && !c.usedBy && c !== first && vol != null; }) || cands.find(function(c) { return c.kind === 'pdf'; }) || first || cands[0] || null;
+    var coverWarn = null;
+    if (first && vol != null && pick !== first) {
+      coverWarn = first.usedBy != null ? f(S.lkCoverWarnUsed, first.usedBy, vol)
+        : r.kind === 'series' ? f(S.lkCoverWarnSeries, vol) : f(S.lkCoverWarnOther, r.volume != null ? r.volume : '?', vol);
+    }
 
     var top = el('div', 'lk-compare');
     var now = el('div', 'lk-thumb big');
     var nowUrl = await coverUrl(b.id, 'cover');
     if (nowUrl) { var ni = el('img'); ni.src = nowUrl; ni.alt = ''; now.appendChild(ni); }
     var then = el('div', 'lk-thumb big');
-    if (coverTry[0]) { var ti = el('img'); ti.src = r.thumb || coverTry[0]; ti.alt = ''; then.appendChild(ti); }
+    function showPick() {
+      then.replaceChildren();
+      if (pick && pick.thumb) { var ti = el('img'); ti.src = pick.thumb; ti.alt = ''; then.appendChild(ti); }
+    }
+    showPick();
     var info = el('div', 'lk-text');
     info.appendChild(el('b', null, newTitle));
     var ed = r.kind === 'series' ? S.lkSeriesSrc : r.lang ? f(S.lkEdition, langName(r.lang, ES)) : S.lkNoLang;
     info.appendChild(el('div', 'muted', ed + ' · ' + r.source));
     if (r.otherLang) info.appendChild(el('div', 'lk-warn', f(S.lkWarnLang, langName(r.lang, ES), langName(want, ES))));
+    if (coverWarn) info.appendChild(el('div', 'lk-warn lk-cover-warn', coverWarn));
     top.append(now, el('span', 'lk-arrow', '→'), then, info);
     pane.appendChild(top);
 
@@ -1072,11 +1141,11 @@ async function showLookup(i, granted) {
       ['year', S.year, b.year, r.year, true],
       ['publisher', S.publisher, b.publisher, r.publisher, true],
       ['isbn', S.isbn, b.isbn || b.isbnFound, r.isbn13 || r.isbn10, sameLang],
-      ['cover', S.lkCover, nowUrl ? '✓' : '', coverTry.length ? '✓' : '', true]
+      ['cover', S.lkCover, nowUrl ? '✓' : '', pick ? '✓' : '', !!pick]
     ];
     var table = el('div', 'lk-fields');
     table.append(el('span', 'muted'), el('span', 'muted', S.lkField), el('span', 'muted', S.lkNow), el('span', 'muted', S.lkNew));
-    var boxes = {};
+    var boxes = {}, coverName = null;
     rows.forEach(function(row) {
       var key = row[0], proposed = row[3];
       if (proposed == null || proposed === '') return;
@@ -1090,10 +1159,36 @@ async function showLookup(i, granted) {
       boxes[key] = cb;
       var label = el('label', null, row[1]);
       table.append(cb, label, el('span', 'lk-now', key === 'cover' ? (nowUrl ? '▣' : '—') : current || '—'),
-        el('span', 'lk-new', key === 'cover' ? '▣' : same ? S.lkSame : String(proposed)));
+        key === 'cover' ? (coverName = el('span', 'lk-new', pick ? pick.label : '—')) : el('span', 'lk-new', same ? S.lkSame : String(proposed)));
       label.onclick = function() { if (!cb.disabled) cb.checked = !cb.checked; };
     });
     pane.appendChild(table);
+
+    // The quick gallery: choose this volume's cover by eye
+    if (cands.length > 1) {
+      pane.appendChild(el('div', 'muted lk-gal-title', vol != null ? f(S.lkPickCover, vol) : S.lkPickCoverAny));
+      var gal = el('div', 'lk-gallery');
+      cands.forEach(function(c) {
+        var opt = el('button', 'lk-cand' + (c === pick ? ' on' : ''));
+        opt.type = 'button';
+        opt.dataset.src = c.src;
+        opt.setAttribute('aria-pressed', String(c === pick));
+        var th = el('div', 'lk-thumb big');
+        if (c.thumb) { var im = el('img'); im.src = c.thumb; im.alt = ''; im.loading = 'lazy'; th.appendChild(im); }
+        opt.appendChild(th);
+        opt.appendChild(el('span', null, c.label));
+        if (c.usedBy != null) opt.appendChild(el('span', 'lk-used', f(S.lkUsedBy, c.usedBy)));
+        opt.onclick = function() {
+          pick = c;
+          gal.querySelectorAll('.lk-cand').forEach(function(o) { var on = o === opt; o.classList.toggle('on', on); o.setAttribute('aria-pressed', String(on)); });
+          showPick();
+          if (coverName) coverName.textContent = c.label;
+          if (boxes.cover) boxes.cover.checked = true;
+        };
+        gal.appendChild(opt);
+      });
+      pane.appendChild(gal);
+    }
     var msg = el('div', 'bad');
     pane.appendChild(msg);
     var row2 = el('div', 'row2 lk-actions');
@@ -1106,13 +1201,19 @@ async function showLookup(i, granted) {
       var on = function(k) { return boxes[k] && boxes[k].checked; };
       if (!Object.keys(boxes).some(on)) { msg.textContent = S.lkNothing; return; }
       apply.disabled = true;
-      var patch = { meta: { source: r.source, at: Date.now(), title: newTitle, authors: r.authors, lang: r.lang, year: r.year, publisher: r.publisher, isbn: r.isbn13 || r.isbn10 || null, url: r.url || null } };
+      var patch = { meta: { source: r.source, at: Date.now(), title: newTitle, authors: r.authors, lang: r.lang, year: r.year, publisher: r.publisher, isbn: r.isbn13 || r.isbn10 || null, url: r.url || null,
+        coverSrc: (b.meta && b.meta.coverSrc) || null } };
       if (on('title')) patch.title = newTitle;
       if (on('author')) patch.author = r.authors.join(', ');
       if (on('year')) patch.year = r.year;
       if (on('publisher')) patch.publisher = r.publisher;
       if (on('isbn')) patch.isbn = r.isbn13 || r.isbn10;
-      await applyDetails(b, patch, on('cover') ? coverTry : null);
+      var coverList = null;
+      if (on('cover') && pick) {
+        if (pick.kind === 'pdf') { await removeFile(b.id, 'cover-meta'); patch.meta.coverSrc = null; }
+        else { coverList = pick.full; patch.meta.coverSrc = pick.src; }
+      }
+      await applyDetails(b, patch, coverList);
       next();
     };
     row2.append(back, apply);
@@ -1120,10 +1221,9 @@ async function showLookup(i, granted) {
   }
 
   // Your own details, and a cover from a link or a file
-  function showManual(note) {
+  function showManual() {
     tab('manual');
     pane.replaceChildren();
-    if (note) pane.appendChild(el('div', 'muted lk-note', note));
     pane.appendChild(el('p', 'muted', S.lkManualHint));
     var form = el('div', 'lk-manual');
     function field(label, value, type) {
@@ -1172,7 +1272,7 @@ async function showLookup(i, granted) {
     var web = el('button', 'btn ghost', S.lkCoverWeb);
     web.type = 'button';
     web.onclick = function() {
-      var q = [fSeries.value || fTitle.value, fVol.value ? 'vol ' + fVol.value : '', 'cover'].filter(Boolean).join(' ');
+      var q = [fSeries.value || fTitle.value, fVol.value ? 'Volume ' + fVol.value : '', 'book cover'].filter(Boolean).join(' ');
       var url = 'https://duckduckgo.com/?iax=images&ia=images&q=' + encodeURIComponent(q);
       try { browser.tabs.create({ url: url }); } catch (_) { window.open(url, '_blank', 'noopener'); }
     };
@@ -1196,7 +1296,7 @@ async function showLookup(i, granted) {
         title: fTitle.value.trim() || b.title, titleEdited: true, author: fAuthor.value.trim(), authorEdited: true,
         year: fYear.value ? Number(fYear.value) : null, publisher: fPub.value.trim(), isbn: fIsbn.value.replace(/[^\dX]/gi, '') || null,
         series: series, volume: v, sortKey: sortKeyOf(series || fTitle.value.trim() || b.title, v),
-        meta: { source: 'manual', at: Date.now() }
+        meta: { source: 'manual', at: Date.now(), coverSrc: url || (file ? 'file' : (b.meta && b.meta.coverSrc) || null) }
       };
       var ok = true;
       try { ok = await access; } catch (_) { ok = false; }

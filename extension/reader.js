@@ -7165,7 +7165,7 @@ function parseTitle(name) {
   s = s.replace(/[_+]+/g, " ").replace(/\.(?!\d)/g, " ");
   s = s.replace(JUNK, " ").replace(new RegExp(LN.source, "gi"), " ");
   var volume = null, chapter = null, m;
-  if ((m = s.match(/\b(?:vol(?:ume|umen)?|tomo|libro|book|t)\s*\.?\s*(\d{1,3}(?:\.\d)?)\b/i)) || (m = s.match(/\bv(\d{1,3})\b/i))) {
+  if ((m = s.match(/\b(?:vol(?:ume|umen|\.)?|tomo|tome|tom|libro|livre|band|book|t)\s*\.?\s*[#nº°]*\s*(\d{1,3}(?:\.\d)?)\b/i)) || (m = s.match(/#\s*(\d{1,3})\b/)) || (m = s.match(/\bv(\d{1,3})\b/i))) {
     volume = parseFloat(m[1]);
     s = s.replace(m[0], " ");
   }

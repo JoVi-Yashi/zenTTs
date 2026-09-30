@@ -5,6 +5,8 @@
 ### Arreglos
 - **Estantería sin parpadeo:** al pasar el ratón por el borde de un libro, este ya no entra y sale del hover sin parar. Su caja no se mueve (los vecinos se apartan con transformaciones), las caras 3D no reciben el puntero y el libro se levanta tras una breve intención. Al recargar la estantería solo se animan los libros nuevos.
 - **Libros que se montaban en una balda llena:** cada libro se ve ahora de frente (perspectiva propia) y en reposo solo muestra el lomo; antes los de la derecha enseñaban su tapa encima del vecino. Al levantar uno, los vecinos se apartan sin salirse del mueble.
+- **Misma portada en todos los volúmenes:** al buscar datos de una saga, la portada de la serie (la del vol. 1, de AniList o MyAnimeList) acababa en cada tomo. Ahora la búsqueda lleva siempre el volumen ("Vol N", "Volume N"), la relevancia premia el volumen exacto y castiga otro, y esa portada, la de otro volumen o la que ya usa otro tomo no se toman por defecto: la vista previa avisa y ofrece una galería (portadas de ese tomo, página 1 del PDF y el resto). Cada libro recuerda de dónde vino su portada. El nombre reconoce también `Tom`, `Tome`, `Band` y `#N`.
+- **Búsqueda sin resultados:** ya no salta sola a "Escribir a mano" (y al volver no buscaba otra vez para saltar de nuevo). Se queda en Resultados con el aviso y un botón "Escribir a mano"; lo escrito en "Otra búsqueda" y los resultados se conservan al cambiar de pestaña.
 - **Acabado mate:** lomos y tapas sin brillo de plástico, con sombras suaves y un grano de tela y papel.
 
 ### Nuevo

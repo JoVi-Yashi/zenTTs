@@ -55,7 +55,8 @@ export function parseTitle(name) {
   s = s.replace(/[_+]+/g, ' ').replace(/\.(?!\d)/g, ' ');
   s = s.replace(JUNK, ' ').replace(new RegExp(LN.source, 'gi'), ' ');
   var volume = null, chapter = null, m;
-  if ((m = s.match(/\b(?:vol(?:ume|umen)?|tomo|libro|book|t)\s*\.?\s*(\d{1,3}(?:\.\d)?)\b/i)) ||
+  if ((m = s.match(/\b(?:vol(?:ume|umen|\.)?|tomo|tome|tom|libro|livre|band|book|t)\s*\.?\s*[#nº°]*\s*(\d{1,3}(?:\.\d)?)\b/i)) ||
+      (m = s.match(/#\s*(\d{1,3})\b/)) ||
       (m = s.match(/\bv(\d{1,3})\b/i))) {
     volume = parseFloat(m[1]);
     s = s.replace(m[0], ' ');
@@ -204,6 +205,22 @@ function hasNumber(text, n) {
   return new RegExp('(^|\\D)0*' + String(n).replace('.', '\\.') + '(?!\\d)').test(text);
 }
 
+// true: the match is that volume; false: it's another one; null: can't tell
+export function volumeMatch(r, volume) {
+  if (volume == null || r.kind !== 'book') return null;
+  var text = r.title + ' ' + (r.subtitle || '');
+  if (hasNumber(text, volume)) return true;
+  var nums = (fold(text).match(/\d+(\.\d)?/g) || []).map(Number).filter(function(n) { return n > 0 && n < 400; });
+  return nums.length ? false : null;
+}
+
+// The volume number written in a match's title ("… Vol. 3" → 3), or null
+export function volumeOf(r) {
+  var m = /\b(?:vol(?:ume|umen)?|tomo|tome|book|libro)\s*\.?\s*(\d{1,3})\b/i.exec(r.title + ' ' + (r.subtitle || '')) ||
+    /(?:^|\s)(\d{1,3})\s*$/.exec(r.title);
+  return m ? parseInt(m[1], 10) : null;
+}
+
 export function score(r, o) {
   var p = o.parsed || {};
   var mine = p.keywords && p.keywords.length ? p.keywords : wordsOf(o.query || '');
@@ -211,15 +228,17 @@ export function score(r, o) {
   var theirs = new Set(wordsOf(text));
   var common = mine.filter(function(w) { return theirs.has(w); }).length;
   var s = mine.length ? 4 * common / mine.length : 1;
-  if (p.volume != null && r.kind === 'book') {
-    var nums = (fold(r.title + ' ' + r.subtitle).match(/\d+(\.\d)?/g) || []).map(Number);
-    if (hasNumber(r.title + ' ' + r.subtitle, p.volume)) s += 1.5;
-    else if (nums.some(function(n) { return n > 0 && n < 400; })) s -= 1;
-  }
+  // The volume weighs a lot: a match for another volume has another cover
+  var vm = volumeMatch(r, p.volume);
+  if (vm === true) s += 2.5;
+  else if (vm === false) s -= 2;
+  else if (p.volume != null && r.kind === 'book') s -= 0.3;
   if (r.cover || r.thumb) s += 0.6;
   if (r.authors && r.authors.length) s += 0.3;
   if (o.lang && r.lang) s += r.lang === o.lang ? 1.2 : -0.8;
-  if (r.kind === 'series') s += p.lnHint ? 0.8 : -0.5;
+  // A series (AniList, MyAnimeList) has the series' cover, usually volume 1's:
+  // good for the details, not for the cover of another volume
+  if (r.kind === 'series') s += p.volume != null && p.volume !== 1 ? -0.6 : p.lnHint ? 0.8 : -0.5;
   var isbn = o.isbn && String(o.isbn);
   // The ISBN printed in the PDF counts, unless it led to an edition in another language
   if (isbn && (r.isbn13 === isbn || r.isbn10 === isbn)) s += o.lang && r.lang && r.lang !== o.lang ? 0.3 : 2;
@@ -264,7 +283,9 @@ export async function searchBooks(o) {
     return out.filter(function(r) { return score(r, opts) >= 3.2 && (!lang || !r.lang || r.lang === lang); }).length;
   }
 
-  var text = o.query || [p.series, p.volume != null ? p.volume : ''].join(' ').trim();
+  // The volume always goes in the query, spelled out ("… Vol 15", "… Volume 15")
+  var hasVol = !o.query && p.series && p.volume != null;
+  var text = o.query || (hasVol ? p.series + ' Vol ' + p.volume : p.series || '');
   if (o.isbn) {
     step('isbn');
     await run([openLibrary({ isbn: o.isbn }), googleBooks('isbn:' + o.isbn)]);
@@ -274,13 +295,18 @@ export async function searchBooks(o) {
     step('title');
     var jobs = [openLibrary({ q: text }), googleBooks(text)];
     if (lang) jobs.push(openLibrary({ q: text }, lang), googleBooks(text, lang));
-    if (p.series && p.volume != null) jobs.push(googleBooks('intitle:' + p.series + ' ' + p.volume, lang));
+    if (hasVol) {
+      var spelled = p.series + ' Volume ' + p.volume;
+      jobs.push(googleBooks('intitle:' + p.series + ' ' + p.volume, lang), googleBooks(spelled), openLibrary({ q: spelled }));
+    }
     await run(jobs);
   }
   if (good() < 3 && p.series) {
     step('keywords');
     var kw = p.keywords.join(' ');
-    var more = [googleBooks(p.series, lang), openLibrary({ title: p.series })];
+    // Still with the volume: the series alone would bring volume 1 first
+    var more = hasVol ? [googleBooks(p.series + ' ' + p.volume, lang), openLibrary({ title: p.series }), googleBooks(p.series, lang)]
+      : [googleBooks(p.series, lang), openLibrary({ title: p.series })];
     if (kw && kw !== fold(p.series)) more.push(openLibrary({ q: kw }));
     if (p.lnHint) more.push(googleBooks(p.series + ' light novel' + (p.volume != null ? ' ' + p.volume : '')));
     await run(more);
@@ -293,6 +319,8 @@ export async function searchBooks(o) {
   out.forEach(function(r) {
     r.score = score(r, opts);
     r.otherLang = !!(lang && r.lang && r.lang !== lang);
+    r.volMatch = volumeMatch(r, p.volume);
+    r.volume = r.kind === 'book' ? volumeOf(r) : null;
   });
   out.sort(function(a, b) { return b.score - a.score; });
   return out;
