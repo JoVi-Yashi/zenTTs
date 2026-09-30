@@ -48,7 +48,7 @@ var S = ES ? {
   lkCover: 'Portada', lkSame: 'igual', lkNothing: 'Marca al menos un campo.',
   lkManualHint: 'Escribe los datos que quieras. La serie y el volumen deciden el orden en la estantería.',
   lkCoverUrl: 'URL de la portada', lkCoverFile: 'Elegir imagen…', lkCoverWeb: 'Buscar portada en la web',
-  lkCoverBad: 'No se pudo descargar esa imagen.', lkEmptyManual: 'Nada encontrado. Puedes escribir los datos a mano.',
+  lkCoverBad: 'No se pudo descargar esa imagen.', lkEmpty: 'Nada encontrado. Corrige la serie o el volumen, prueba otra búsqueda o escribe los datos a mano.', lkToManual: 'Escribir a mano',
   lkApplyManual: 'Guardar'
 } : {
   title: '· Library', search: 'Search by title or author', open: 'Open PDF', settings: 'Library settings',
@@ -87,7 +87,7 @@ var S = ES ? {
   lkCover: 'Cover', lkSame: 'same', lkNothing: 'Tick at least one field.',
   lkManualHint: 'Type the details you want. Series and volume decide the order on the shelf.',
   lkCoverUrl: 'Cover URL', lkCoverFile: 'Choose image…', lkCoverWeb: 'Search the web for a cover',
-  lkCoverBad: 'That image could not be downloaded.', lkEmptyManual: 'Nothing found. You can type the details in.',
+  lkCoverBad: 'That image could not be downloaded.', lkEmpty: 'Nothing found. Correct the series or volume, try another search or type the details in.', lkToManual: 'Type them in',
   lkApplyManual: 'Save'
 };
 function f(s) { var a = [].slice.call(arguments, 1); a.forEach(function(x) { s = s.replace('%s', x); }); return s; }
@@ -964,49 +964,66 @@ async function showLookup(i, granted) {
     return inp;
   }
 
-  var results = [], shownAll = false;
+  // The search form, its status and its list live across both tabs: going to
+  // "Type them in" and back keeps what you typed and what was found, and never
+  // searches again by itself
+  var results = [], shownAll = false, searched = false, runs = 0;
+  var hint = el('p', 'muted', S.lookupHint);
+  var form = el('form', 'lk-form');
+  var q = el('input');
+  q.type = 'search';
+  q.placeholder = S.lkOther;
+  q.className = 'lk-q';
+  var go = el('button', 'btn', S.lookupSearch);
+  form.append(q, go);
+  var status = el('div', 'muted lk-status');
+  var list = el('div', 'lk-list');
+  form.onsubmit = function(e) { e.preventDefault(); run(q.value.trim()); };
+  chips.onchange = function() { run(q.value.trim()); };
 
   function showResults() {
     tab('results');
-    pane.replaceChildren();
-    pane.appendChild(el('p', 'muted', S.lookupHint));
-    pane.appendChild(chips);
-    var form = el('form', 'lk-form');
-    var q = el('input');
-    q.type = 'search';
-    q.placeholder = S.lkOther;
-    q.className = 'lk-q';
-    var go = el('button', 'btn', S.lookupSearch);
-    form.append(q, go);
-    pane.appendChild(form);
-    var status = el('div', 'muted lk-status');
-    var list = el('div', 'lk-list');
-    pane.append(status, list);
-    form.onsubmit = function(e) { e.preventDefault(); run(q.value.trim()); };
-    chips.onchange = function() { run(q.value.trim()); };
-    if (results.length) draw(list, status); else run('');
-
-    async function run(other) {
-      list.replaceChildren();
-      status.textContent = S.lookupWait;
-      if (!granted) { status.textContent = ''; list.appendChild(el('div', 'bad', S.lookupDenied)); return; }
-      var isbn = /^[\d\s-]{10,17}X?$/i.test(other) ? other.replace(/[\s-]/g, '') : (b.isbn || b.isbnFound || null);
-      var p = {
-        series: seriesIn.value.trim(), volume: volIn.value === '' ? null : Number(volIn.value), chapter: null,
-        keywords: wordsOf(seriesIn.value), lnHint: lnIn.checked
-      };
-      if (other && isbn !== other.replace(/[\s-]/g, '')) p = Object.assign(parseTitle(other), { lnHint: lnIn.checked });
-      try {
-        results = await searchBooks({ parsed: p, isbn: isbn, query: other && !/^[\d\s-]+X?$/i.test(other) ? other : null, lang: want,
-          onStep: function(st) { status.textContent = S.lkStep[st] || S.lookupWait; } });
-      } catch (_) { status.textContent = ''; list.appendChild(el('div', 'bad', S.lookupOffline)); return; }
-      shownAll = false;
-      if (!results.length) { showManual(S.lkEmptyManual); return; }
-      draw(list, status);
-    }
+    pane.replaceChildren(hint, chips, form, status, list);
+    if (!searched) run('');
   }
 
-  function draw(list, status) {
+  // Nothing found, offline or no access: say so here, with a way to type them in
+  function problem(text) {
+    status.textContent = '';
+    list.replaceChildren();
+    var box = el('div', 'lk-empty');
+    box.appendChild(el('div', text === S.lkEmpty ? 'muted' : 'bad', text));
+    var man = el('button', 'btn', S.lkToManual);
+    man.type = 'button';
+    man.onclick = function() { showManual(); };
+    box.appendChild(man);
+    list.appendChild(box);
+  }
+
+  async function run(other) {
+    searched = true;
+    var mine = ++runs;   // an older search that answers late is ignored
+    list.replaceChildren();
+    status.textContent = S.lookupWait;
+    if (!granted) { problem(S.lookupDenied); return; }
+    var isbn = /^[\d\s-]{10,17}X?$/i.test(other) ? other.replace(/[\s-]/g, '') : (b.isbn || b.isbnFound || null);
+    var found, p = {
+      series: seriesIn.value.trim(), volume: volIn.value === '' ? null : Number(volIn.value), chapter: null,
+      keywords: wordsOf(seriesIn.value), lnHint: lnIn.checked
+    };
+    if (other && isbn !== other.replace(/[\s-]/g, '')) p = Object.assign(parseTitle(other), { lnHint: lnIn.checked });
+    try {
+      found = await searchBooks({ parsed: p, isbn: isbn, query: other && !/^[\d\s-]+X?$/i.test(other) ? other : null, lang: want,
+        onStep: function(st) { status.textContent = S.lkStep[st] || S.lookupWait; } });
+    } catch (_) { if (mine === runs) { results = []; problem(S.lookupOffline); } return; }
+    if (mine !== runs) return;
+    results = found;
+    shownAll = false;
+    if (!results.length) { problem(S.lkEmpty); return; }
+    draw();
+  }
+
+  function draw() {
     status.textContent = '';
     list.replaceChildren();
     var top = shownAll ? results.slice(0, 16) : results.slice(0, 4);
@@ -1014,7 +1031,7 @@ async function showLookup(i, granted) {
     if (!shownAll && results.length > 4) {
       var more = el('button', 'btn ghost lk-more', f(S.lkMore, Math.min(results.length, 16) - 4));
       more.type = 'button';
-      more.onclick = function() { shownAll = true; draw(list, status); };
+      more.onclick = function() { shownAll = true; draw(); };
       list.appendChild(more);
     }
   }
@@ -1120,10 +1137,9 @@ async function showLookup(i, granted) {
   }
 
   // Your own details, and a cover from a link or a file
-  function showManual(note) {
+  function showManual() {
     tab('manual');
     pane.replaceChildren();
-    if (note) pane.appendChild(el('div', 'muted lk-note', note));
     pane.appendChild(el('p', 'muted', S.lkManualHint));
     var form = el('div', 'lk-manual');
     function field(label, value, type) {

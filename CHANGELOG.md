@@ -5,6 +5,7 @@
 ### Arreglos
 - **Estantería sin parpadeo:** al pasar el ratón por el borde de un libro, este ya no entra y sale del hover sin parar. Su caja no se mueve (los vecinos se apartan con transformaciones), las caras 3D no reciben el puntero y el libro se levanta tras una breve intención. Al recargar la estantería solo se animan los libros nuevos.
 - **Libros que se montaban en una balda llena:** cada libro se ve ahora de frente (perspectiva propia) y en reposo solo muestra el lomo; antes los de la derecha enseñaban su tapa encima del vecino. Al levantar uno, los vecinos se apartan sin salirse del mueble.
+- **Búsqueda sin resultados:** ya no salta sola a "Escribir a mano" (y al volver no buscaba otra vez para saltar de nuevo). Se queda en Resultados con el aviso y un botón "Escribir a mano"; lo escrito en "Otra búsqueda" y los resultados se conservan al cambiar de pestaña.
 - **Acabado mate:** lomos y tapas sin brillo de plástico, con sombras suaves y un grano de tela y papel.
 
 ### Nuevo
