@@ -36,7 +36,9 @@ export function createNativeEngine() {
         if (!e.name || e.name === 'word') onWord(e.charIndex);
       };
       var voice = pickNativeVoice(opts.voice, opts.lang);
-      if (voice) { u.voice = voice; u.lang = voice.lang; } else if (opts.lang) { u.lang = opts.lang; }
+      try {
+        if (voice) { u.voice = voice; u.lang = voice.lang; } else if (opts.lang) { u.lang = opts.lang; }
+      } catch (_) { if (opts.lang) u.lang = opts.lang; }
       u.rate = opts.rate();
       u.onend = function() { resolve(); };
       u.onerror = function(e) {

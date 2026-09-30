@@ -3,6 +3,7 @@
 // and runs the Piper voice (WASM) for the offline "local" engine.
 
 import { TtsSession, voices as piperCatalog, PATH_MAP, HF_BASE } from '@mintplex-labs/piper-tts-web';
+import * as offline from './translator.js';
 
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   switch (message.action) {
@@ -39,6 +40,43 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case 'extract_url':
       handleExtractUrl(message.url, message.voice, message.rate)
         .then(sendResponse)
+        .catch(err => sendResponse({ success: false, error: err.message }));
+      return true;
+
+    case 'tr_status':
+      offline.status(message.from, message.to)
+        .then(st => sendResponse(Object.assign({ success: true }, st)))
+        .catch(err => sendResponse({ success: false, error: err.message }));
+      return true;
+
+    case 'tr_download': {
+      const tabId = sender.tab && sender.tab.id;
+      let last = 0;
+      offline.download(message.from, message.to, fraction => {
+        if (tabId === undefined || (fraction < 1 && Date.now() - last < 200)) return;
+        last = Date.now();
+        browser.tabs.sendMessage(tabId, { action: 'tr_progress', from: message.from, to: message.to, fraction }).catch(() => {});
+      })
+        .then(() => sendResponse({ success: true }))
+        .catch(err => sendResponse({ success: false, error: err.message }));
+      return true;
+    }
+
+    case 'tr_translate':
+      offline.translate(message.from, message.to, message.texts)
+        .then(texts => sendResponse({ success: true, texts }))
+        .catch(err => sendResponse({ success: false, error: err.message }));
+      return true;
+
+    case 'tr_list':
+      offline.listPacks()
+        .then(packs => sendResponse({ success: true, packs }))
+        .catch(err => sendResponse({ success: false, error: err.message }));
+      return true;
+
+    case 'tr_remove':
+      offline.removePack(message.pair)
+        .then(() => sendResponse({ success: true }))
         .catch(err => sendResponse({ success: false, error: err.message }));
       return true;
 

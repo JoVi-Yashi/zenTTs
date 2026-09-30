@@ -8,6 +8,7 @@
 
 var SENTENCE = 'zentts-sentence';
 var WORD = 'zentts-word';
+var PICK = 'zentts-pick';
 var INK = '#1b1916';
 var MARK = '#f6e7b0';          // opaque, so dark text reads on any site
 var WORD_MARK = '#e3b04b';
@@ -20,7 +21,8 @@ function ensureStyles() {
   style.id = 'zentts-highlight';
   style.textContent =
     '::highlight(' + SENTENCE + ') { background-color: ' + MARK + '; color: ' + INK + '; }\n' +
-    '::highlight(' + WORD + ') { background-color: ' + WORD_MARK + '; color: ' + INK + '; }';
+    '::highlight(' + WORD + ') { background-color: ' + WORD_MARK + '; color: ' + INK + '; }\n' +
+    '::highlight(' + PICK + ') { background-color: #dbe6f3; color: ' + INK + '; text-decoration: underline dotted 2px #2f5d8a; }';
   (document.head || document.documentElement).appendChild(style);
 }
 
@@ -177,4 +179,66 @@ export function showWord(i) {
 
 export function hideWord() {
   if (supported) CSS.highlights.delete(WORD);
+}
+
+// ---- "Choose where to start" ----
+
+function caretAt(x, y) {
+  if (document.caretPositionFromPoint) {
+    var p = document.caretPositionFromPoint(x, y);
+    return p ? { node: p.offsetNode, offset: p.offset } : null;
+  }
+  if (document.caretRangeFromPoint) {
+    var r = document.caretRangeFromPoint(x, y);
+    return r ? { node: r.startContainer, offset: r.startOffset } : null;
+  }
+  return null;
+}
+
+// Index of the sentence under the pointer, or -1.
+// paragraphs: [{el}], sentences: [{text, refIdx, hint}]
+export function sentenceAtPoint(x, y, paragraphs, sentences) {
+  var caret = caretAt(x, y);
+  if (!caret || !caret.node) return -1;
+  var p = -1;
+  for (var i = 0; i < paragraphs.length; i++) {
+    if (paragraphs[i].el && paragraphs[i].el.contains(caret.node)) { p = i; break; }
+  }
+  if (p < 0) return -1;
+
+  // Position of the caret in the paragraph's whitespace-free text
+  var idx = indexOf(paragraphs[p].el);
+  var pos = 0;
+  for (var k = 0; k < idx.map.length; k++) {
+    var m = idx.map[k];
+    if (m.node === caret.node && m.offset >= caret.offset) { pos = k; break; }
+    pos = k;
+  }
+  var first = -1, found = -1;
+  for (var j = 0; j < sentences.length; j++) {
+    var s = sentences[j];
+    if (s.refIdx !== p) continue;
+    if (first < 0) first = j;
+    if (s.hint <= pos) found = j;
+  }
+  // Translated text doesn't map to the page: start at the paragraph instead
+  return found >= 0 ? found : first;
+}
+
+export function showPick(el, sentence, hint) {
+  if (!supported || !el) return;
+  ensureStyles();
+  var idx = indexOf(el);
+  var needle = compact(sentence);
+  var at = find(idx, needle, hint);
+  var range = at >= 0 ? rangeFromCompact(idx, at, at + needle.length) : null;
+  if (!range) {
+    range = document.createRange();
+    range.selectNodeContents(el);
+  }
+  CSS.highlights.set(PICK, new Highlight(range));
+}
+
+export function clearPick() {
+  if (supported) CSS.highlights.delete(PICK);
 }

@@ -10,3 +10,4 @@ tts-original.png
 extension/*.zip
 tts-zen-source.zip
 extension/vendor/
+extension/worker/

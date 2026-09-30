@@ -9,6 +9,10 @@ const VENDOR = [
   ['node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.mjs', 'vendor/ort/ort-wasm-simd-threaded.mjs'],
   ['node_modules/@diffusionstudio/piper-wasm/build/piper_phonemize.wasm', 'vendor/piper/piper_phonemize.wasm'],
   ['node_modules/@diffusionstudio/piper-wasm/build/piper_phonemize.data', 'vendor/piper/piper_phonemize.data'],
+  // Bergamot resolves its worker next to the bundle (new URL('./worker/…', import.meta.url))
+  ['node_modules/@browsermt/bergamot-translator/worker/translator-worker.js', 'worker/translator-worker.js'],
+  ['node_modules/@browsermt/bergamot-translator/worker/bergamot-translator-worker.js', 'worker/bergamot-translator-worker.js'],
+  ['node_modules/@browsermt/bergamot-translator/worker/bergamot-translator-worker.wasm', 'worker/bergamot-translator-worker.wasm'],
 ];
 
 function copyVendor() {
@@ -25,7 +29,7 @@ Promise.all([
   // ESM so onnxruntime-web can use import.meta and dynamic import()
   esbuild.build({ ...common, entryPoints: ['src/background.js'], outfile: 'background.js', format: 'esm', target: 'es2022',
     // Node-only branches of the Emscripten glue; never taken in the browser
-    external: ['fs', 'path', 'crypto', 'worker_threads'] }),
+    external: ['fs', 'path', 'crypto', 'worker_threads', 'node:worker_threads'] }),
 ])
   .then(copyVendor)
   .catch(() => process.exit(1));
