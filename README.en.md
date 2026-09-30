@@ -4,12 +4,14 @@
     <a href="README.md">Español</a> · <a href="README.en.md">English</a>
 </p>
 
-A TTS panel injected into any page via Shadow DOM. Extracts text, reads it with **native SpeechSynthesis** or **edge-tts** (45 Microsoft neural voices), and highlights each sentence in real time. Includes a **desktop app** to manage the server without touching a terminal.
+A panel that reads the page or PDF you have open out loud, marking the sentence and the word as it goes. It extracts just the story, reads it with the **browser's** voice, Microsoft **neural voices** (edge-tts) or an offline **local voice** (Piper), and if it's in another language it **translates** it while you listen. Includes a **desktop app** to manage the neural voice server.
 
-Built for Wattpad, AO3, and FanFiction readers. Powered by the [Web Speech API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Speech_API).
+Built for Wattpad, AO3, FanFiction and Webnovel readers; works on any article and on PDFs.
+
+**How to use it:** press the zenTTS button in the browser toolbar (or `Alt+Shift+Z`), then **Read**. The panel never appears on a page by itself.
 
 > [!WARNING]
-> The extension is loaded as a temporary add-on via `about:debugging`. It is not published on addons.mozilla.org.
+> The extension is not on addons.mozilla.org yet: load it as a temporary add-on in `about:debugging` (see [Installation](#installation)).
 
 <p align="center"><img alt="zenTTS panel" src="docs/screenshot.png" width="640"></p>
 
@@ -82,15 +84,22 @@ make build-extension
 
 ### Load the extension in Zen
 
-1. `about:debugging` → **Load Temporary Add-on**
-2. Select `extension/manifest.json`
+- **From the release:** download `zentts-1.0.0.zip` from [Releases](https://github.com/JoVi-Yashi/zenTTs/releases/latest) → `about:debugging` → **This Zen** → **Load Temporary Add-on** → pick the zip.
+- **From source:** `make extension` (or `make build-extension` once dependencies are installed) and pick `extension/manifest.json` in `about:debugging`. `make package` builds `dist/zentts-1.0.0.zip`.
 
 ---
 
 ## Features
 
-### Floating panel
-Shadow DOM encapsulation. Site CSS never interferes. Appears bottom-right, collapsible to a 44px circle.
+### Appears only when you call it
+The zenTTS button in the browser toolbar (or `Alt+Shift+Z`) shows or hides the panel in that tab; it stays through reloads and chapter changes, and the button shows a dot while it's on. ⚙ → Reading → "Always open on this site" makes it open by itself on that domain. The panel lives in Shadow DOM, so the site's CSS doesn't touch it.
+
+### PDF reader
+On a tab with a PDF, the button opens the zenTTS reader: the pages rendered with pdf.js, the sentence and the word marked on top, without repeated headers or page numbers, and with "pick up where you left off". Web PDFs load by themselves (the first time it may ask for permission for that site). Firefox doesn't let extensions read local files (`file://`), so for a PDF on your computer the reader asks you to drop or choose it once.
+
+### Voice performance and which translation to pick
+- **High-quality** Local voices do much more work per second of audio, and Piper runs on a single thread inside the browser: on modest computers they can fall behind the reading and leave pauses between sentences. zenTTS loads the voice ahead of time, cuts long sentences and generates several ahead; if it still can't keep up, ⚙ → Voice says so. **Standard** quality is the best balance.
+- **Online** translation (with the server) is the most accurate and nearly instant. **Offline** (Firefox Translations) is private and works without internet; it's a bit less polished and uses the CPU, so with Local voices it translates at the pace of the reading so it doesn't compete with the voice.
 
 ### Dual TTS engines
 Choose between native SpeechSynthesis (no dependencies) or edge-tts with Microsoft neural voices. Switch from ⚙ → Engine without restarting.
@@ -128,8 +137,8 @@ zenTTS remembers the sentence you were on in each chapter. When you come back, t
 ### Platform extractors
 Wattpad, AO3, FanFiction, and Webnovel have optimized extractors with platform-specific selectors. Ignores headers, navs, and sidebars.
 
-### Site Manager
-Enable or disable the tool per domain with toggle switches. Real favicons. Persists across sessions.
+### Supported sites
+The globe button lists the sites with their own extractor (AO3, FanFiction, Wattpad, Webnovel) and the editable list of sites where the panel opens by itself.
 
 ### Desktop app
 Native GTK3 GUI. Linux and Windows compatible. Warm dark theme, system header bar, real-time status.
@@ -152,6 +161,8 @@ zenTTs/
 │   ├── src/progress.js     # Remembers your place per chapter
 │   ├── src/background.js   # Server proxy + Piper
 │   ├── src/panel.js        # Panel UI, settings, sites
+│   ├── src/reader.js       # PDF reader (pdf.js)
+│   ├── reader.html         # Reader page
 │   └── icons/
 ├── server.rb               # REST API Ruby/Sinatra
 ├── gui.rb                  # GTK3 desktop app

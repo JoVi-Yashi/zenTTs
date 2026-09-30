@@ -1,5 +1,6 @@
-// esbuild config — bundles the content script (with Readability and the panel)
-// and the background page (with Piper), and copies the WASM files Piper needs.
+// esbuild config — bundles the content script (with Readability and the panel),
+// the background page (with Piper and Bergamot) and the PDF reader (with pdf.js),
+// and copies the WASM and worker files they need.
 const esbuild = require('esbuild');
 const fs = require('fs');
 const path = require('path');
@@ -13,6 +14,8 @@ const VENDOR = [
   ['node_modules/@browsermt/bergamot-translator/worker/translator-worker.js', 'worker/translator-worker.js'],
   ['node_modules/@browsermt/bergamot-translator/worker/bergamot-translator-worker.js', 'worker/bergamot-translator-worker.js'],
   ['node_modules/@browsermt/bergamot-translator/worker/bergamot-translator-worker.wasm', 'worker/bergamot-translator-worker.wasm'],
+  // pdf.js worker for the PDF reader
+  ['node_modules/pdfjs-dist/build/pdf.worker.min.mjs', 'vendor/pdfjs/pdf.worker.min.mjs'],
 ];
 
 function copyVendor() {
@@ -30,6 +33,8 @@ Promise.all([
   esbuild.build({ ...common, entryPoints: ['src/background.js'], outfile: 'background.js', format: 'esm', target: 'es2022',
     // Node-only branches of the Emscripten glue; never taken in the browser
     external: ['fs', 'path', 'crypto', 'worker_threads', 'node:worker_threads'] }),
+  // PDF reader page: pdf.js + the same reading code as the content script
+  esbuild.build({ ...common, entryPoints: ['src/reader.js'], outfile: 'reader.js', format: 'esm', target: 'es2022' }),
 ])
   .then(copyVendor)
   .catch(() => process.exit(1));

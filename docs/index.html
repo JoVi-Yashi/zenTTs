@@ -4,10 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>zenTTS — lectura en voz alta para Zen Browser</title>
-<meta name="description" content="Un panel pequeño que lee en voz alta la página que tienes abierta. Pensado para Wattpad, AO3, FanFiction y Webnovel.">
+<meta name="description" content="Lee en voz alta la página o el PDF que tienes abierto, marcando la frase y la palabra. Voces del navegador, neurales o locales sin conexión, y traducción. Para Zen Browser y Firefox.">
 <link rel="icon" type="image/png" href="tts.png">
 <meta property="og:title" content="zenTTS — lectura en voz alta para Zen Browser">
-<meta property="og:description" content="Un panel pequeño que lee en voz alta la página que tienes abierta. Voces del navegador, voces neurales o una voz local sin conexión.">
+<meta property="og:description" content="Lee en voz alta la página o el PDF que tienes abierto, marcando la frase y la palabra. Voces del navegador, neurales o locales sin conexión, y traducción.">
 <meta property="og:image" content="https://jovi-yashi.github.io/zenTTs/tts.png">
 <meta property="og:type" content="website">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -86,11 +86,24 @@
     display: flex; justify-content: space-between; align-items: baseline;
     font: 16px var(--display-sc); color: var(--ink-soft); letter-spacing: .04em;
   }
+  /* Language: the sound of each tongue in IPA — /ɲ/ as in "ñ", /ə/ the English schwa */
+  .lang { display: inline-flex; gap: 4px; }
   .lang button {
-    background: none; border: none; padding: 2px 4px; cursor: pointer;
-    font: inherit; color: var(--ink-soft);
+    position: relative; min-width: 42px; padding: 2px 8px 3px; cursor: pointer;
+    background: none; border: 1px solid transparent; border-radius: 3px;
+    font: 20px/1.2 var(--text); font-variant-numeric: normal; color: var(--ink-soft);
+    transition: color .15s ease, border-color .15s ease, background-color .15s ease;
   }
-  .lang button[aria-pressed="true"] { color: var(--rubric); text-decoration: underline; text-underline-offset: 4px; }
+  .lang button:hover { color: var(--ink); border-color: var(--rule); }
+  .lang button[aria-pressed="true"] { color: var(--rubric); border-color: var(--gold); background: rgba(184, 135, 46, .1); }
+  .lang button::after {
+    content: attr(data-name); position: absolute; top: calc(100% + 8px); left: 50%;
+    transform: translate(-50%, -3px); padding: 4px 9px; border-radius: 3px; white-space: nowrap;
+    background: var(--ink); color: var(--folio); font: 14px var(--sans); letter-spacing: 0;
+    opacity: 0; pointer-events: none; transition: opacity .15s ease .25s, transform .15s ease .25s; z-index: 5;
+  }
+  .lang button:hover::after, .lang button:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
+  button:focus-visible, a:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 
   /* ---- Title page ---- */
   .incipit {
@@ -140,6 +153,18 @@
   .excerpt p { margin: 0 0 14px; hyphens: auto; }
   .excerpt .chapter { font: 18px var(--display-sc); color: var(--rubric); letter-spacing: .08em; margin-bottom: 12px; text-align: left; }
   .excerpt mark { background: var(--mark); color: inherit; box-shadow: -4px 0 0 var(--mark), 4px 0 0 var(--mark); }
+  .excerpt .word { font-weight: inherit; background: var(--gold-light); color: #2b1d12; border-radius: 2px; box-shadow: -2px 0 0 var(--gold-light), 2px 0 0 var(--gold-light); }
+  .demo-tr { grid-template-columns: 1fr; margin-top: 34px; }
+  .demo-tr .excerpt { max-width: 34em; margin: 0 auto; }
+  .caption {
+    margin: -6px 0 16px; padding: 8px 14px; max-width: 30em;
+    background: #fbf8f1; color: #2a2622; font: 16px/1.5 var(--sans);
+    border: 1px solid #ddd4c3; border-left: 3px solid #9a3b25; border-radius: 6px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 8px 22px rgba(43,29,18,.14);
+  }
+  .caption .word { background: #e3b04b; box-shadow: none; }
+  .excerpt .after { opacity: .7; }
+  .note { text-align: center; font-style: italic; color: var(--ink-soft); font-size: 17px; margin: 14px 0 0; }
   .gloss {
     grid-column: 1 / -1; margin: 0; padding-top: 12px; border-top: 1px solid var(--rule);
     font: italic 17px var(--text); color: var(--ink-soft); text-align: center;
@@ -152,10 +177,11 @@
     box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 10px 26px rgba(43,29,18,.18);
     transform: rotate(1.2deg);
   }
-  .panel-head { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid #ddd4c3; }
+  .panel-head { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-top: 1px solid #ddd4c3; }
+  .panel-nav { display: flex; justify-content: center; gap: 22px; padding: 0 0 8px; color: #6d655a; font: 16px var(--sans); }
   .panel-head b { font: 600 15px Georgia, serif; }
   .panel-head b i { font-weight: 400; color: #9a3b25; }
-  .panel-head span { display: flex; gap: 10px; color: #6d655a; }
+  .panel-head span { display: flex; gap: 10px; color: #6d655a; align-items: center; }
   .panel-folio { text-align: center; padding: 12px 0 8px; font: italic 14px Georgia, serif; color: #6d655a; }
   .panel-ctrls { display: flex; gap: 6px; padding: 0 12px 10px; }
   .panel-ctrls div { height: 30px; border: 1px solid #ddd4c3; border-radius: 4px; width: 36px; display: flex; align-items: center; justify-content: center; }
@@ -198,6 +224,7 @@
   .explicit .word { font: 20px var(--display-sc); color: var(--rubric); letter-spacing: .2em; }
   .explicit p { margin: 4px 0; font-style: italic; color: var(--ink-soft); font-size: 17px; }
 
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
   @media (max-width: 760px) {
     body { font-size: 18px; }
     .folio { margin: 0; padding: 52px 26px 44px; box-shadow: none; }
@@ -228,19 +255,20 @@
 
   <header>
     <div class="top">
-      <span>zenTTS</span>
+      <span>zenTTS · 1.0</span>
       <span class="lang" role="group" aria-label="Idioma / Language">
-        <button type="button" data-lang="es" aria-pressed="true">ES</button>·<button type="button" data-lang="en" aria-pressed="false">EN</button>
+        <button type="button" data-lang="es" aria-pressed="true" aria-label="Español" data-name="Español">/ɲ/</button><button type="button" data-lang="en" aria-pressed="false" aria-label="English" data-name="English">/ə/</button>
       </span>
     </div>
 
     <p class="incipit" data-en="Here begins the book of">Aquí comienza el libro de</p>
     <h1>zen<em>TTS</em></h1>
-    <svg class="ornament" viewBox="0 0 220 22" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 11 H86"/><path d="M134 11 H216"/><path d="M110 3 L118 11 L110 19 L102 11 Z" fill="currentColor"/><path d="M86 11 c6 -8 12 -8 16 0 c-4 8 -10 8 -16 0 z"/><path d="M134 11 c-6 -8 -12 -8 -16 0 c4 8 10 8 16 0 z"/><circle cx="4" cy="11" r="2.4" fill="currentColor"/><circle cx="216" cy="11" r="2.4" fill="currentColor"/></g></svg>
-    <p class="lede" data-en="A small panel that reads the page you have open out loud, sentence by sentence, marking where it is. Made for reading fanfics in Zen Browser.">Un panel pequeño que lee en voz alta la página que tienes abierta, oración por oración, marcando por dónde va. Hecho para leer fanfics en Zen Browser.</p>
+    <svg class="ornament" viewBox="0 0 220 22" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 11 H86"/><path d="M134 11 H216"/><path d="M110 3 L118 11 L110 19 L102 11 Z" fill="currentColor" fill-opacity=".25"/><circle cx="94" cy="11" r="2.4"/><circle cx="126" cy="11" r="2.4"/></g></svg>
+    <p class="lede" data-en="Reads the page you have open out loud, sentence by sentence, marking the sentence and the word as it goes. For fanfics, articles and PDFs, in Zen Browser and Firefox.">Lee en voz alta la página que tienes abierta, oración por oración, marcando la frase y la palabra por donde va. Para fanfics, artículos y PDF, en Zen Browser y Firefox.</p>
     <div class="actions">
-      <a class="seal" href="https://github.com/JoVi-Yashi/zenTTs" data-en="Source on GitHub">Código en GitHub</a>
+      <a class="seal" href="https://github.com/JoVi-Yashi/zenTTs/releases/latest" data-en="Download 1.0">Descargar 1.0</a>
       <a href="#instalar" data-en="How to install">Cómo instalarlo</a>
+      <a href="https://github.com/JoVi-Yashi/zenTTs" data-en="Source">Código</a>
     </div>
   </header>
 
@@ -250,26 +278,40 @@
       <div class="excerpt" lang="es">
         <p class="chapter" data-en="Chapter three · an example">Capítulo tercero · un ejemplo</p>
         <p><span class="dropcap" aria-hidden="true"><span>L</span></span>a lluvia no había parado en tres días. Mara cerró la ventana y se quedó mirando el reflejo de la lámpara en el cristal, como quien espera una carta que ya no vendrá.</p>
-        <p><mark>—No va a volver —dijo Teo desde la puerta, sin atreverse a entrar.</mark> Ella no respondió; ya lo sabía.</p>
+        <p><mark>—No va a volver —dijo Teo desde la <b class="word">puerta</b>, sin atreverse a entrar.</mark> Ella no respondió; ya lo sabía.</p>
         <p>Afuera, un tranvía cruzó la avenida vacía, iluminando por un segundo los charcos como si fueran monedas.</p>
       </div>
       <div class="panel" aria-hidden="true">
-        <div class="panel-head">
-          <b>zen<i>TTS</i></b>
-          <span>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/></svg>
-          </span>
-        </div>
         <div class="panel-folio">5 / 42</div>
+        <div class="panel-nav"><span>‹</span><span>›</span></div>
         <div class="panel-ctrls">
           <div class="play"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg><span data-en="Continue">Continuar</span></div>
           <div><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg></div>
           <div><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="1"/></svg></div>
+          <div><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg></div>
         </div>
         <div class="panel-st" data-en="Playing…">Reproduciendo…</div>
+        <div class="panel-head">
+          <b>zen<i>TTS</i></b>
+          <span>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15 15 0 0 1 4 10 15 15 0 0 1-4 10 15 15 0 0 1-4-10 15 15 0 0 1 4-10z"/></svg>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8" stroke-dasharray="3 2.2"/></svg>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="7" x2="17" y2="17"/><polyline points="17 9 17 17 9 17"/></svg>
+          </span>
+        </div>
       </div>
-      <figcaption class="gloss" data-en="The sentence being read is marked on the page itself; the panel waits in a corner.">La oración que se está leyendo se marca en la propia página; el panel espera en una esquina.</figcaption>
+      <figcaption class="gloss" data-en="The sentence being read and the spoken word are marked on the page itself; the panel waits in the corner you choose, turned towards it.">La oración que se lee y la palabra que suena se marcan en la propia página; el panel espera en la esquina que elijas, orientado hacia ella.</figcaption>
+    </figure>
+
+    <figure class="demo demo-tr">
+      <div class="excerpt" lang="en">
+        <p class="chapter" data-en="In another tongue">En otra lengua</p>
+        <p><mark>The rain had not stopped for three days.</mark> Mara closed the window and watched the lamp in the glass.</p>
+        <div class="caption" lang="es">La lluvia no se había <b class="word">detenido</b> durante tres días.</div>
+        <p class="after">Outside, a tram crossed the empty avenue.</p>
+      </div>
+      <figcaption class="gloss" data-en="A chapter in another language is translated as you listen, on your own computer or online, and the translated sentence appears under the original.">Un capítulo en otro idioma se traduce mientras escuchas, en tu propio equipo o en línea, y la frase traducida aparece bajo la original.</figcaption>
     </figure>
 
     <h2 data-en="Of what it does">De lo que hace</h2>
@@ -277,18 +319,22 @@
       <p><span class="dropcap lapis" aria-hidden="true"><span>E</span></span><span data-en="xtracts only the story from the page, skipping menus, summaries and comments, and reads it with the voice you choose: the browser's own, the Microsoft neural voices, or a voice that lives on your computer and needs no connection at all. When a chapter ends it fetches the next one and keeps going; when you come back, it remembers where you stopped.">xtrae de la página solo la historia, sin menús, resúmenes ni comentarios, y la lee con la voz que elijas: la del propio navegador, las voces neurales de Microsoft o una voz que vive en tu equipo y no necesita conexión. Al terminar un capítulo trae el siguiente y sigue; cuando vuelves, recuerda dónde te quedaste.</span></p>
     </div>
     <dl>
+      <dt data-en="Only when you call it">Solo cuando la llamas</dt>
+      <dd data-en="Nothing appears on its own: the zenTTS button in the toolbar (or Alt+Shift+Z) shows it in that tab, and it stays through reloads and chapters. On the sites you choose it can open by itself.">Nada aparece por su cuenta: el botón de zenTTS en la barra (o Alt+Mayús+Z) lo muestra en esa pestaña, y se queda al recargar y al pasar de capítulo. En los sitios que elijas puede abrirse solo.</dd>
+      <dt data-en="Also in PDF">También en PDF</dt>
+      <dd data-en="On a PDF tab the button opens the zenTTS reader: the pages as they are, with the sentence and the word marked, without the running headers and page numbers.">En una pestaña con un PDF, el botón abre el lector de zenTTS: las páginas tal cual, con la frase y la palabra marcadas, sin encabezados ni números de página.</dd>
+      <dt data-en="In any language">En cualquier idioma</dt>
+      <dd data-en="It detects the language of the chapter. If it isn't yours, it translates it with Firefox Translations on your computer, or online, and starts reading as soon as the first paragraphs are ready.">Detecta el idioma del capítulo. Si no es el tuyo, lo traduce con Firefox Translations en tu equipo, o en línea, y empieza a leer en cuanto están listos los primeros párrafos.</dd>
+      <dt data-en="From where you choose">Desde donde elijas</dt>
+      <dd data-en="Press the crosshair and click a sentence: reading starts there. Without the button, clicks on the page do nothing.">Pulsa la mira y haz clic en una frase: la lectura empieza ahí. Sin el botón, los clics en la página no hacen nada.</dd>
       <dt data-en="The next chapter, unasked">El capítulo siguiente, sin pedirlo</dt>
       <dd data-en="On AO3, FanFiction.net and Wattpad the next chapter loads in the same page and the reading carries on.">En AO3, FanFiction.net y Wattpad el capítulo siguiente se carga en la misma página y la lectura continúa.</dd>
       <dt data-en="Where you left off">Donde lo dejaste</dt>
-      <dd data-en="Each chapter keeps its place; the button offers “Continue · 34 / 120”.">Cada capítulo guarda su punto; el botón ofrece «Continuar · 34 / 120».</dd>
+      <dd data-en="Each chapter and each PDF keeps its place; the button offers “Continue · 34 / 120”.">Cada capítulo y cada PDF guarda su punto; el botón ofrece «Continuar · 34 / 120».</dd>
       <dt data-en="A voice that never fails you">Una voz que no te deja a medias</dt>
-      <dd data-en="If the neural voice stops answering, the reading goes on from the same sentence with the local or the browser voice.">Si la voz neural deja de responder, la lectura sigue desde la misma oración con la voz local o la del navegador.</dd>
-      <dt data-en="Dressed in your browser's colors">Vestido con los colores de tu navegador</dt>
-      <dd data-en="Follows light and dark mode and the installed Firefox theme; paste the value of zen.theme.accent-color to match your Zen accent.">Sigue el modo claro u oscuro y el tema de Firefox instalado; pega el valor de zen.theme.accent-color para igualar tu acento de Zen.</dd>
-      <dt data-en="The reading view">La vista de lectura</dt>
-      <dd data-en="The extracted text on a clean page, the current sentence marked, in serif, sans or mono.">El texto extraído en una página limpia, con la oración actual marcada, en serif, sans o mono.</dd>
-      <dt data-en="Translation">Traducción</dt>
-      <dd data-en="Optionally translated paragraph by paragraph, so you can listen to a story written in another tongue.">Opcionalmente traducida párrafo a párrafo, para escuchar una historia escrita en otra lengua.</dd>
+      <dd data-en="If the neural voice stops answering, the reading goes on from the same sentence with the local or the browser voice. Change the voice mid-sentence and it starts over with the new one.">Si la voz neural deja de responder, la lectura sigue desde la misma oración con la voz local o la del navegador. Cambia de voz a mitad de frase y vuelve a empezarla con la nueva.</dd>
+      <dt data-en="A panel that keeps out of the way">Un panel que no estorba</dt>
+      <dd data-en="Minimized, it is a bubble you drag to any corner. Its settings live in four small tabs, and it follows your browser's colors.">Minimizado es una burbuja que arrastras a cualquier esquina. Sus ajustes viven en cuatro pestañas pequeñas y sigue los colores de tu navegador.</dd>
     </dl>
 
     <h2 data-en="The houses it knows">Las casas que conoce</h2>
@@ -298,44 +344,45 @@
       <li><img src="site-fanfiction.svg" alt="">FanFiction.net</li>
       <li><img src="site-webnovel.svg" alt="">Webnovel</li>
     </ul>
+    <p class="note" data-en="Any other page is read with the article extractor; PDFs with the reader.">Cualquier otra página se lee con el extractor de artículos; los PDF, con el lector.</p>
 
     <h2 data-en="Of the three voices">De las tres voces</h2>
     <table>
       <tr>
         <th data-en="Native">Nativa</th>
-        <td data-en="The voices your browser already has. Nothing to install.">Las voces que ya tiene tu navegador. Nada que instalar.</td>
+        <td data-en="The voices your browser already has. Instant and nothing to install; on Linux they tend to sound robotic.">Las voces que ya tiene tu navegador. Al instante y sin instalar nada; en Linux suelen sonar robóticas.</td>
       </tr>
       <tr>
         <th>Neural</th>
-        <td data-en="Microsoft neural voices through edge-tts, served by a small Ruby server on localhost:8765. The most natural.">Voces neurales de Microsoft mediante edge-tts, servidas por un pequeño servidor Ruby en localhost:8765. Las más naturales.</td>
+        <td data-en="Microsoft neural voices through edge-tts, served by a small Ruby server on localhost:8765. The most natural, and the fastest translation online.">Voces neurales de Microsoft mediante edge-tts, servidas por un pequeño servidor Ruby en localhost:8765. Las más naturales, y la traducción en línea más rápida.</td>
       </tr>
       <tr>
         <th>Local</th>
-        <td data-en="Piper running inside the browser. Download a voice once (~60 MB) and it works with no server and no connection.">Piper dentro del navegador. Descargas una voz una vez (~60 MB) y funciona sin servidor ni conexión.</td>
+        <td data-en="Piper inside the browser, with no server or connection once downloaded. Three kinds: &lt;i&gt;high quality&lt;/i&gt; (~110 MB, the most natural, slower to generate on modest computers), &lt;i&gt;standard&lt;/i&gt; (~60 MB, the balance) and &lt;i&gt;light&lt;/i&gt; (the fastest). Spanish voices from Spain, Mexico and Argentina.">Piper dentro del navegador, sin servidor ni conexión una vez descargada. Tres clases: <i>alta calidad</i> (~110 MB, la más natural, más lenta de generar en equipos modestos), <i>normal</i> (~60 MB, el equilibrio) y <i>ligera</i> (la más rápida). Voces en español de España, México y Argentina.</td>
       </tr>
     </table>
 
     <h2 id="instalar" data-en="Of its installation">De cómo instalarlo</h2>
     <ol class="steps">
       <li>
-        <strong data-en="Linux, with Flatpak">Linux, con Flatpak</strong>
-        <p data-en="Ruby, edge-tts and trafilatura come bundled.">Ruby, edge-tts y trafilatura vienen incluidos.</p>
+        <strong data-en="The extension, from the release">La extensión, desde la release</strong>
+        <p data-en="Download &lt;code&gt;zentts-1.0.0.zip&lt;/code&gt; from the &lt;a href=&quot;https://github.com/JoVi-Yashi/zenTTs/releases/latest&quot;&gt;latest release&lt;/a&gt;. In Zen, go to &lt;code&gt;about:debugging&lt;/code&gt; → “This Zen” → “Load Temporary Add-on” and pick the zip. Then press the zenTTS button in the toolbar on any page.">Descarga <code>zentts-1.0.0.zip</code> de la <a href="https://github.com/JoVi-Yashi/zenTTs/releases/latest">última release</a>. En Zen, ve a <code>about:debugging</code> → «Este Zen» → «Cargar complemento temporal» y elige el zip. Después pulsa el botón de zenTTS en la barra en cualquier página.</p>
+      </li>
+      <li>
+        <strong data-en="The neural voices, on Linux with Flatpak">Las voces neurales, en Linux con Flatpak</strong>
+        <p data-en="Optional. Ruby, edge-tts and trafilatura come bundled.">Opcional. Ruby, edge-tts y trafilatura vienen incluidos.</p>
         <pre>git clone https://github.com/JoVi-Yashi/zenTTs.git
 cd zenTTs
 make flatpak</pre>
       </li>
       <li>
-        <strong data-en="By hand — Linux or Windows">A mano — Linux o Windows</strong>
-        <p data-en="Needs Ruby 3.2+, plus edge-tts and trafilatura on your PATH. The build also prepares the local voice engine.">Necesitas Ruby 3.2+, y edge-tts y trafilatura en el PATH. El build prepara también el motor de voz local.</p>
+        <strong data-en="From the source — Linux or Windows">Desde el código — Linux o Windows</strong>
+        <p data-en="Needs Node.js to build the extension, and Ruby 3.2+ with edge-tts and trafilatura on your PATH for the neural voices.">Necesitas Node.js para construir la extensión, y Ruby 3.2+ con edge-tts y trafilatura en el PATH para las voces neurales.</p>
         <pre>git clone https://github.com/JoVi-Yashi/zenTTs.git
 cd zenTTs
-make install
-cd extension &amp;&amp; npm install &amp;&amp; cd ..
-make build-extension</pre>
-      </li>
-      <li>
-        <strong data-en="Load it in Zen">Cargarla en Zen</strong>
-        <p data-en="Go to &lt;code&gt;about:debugging&lt;/code&gt;, choose “Load Temporary Add-on” and pick &lt;code&gt;extension/manifest.json&lt;/code&gt;.">Ve a <code>about:debugging</code>, elige «Cargar complemento temporal» y selecciona <code>extension/manifest.json</code>.</p>
+make extension     # npm install + build
+make package       # dist/zentts-1.0.0.zip
+make install       # gems for the server</pre>
         <p data-en="If Zen is a Flatpak, first give it access to the folder:">Si Zen está instalado como Flatpak, primero dale acceso a la carpeta:</p>
         <pre>flatpak override --user \
   --filesystem=$HOME/Proyectos/zenTTs \
@@ -372,8 +419,9 @@ make build-extension</pre>
 
   buttons.forEach(function (b) { b.addEventListener('click', function () { apply(b.dataset.lang); }); });
 
-  var saved = 'es';
-  try { saved = localStorage.getItem('zentts-lang') || 'es'; } catch (_) {}
+  var saved = null;
+  try { saved = localStorage.getItem('zentts-lang'); } catch (_) {}
+  if (!saved) saved = /^es\b/i.test(navigator.language || '') ? 'es' : 'en';
   if (saved === 'en') apply('en');
 })();
 </script>

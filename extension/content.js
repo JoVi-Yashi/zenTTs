@@ -2131,8 +2131,8 @@
     for (var t2 = 0.1; contrast(out, background2) < 3.2 && t2 <= 1; t2 += 0.1) out = mix(accent, target, t2);
     return out;
   }
-  function themeTokens(theme) {
-    var c = theme && theme.colors || {};
+  function themeTokens(theme2) {
+    var c = theme2 && theme2.colors || {};
     var sheet = parseColor(c.popup || c.toolbar || c.frame);
     var ink = parseColor(c.popup_text || c.toolbar_text || c.tab_background_text);
     if (!sheet || !ink || contrast(sheet, ink) < 3) return null;
@@ -2173,6 +2173,332 @@
     host.style.setProperty("--mark", "rgba(" + fitted.map(Math.round).join(",") + ",0.22)");
   }
 
+  // src/highlight.js
+  var SENTENCE = "zentts-sentence";
+  var WORD = "zentts-word";
+  var PICK = "zentts-pick";
+  var INK = "#1b1916";
+  var MARK = "#f6e7b0";
+  var WORD_MARK = "#e3b04b";
+  var supported = typeof CSS !== "undefined" && CSS.highlights && typeof Highlight !== "undefined";
+  var theme = "page";
+  function ensureStyles() {
+    if (document.getElementById("zentts-highlight")) return;
+    var style = document.createElement("style");
+    style.id = "zentts-highlight";
+    style.textContent = theme === "overlay" ? "::highlight(" + SENTENCE + ") { background-color: rgba(243, 214, 102, .38); }\n::highlight(" + WORD + ") { background-color: rgba(227, 160, 40, .55); }\n::highlight(" + PICK + ") { background-color: rgba(47, 93, 138, .22); }" : "::highlight(" + SENTENCE + ") { background-color: " + MARK + "; color: " + INK + "; }\n::highlight(" + WORD + ") { background-color: " + WORD_MARK + "; color: " + INK + "; }\n::highlight(" + PICK + ") { background-color: #dbe6f3; color: " + INK + "; text-decoration: underline dotted 2px #2f5d8a; }";
+    (document.head || document.documentElement).appendChild(style);
+  }
+  function partsOf(el) {
+    return el && el.__zenttsParts ? el.__zenttsParts : [el];
+  }
+  function containsNode(el, node) {
+    return partsOf(el).some(function(p) {
+      return p && p.contains(node);
+    });
+  }
+  function boxOf(el) {
+    var parts = partsOf(el);
+    if (parts.length === 1 && getComputedStyle(parts[0]).display !== "contents") return parts[0].getBoundingClientRect();
+    var box = null;
+    parts.forEach(function(p) {
+      var r = document.createRange();
+      r.selectNodeContents(p);
+      var b = r.getBoundingClientRect();
+      if (!b.width && !b.height) return;
+      box = box ? { left: Math.min(box.left, b.left), top: Math.min(box.top, b.top), right: Math.max(box.right, b.right), bottom: Math.max(box.bottom, b.bottom) } : { left: b.left, top: b.top, right: b.right, bottom: b.bottom };
+    });
+    box = box || { left: 0, top: 0, right: 0, bottom: 0 };
+    box.width = box.right - box.left;
+    box.height = box.bottom - box.top;
+    return box;
+  }
+  function compactChars(ch) {
+    if (/\s/.test(ch)) return "";
+    if (ch === "\u2026") return "...";
+    return ch;
+  }
+  function compact(text) {
+    var out = "";
+    for (var i = 0; i < text.length; i++) out += compactChars(text[i]);
+    return out;
+  }
+  var indexes = /* @__PURE__ */ new WeakMap();
+  function indexOf(el) {
+    var parts = partsOf(el);
+    var raw = parts.map(function(p) {
+      return p.textContent;
+    }).join("\n");
+    var cached = indexes.get(el);
+    if (cached && cached.raw === raw) return cached;
+    var text = "";
+    var map = [];
+    parts.forEach(function(part) {
+      var walker = document.createTreeWalker(part, NodeFilter.SHOW_TEXT, {
+        acceptNode: function(n) {
+          var p = n.parentNode && n.parentNode.nodeName;
+          return p === "SCRIPT" || p === "STYLE" ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+        }
+      });
+      for (var node = walker.nextNode(); node; node = walker.nextNode()) {
+        var data = node.data;
+        for (var i = 0; i < data.length; i++) {
+          var c = compactChars(data[i]);
+          for (var k = 0; k < c.length; k++) {
+            text += c[k];
+            map.push({ node, offset: i });
+          }
+        }
+      }
+    });
+    var idx = { raw, text, map };
+    indexes.set(el, idx);
+    return idx;
+  }
+  function rangeFromCompact(idx, start, end) {
+    if (start < 0 || end > idx.map.length || start >= end) return null;
+    var a = idx.map[start];
+    var b = idx.map[end - 1];
+    var r = document.createRange();
+    r.setStart(a.node, a.offset);
+    r.setEnd(b.node, b.offset + 1);
+    return r;
+  }
+  function find(idx, needle, hint) {
+    if (!needle) return -1;
+    var at = idx.text.indexOf(needle, Math.max(0, (hint || 0) - 8));
+    if (at === -1) at = idx.text.indexOf(needle);
+    return at;
+  }
+  var current = null;
+  var fallbackEl = null;
+  var fallbackStyle = null;
+  function clearFallback() {
+    if (!fallbackEl) return;
+    fallbackEl.style.background = fallbackStyle.background;
+    fallbackEl.style.boxShadow = fallbackStyle.boxShadow;
+    fallbackEl.style.color = fallbackStyle.color;
+    fallbackEl = null;
+  }
+  function markParagraph(el) {
+    if (el === fallbackEl) return;
+    clearFallback();
+    if (!el || !el.isConnected) return;
+    if (supported && (el.__zenttsParts || getComputedStyle(el).display === "contents")) {
+      ensureStyles();
+      var whole = new Highlight();
+      partsOf(el).forEach(function(p) {
+        var r = document.createRange();
+        r.selectNodeContents(p);
+        whole.add(r);
+      });
+      CSS.highlights.set(SENTENCE, whole);
+      return;
+    }
+    fallbackStyle = { background: el.style.background, boxShadow: el.style.boxShadow, color: el.style.color };
+    el.style.background = MARK;
+    el.style.boxShadow = "-6px 0 0 " + MARK + ", 6px 0 0 " + MARK;
+    el.style.color = INK;
+    fallbackEl = el;
+  }
+  function scrollIfNeeded(target) {
+    var rect = target.startContainer ? target.getBoundingClientRect() : boxOf(target);
+    var margin = Math.min(120, window.innerHeight * 0.15);
+    if (rect.top >= margin && rect.bottom <= window.innerHeight - margin) return;
+    var el = target.startContainer ? target.startContainer.parentElement : partsOf(target)[0];
+    if (el && getComputedStyle(el).display === "contents") el = el.firstElementChild;
+    if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+  function clear() {
+    if (supported) {
+      CSS.highlights.delete(SENTENCE);
+      CSS.highlights.delete(WORD);
+    }
+    clearFallback();
+    current = null;
+  }
+  function showSentence(el, sentence, words, hint) {
+    if (supported) CSS.highlights.delete(WORD);
+    if (!el || !el.isConnected) {
+      clear();
+      return;
+    }
+    if (supported) {
+      ensureStyles();
+      var idx = indexOf(el);
+      var needle = compact(sentence);
+      var at = find(idx, needle, hint);
+      var range = at >= 0 ? rangeFromCompact(idx, at, at + needle.length) : null;
+      if (range) {
+        clearFallback();
+        var wordRanges = [];
+        var pos = at;
+        (words || []).forEach(function(w) {
+          var wn = compact(w.text);
+          var wAt = wn ? idx.text.indexOf(wn, pos) : -1;
+          if (wAt >= 0 && wAt < at + needle.length) {
+            wordRanges.push(rangeFromCompact(idx, wAt, wAt + wn.length));
+            pos = wAt + wn.length;
+          } else {
+            wordRanges.push(null);
+          }
+        });
+        CSS.highlights.set(SENTENCE, new Highlight(range));
+        current = { el, range, words: wordRanges };
+        scrollIfNeeded(range);
+        return;
+      }
+    }
+    if (supported) CSS.highlights.delete(SENTENCE);
+    current = { el, range: null, words: [] };
+    markParagraph(el);
+    scrollIfNeeded(el);
+  }
+  function showWord(i) {
+    if (!supported || !current || !current.range) return;
+    var r = current.words[i];
+    if (r) CSS.highlights.set(WORD, new Highlight(r));
+    else CSS.highlights.delete(WORD);
+  }
+  function caretAt(x, y) {
+    if (document.caretPositionFromPoint) {
+      var p = document.caretPositionFromPoint(x, y);
+      return p ? { node: p.offsetNode, offset: p.offset } : null;
+    }
+    if (document.caretRangeFromPoint) {
+      var r = document.caretRangeFromPoint(x, y);
+      return r ? { node: r.startContainer, offset: r.startOffset } : null;
+    }
+    return null;
+  }
+  function sentenceAtPoint(x, y, paragraphs2, sentences2) {
+    var caret = caretAt(x, y);
+    if (!caret || !caret.node) return -1;
+    var p = -1;
+    for (var i = 0; i < paragraphs2.length; i++) {
+      if (paragraphs2[i].el && containsNode(paragraphs2[i].el, caret.node)) {
+        p = i;
+        break;
+      }
+    }
+    if (p < 0) return -1;
+    var idx = indexOf(paragraphs2[p].el);
+    var pos = 0;
+    for (var k = 0; k < idx.map.length; k++) {
+      var m = idx.map[k];
+      if (m.node === caret.node && m.offset >= caret.offset) {
+        pos = k;
+        break;
+      }
+      pos = k;
+    }
+    var first = -1, found = -1;
+    for (var j = 0; j < sentences2.length; j++) {
+      var s = sentences2[j];
+      if (s.refIdx !== p) continue;
+      if (first < 0) first = j;
+      if (s.hint <= pos) found = j;
+    }
+    return found >= 0 ? found : first;
+  }
+  function showPick(el, sentence, hint) {
+    if (!supported || !el) return;
+    ensureStyles();
+    var idx = indexOf(el);
+    var needle = compact(sentence);
+    var at = find(idx, needle, hint);
+    var range = at >= 0 ? rangeFromCompact(idx, at, at + needle.length) : null;
+    if (!range) {
+      range = document.createRange();
+      range.selectNodeContents(partsOf(el)[0]);
+    }
+    CSS.highlights.set(PICK, new Highlight(range));
+  }
+  function clearPick() {
+    if (supported) CSS.highlights.delete(PICK);
+  }
+  var caption = null;
+  var suppressed = false;
+  var CAPTION_CSS = ":host { all: initial; }\n.cap { box-sizing: border-box; max-width: 680px; padding: 8px 12px; border-radius: 6px; background: #fbf8f1; color: " + INK + '; border: 1px solid #ddd4c3; border-left: 3px solid #9a3b25; box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 8px 22px rgba(0,0,0,.14); font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; transition: opacity .18s ease, transform .22s cubic-bezier(.2,.8,.2,1); }\n.cap.enter { opacity: 0; transform: translateY(-4px); }\n.w { border-radius: 2px; transition: background-color .12s ease; }\n.w.on { background: ' + WORD_MARK + "; }\n@media (prefers-color-scheme: dark) { .cap { background: #23201c; color: #e9e2d4; border-color: #3a352e; border-left-color: #d9785c; } .w.on { color: " + INK + "; } }\n@media (prefers-reduced-motion: reduce) { .cap, .w { transition: none; } }";
+  function captionHost() {
+    if (caption && caption.host.isConnected) return caption;
+    var host = document.createElement("div");
+    host.id = "zentts-caption";
+    host.style.cssText = "position:absolute;top:0;left:0;z-index:999998;pointer-events:none;display:none;";
+    var root = host.attachShadow({ mode: "open" });
+    var style = document.createElement("style");
+    style.textContent = CAPTION_CSS;
+    var box = document.createElement("div");
+    box.className = "cap";
+    root.append(style, box);
+    document.documentElement.appendChild(host);
+    caption = { host, box, text: null, words: [], el: null };
+    window.addEventListener("resize", placeCaption, { passive: true });
+    return caption;
+  }
+  function placeCaption() {
+    if (!caption || !caption.el || caption.host.style.display === "none") return;
+    caption.host.style.visibility = suppressed ? "hidden" : "";
+    if (!caption.el.isConnected) {
+      hideCaption();
+      return;
+    }
+    var r = boxOf(caption.el);
+    var width = Math.min(Math.max(r.width, 260), 680, window.innerWidth - 16);
+    var left = Math.max(8, Math.min(r.left, window.innerWidth - width - 8));
+    caption.host.style.width = width + "px";
+    var h = caption.box.offsetHeight;
+    var below = r.bottom + 8;
+    var top = below + h > window.innerHeight - 8 && r.top - h - 8 > 8 ? r.top - h - 8 : below;
+    caption.host.style.left = left + window.scrollX + "px";
+    caption.host.style.top = top + window.scrollY + "px";
+  }
+  function showCaption(el, text, words) {
+    if (!el || !el.isConnected) {
+      hideCaption();
+      return;
+    }
+    var c = captionHost();
+    c.el = el;
+    c.host.style.display = "block";
+    if (c.text !== text) {
+      c.text = text;
+      c.box.replaceChildren();
+      c.words = [];
+      var last = 0;
+      (words || []).forEach(function(w) {
+        if (w.start > last) c.box.appendChild(document.createTextNode(text.slice(last, w.start)));
+        var span = document.createElement("span");
+        span.className = "w";
+        span.textContent = w.text;
+        c.box.appendChild(span);
+        c.words.push(span);
+        last = w.start + w.text.length;
+      });
+      if (last < text.length) c.box.appendChild(document.createTextNode(text.slice(last)));
+      c.box.classList.add("enter");
+      void c.box.offsetWidth;
+      c.box.classList.remove("enter");
+    }
+    placeCaption();
+  }
+  function showCaptionWord(i) {
+    if (!caption || caption.host.style.display === "none") return;
+    caption.words.forEach(function(span, k) {
+      span.classList.toggle("on", k === i);
+    });
+  }
+  function hideCaption() {
+    if (!caption) return;
+    caption.host.style.display = "none";
+    caption.text = null;
+    caption.el = null;
+  }
+  function suppressCaption(on) {
+    suppressed = !!on;
+    if (caption) caption.host.style.visibility = suppressed ? "hidden" : "";
+  }
+
   // src/panel.js
   var ACCENT_PRESETS = ["#9a3b25", "#2f5d8a", "#3f7a4a", "#7a3b6e", "#b07a1c"];
   var PANEL_HTML = `
@@ -2188,7 +2514,7 @@
           <circle cx="12" cy="12" r="3"></circle>
         </svg>
       </button>
-      <button id="tts-zen-sites-btn" title="Gestionar sitios">
+      <button id="tts-zen-sites-btn" title="Sitios compatibles">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="10"></circle>
           <line x1="2" y1="12" x2="22" y2="12"></line>
@@ -2237,6 +2563,14 @@
           <div class="select-wrap">
             <select id="tts-zen-voice"></select>
           </div>
+        </div>
+        <div class="setting-row" id="tts-zen-voice-info-row" hidden>
+          <label></label>
+          <div class="hint-text" id="tts-zen-voice-info"></div>
+        </div>
+        <div class="setting-row" id="tts-zen-slow-hint" hidden>
+          <label></label>
+          <div class="hint-text warn" id="tts-zen-slow-text"></div>
         </div>
         <div class="setting-row" id="tts-zen-voice-hint" hidden>
           <label></label>
@@ -2287,6 +2621,10 @@
         <label class="check-row">
           <input type="checkbox" id="tts-zen-autonext">
           <span id="tts-zen-autonext-label">Seguir con el siguiente cap\xEDtulo</span>
+        </label>
+        <label class="check-row" id="tts-zen-autoopen-row">
+          <input type="checkbox" id="tts-zen-autoopen">
+          <span id="tts-zen-autoopen-label">Abrir siempre en este sitio</span>
         </label>
         <label class="check-row">
           <input type="checkbox" id="tts-zen-inline-tr">
@@ -2411,6 +2749,8 @@
   </div>
 </div>
 
+<div id="tts-zen-tip" role="tooltip" hidden></div>
+<div id="tts-zen-bubble-ghost" data-corner="br" aria-hidden="true"></div>
 <div id="tts-zen-collapsed" class="hidden" data-corner="br" role="button" tabindex="0" title="zenTTS">
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
@@ -2448,7 +2788,7 @@
 <div id="tts-zen-sites-overlay" class="hidden">
   <div id="tts-zen-sites-modal">
     <div id="tts-zen-sites-header">
-      <span>Sitios</span>
+      <span>Sitios compatibles</span>
       <button id="tts-zen-sites-close">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
           <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -2697,6 +3037,14 @@ button:active:not(:disabled) { transform: scale(.96); }
 .check-row { display: flex; align-items: flex-start; gap: 8px; font-size: 12px; line-height: 1.35; color: var(--ink-soft); cursor: pointer; }
 .check-row input { accent-color: var(--ink); margin: 1px 0 0; flex-shrink: 0; }
 
+.hint-text.warn { color: var(--accent); }
+#tts-zen-tip {
+  position: fixed; z-index: 10000000; max-width: 240px; padding: 5px 8px; border-radius: 4px;
+  background: var(--ink); color: var(--sheet); font: 12px/1.35 var(--sans);
+  box-shadow: 0 4px 14px rgba(0,0,0,.18); pointer-events: none;
+  animation: tip-in .14s ease;
+}
+@keyframes tip-in { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
 .hint-text { flex: 1; min-width: 0; font-size: 12px; line-height: 1.35; color: var(--ink-soft); }
 .link-btn {
   background: none; border: none; padding: 0; cursor: pointer; font: inherit;
@@ -2793,8 +3141,15 @@ button:active:not(:disabled) { transform: scale(.96); }
   transition: transform .16s ease, opacity .12s ease, visibility 0s .16s;
 }
 #tts-zen-collapsed:hover { color: var(--accent); }
-#tts-zen-collapsed.dragging { transition: none; cursor: grabbing; box-shadow: 0 8px 24px rgba(0,0,0,.22); }
-#tts-zen-collapsed.settling { transition: transform .42s cubic-bezier(.34,1.56,.64,1); }
+#tts-zen-collapsed.dragging { transition: none; cursor: grabbing; box-shadow: 0 10px 28px rgba(0,0,0,.24); }
+/* Where the bubble will land while it is being dragged */
+#tts-zen-bubble-ghost {
+  position: fixed; z-index: 999998; width: 40px; height: 40px; border-radius: 50%;
+  border: 2px dashed var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent);
+  opacity: 0; transform: scale(.6); pointer-events: none;
+  transition: opacity .18s ease, transform .22s cubic-bezier(.2,.8,.2,1), top .22s cubic-bezier(.2,.8,.2,1), left .22s cubic-bezier(.2,.8,.2,1), right .22s cubic-bezier(.2,.8,.2,1), bottom .22s cubic-bezier(.2,.8,.2,1);
+}
+#tts-zen-bubble-ghost.show { opacity: 1; transform: scale(1); }
 
 /* Modals */
 #tts-zen-preview-overlay, #tts-zen-sites-overlay {
@@ -2882,20 +3237,15 @@ button:active:not(:disabled) { transform: scale(.96); }
 .site-row-info { display: flex; flex-direction: column; min-width: 0; }
 .site-row-name { font-size: 14px; color: var(--ink); }
 .site-row-domain { font-size: 12px; color: var(--ink-soft); }
-.site-toggle {
-  width: 34px; height: 20px; border-radius: 10px; border: none; padding: 0;
-  cursor: pointer; position: relative; background: var(--rule); flex-shrink: 0;
-  transition: background .15s ease;
-}
-.site-toggle.on { background: var(--accent); }
-.site-toggle::after {
-  content: ''; position: absolute; top: 3px; left: 3px;
-  width: 14px; height: 14px; border-radius: 50%; background: var(--sheet);
-  transition: transform .15s ease;
-}
-.site-toggle.on::after { transform: translateX(14px); }
-
 .site-add-row { padding-top: 12px; }
+.sites-section { margin: 14px 0 2px; font-size: 12px; color: var(--ink-soft); font-variant: small-caps; letter-spacing: .04em; }
+.sites-section:first-child { margin-top: 4px; }
+.sites-hint { margin: 2px 0 6px; font-size: 12px; line-height: 1.4; color: var(--ink-soft); }
+.site-remove {
+  flex-shrink: 0; width: 24px; height: 24px; padding: 0; border: none; border-radius: 4px;
+  background: transparent; color: var(--ink-soft); cursor: pointer;
+}
+.site-remove:hover { background: var(--hover); color: var(--ink); }
 #tts-zen-add-site-input {
   flex: 1; min-width: 0; padding: 6px 8px; border-radius: 4px;
   border: 1px solid var(--rule); background: var(--sheet); color: var(--ink);
@@ -2917,7 +3267,7 @@ button:active:not(:disabled) { transform: scale(.96); }
     es: {
       minimize: "Minimizar",
       preview: "Ver texto extra\xEDdo",
-      sites: "Gestionar sitios",
+      sites: "Sitios compatibles",
       settings: "Ajustes",
       voice: "Voz",
       engine: "Motor",
@@ -2936,7 +3286,7 @@ button:active:not(:disabled) { transform: scale(.96); }
       increase: "Aumentar",
       lessSpacing: "Menos espacio",
       moreSpacing: "M\xE1s espacio",
-      sitesModal: "Sitios",
+      sitesModal: "Sitios compatibles",
       loadingVoices: "Cargando voces...",
       loadingEdgeVoices: "Cargando voces edge-tts...",
       serverUnavailable: "Servidor no disponible",
@@ -3002,12 +3352,29 @@ button:active:not(:disabled) { transform: scale(.96); }
       qMedium: "Normal",
       qLow: "Ligera",
       retry: "No se pudo descargar \xB7 Reintentar",
-      downloadPct: "Descargando\u2026 %s"
+      downloadPct: "Descargando\u2026 %s",
+      tipHigh: "Alta calidad \xB7 la m\xE1s natural; ~110 MB y tarda m\xE1s en generar cada frase",
+      tipMedium: "Normal \xB7 buen equilibrio entre naturalidad y rapidez; ~60 MB",
+      tipLow: "Ligera \xB7 la m\xE1s r\xE1pida y peque\xF1a; suena m\xE1s rob\xF3tica",
+      tipNative: "Voces del navegador: al instante, sin descargas; calidad seg\xFAn tu sistema",
+      tipServer: "Voces neurales de Microsoft (edge-tts): las m\xE1s naturales; necesita el servidor en marcha",
+      tipLocal: "Piper en tu equipo: sin conexi\xF3n una vez descargada la voz",
+      infoNative: "Voz del navegador \xB7 al instante",
+      infoNativeRobotic: "Voz del sistema (espeak) \xB7 suena rob\xF3tica",
+      infoServer: "Neural \xB7 la m\xE1s natural; necesita el servidor",
+      slowVoice: "En tu equipo esta voz se genera m\xE1s despacio de lo que suena (x%s), por eso hay pausas entre frases. Prueba una de calidad Normal o Ligera.",
+      autoOpen: "Abrir siempre en este sitio",
+      presetsTitle: "Sitios con extractor propio",
+      presetNext: "solo la historia \xB7 cap\xEDtulo siguiente en la misma p\xE1gina",
+      presetScroll: "solo la historia \xB7 sigue el scroll infinito",
+      presetGeneric: "cualquier otra p\xE1gina \xB7 extractor de art\xEDculos",
+      autoTitle: "Abrir siempre en",
+      autoHint: "El panel aparece al pulsar el bot\xF3n de zenTTS en la barra del navegador (Alt+May\xFAs+Z). En estos sitios se abre solo."
     },
     en: {
       minimize: "Minimize",
       preview: "View extracted text",
-      sites: "Manage sites",
+      sites: "Supported sites",
       settings: "Settings",
       voice: "Voice",
       engine: "Engine",
@@ -3026,7 +3393,7 @@ button:active:not(:disabled) { transform: scale(.96); }
       increase: "Increase",
       lessSpacing: "Less spacing",
       moreSpacing: "More spacing",
-      sitesModal: "Sites",
+      sitesModal: "Supported sites",
       loadingVoices: "Loading voices...",
       loadingEdgeVoices: "Loading edge-tts voices...",
       serverUnavailable: "Server unavailable",
@@ -3092,7 +3459,24 @@ button:active:not(:disabled) { transform: scale(.96); }
       qMedium: "Standard",
       qLow: "Light",
       retry: "Download failed \xB7 Retry",
-      downloadPct: "Downloading\u2026 %s"
+      downloadPct: "Downloading\u2026 %s",
+      tipHigh: "High quality \xB7 the most natural; ~110 MB and slower to generate each sentence",
+      tipMedium: "Standard \xB7 a good balance of naturalness and speed; ~60 MB",
+      tipLow: "Light \xB7 the fastest and smallest; sounds more robotic",
+      tipNative: "Browser voices: instant, nothing to download; quality depends on your system",
+      tipServer: "Microsoft neural voices (edge-tts): the most natural; needs the server running",
+      tipLocal: "Piper on your computer: offline once the voice is downloaded",
+      infoNative: "Browser voice \xB7 instant",
+      infoNativeRobotic: "System voice (espeak) \xB7 sounds robotic",
+      infoServer: "Neural \xB7 the most natural; needs the server",
+      slowVoice: "On your computer this voice takes longer to generate than to play (x%s), hence the pauses between sentences. Try a Standard or Light one.",
+      autoOpen: "Always open on this site",
+      presetsTitle: "Sites with their own extractor",
+      presetNext: "just the story \xB7 next chapter in the same page",
+      presetScroll: "just the story \xB7 follows infinite scroll",
+      presetGeneric: "any other page \xB7 article extractor",
+      autoTitle: "Always open on",
+      autoHint: "The panel appears when you press the zenTTS button in the browser toolbar (Alt+Shift+Z). On these sites it opens by itself."
     }
   };
   function t(key) {
@@ -3276,11 +3660,14 @@ button:active:not(:disabled) { transform: scale(.96); }
       if (region) parts.push(region);
       if (localStored.includes(v.key)) parts.push(t("downloaded"));
       else if (v.size) parts.push(Math.round(v.size / 1048576) + " MB");
+      var q = QUALITY[v.quality] || "qMedium";
       return {
         name: v.key,
         label: parts.join(" \xB7 "),
         lang: v.language,
         size: v.size,
+        quality: q,
+        tip: t({ qHigh: "tipHigh", qMedium: "tipMedium", qLow: "tipLow" }[q]),
         group: v.key.toLowerCase().startsWith(prefix) ? QUALITY[v.quality] || "qMedium" : null
       };
     });
@@ -3298,6 +3685,7 @@ button:active:not(:disabled) { transform: scale(.96); }
     }
     populateVoiceDropdown("localVoice");
     updateLocalRow();
+    warmLocalVoice();
   }
   function setFill(btn, text, fraction) {
     if (!btn) return;
@@ -3416,7 +3804,7 @@ button:active:not(:disabled) { transform: scale(.96); }
       var opt = document.createElement("option");
       opt.value = v.name;
       opt.textContent = (v.label || v.name) + (withLang && v.label && v.label.indexOf(langLabel(v.lang)) !== 0 ? " \u2014 " + langLabel(v.lang) : "");
-      opt.title = v.name;
+      opt.title = v.tip ? v.tip + " \u2014 " + v.name : v.name;
       opt.selected = v.name === state[key];
       return opt;
     }
@@ -3441,7 +3829,52 @@ button:active:not(:disabled) { transform: scale(.96); }
     var chosen = state.voices.find(function(v) {
       return v.name === state[key];
     });
-    select.title = chosen ? chosen.name : "";
+    select.title = chosen ? (chosen.tip ? chosen.tip + " \u2014 " : "") + chosen.name : "";
+    renderVoiceInfo();
+  }
+  function renderVoiceInfo() {
+    var row = getEl("tts-zen-voice-info-row"), el = getEl("tts-zen-voice-info");
+    if (!row || !el) return;
+    var text = "";
+    if (state.currentEngine === "local") {
+      var v = (state.voices || []).find(function(x) {
+        return x.name === state.localVoice;
+      });
+      text = v && v.tip ? v.tip : "";
+    } else if (state.currentEngine === "server") {
+      text = t("infoServer");
+    } else {
+      var n = (state.voices || []).find(function(x) {
+        return x.name === state.currentVoice;
+      });
+      if (n) text = n.robotic ? t("infoNativeRobotic") : t("infoNative");
+    }
+    el.textContent = text;
+    row.hidden = !text;
+    renderSlowHint();
+  }
+  var slowVoices = {};
+  function renderSlowHint() {
+    var row = getEl("tts-zen-slow-hint");
+    if (!row) return;
+    var ratio = slowVoices[state.localVoice];
+    var show = state.currentEngine === "local" && ratio > 1;
+    row.hidden = !show;
+    if (show) getEl("tts-zen-slow-text").textContent = tf("slowVoice", ratio.toFixed(1));
+  }
+  if (typeof window !== "undefined") {
+    window.addEventListener("zentts-voice-speed", function(e) {
+      slowVoices[e.detail.voice] = e.detail.ratio;
+      renderSlowHint();
+    });
+  }
+  function warmLocalVoice() {
+    if (state.currentEngine !== "local" || !localStored.includes(state.localVoice)) return;
+    try {
+      browser.runtime.sendMessage({ action: "local_warm", voiceId: state.localVoice }).catch(function() {
+      });
+    } catch (_) {
+    }
   }
   function applyLanguage(shadow) {
     var lang = state.lang;
@@ -3454,6 +3887,7 @@ button:active:not(:disabled) { transform: scale(.96); }
       ["tts-zen-tab-tr", "tabTr"],
       ["tts-zen-tab-look", "tabLook"],
       ["tts-zen-inline-tr-label", "inlineTr"],
+      ["tts-zen-autoopen-label", "autoOpen"],
       ["tts-zen-trmode-label", "trMode"],
       ["tts-zen-neural-hint-text", "neuralHint"],
       ["tts-zen-try-neural", "tryNeural"],
@@ -3476,8 +3910,8 @@ button:active:not(:disabled) { transform: scale(.96); }
     renderReadLabel();
     updateLocalRow();
     var trModeSel = shadow.getElementById("tts-zen-trmode");
-    if (trModeSel) ["trAsk", "trOffline", "trOnlineMode", "trNever"].forEach(function(k, i2) {
-      trModeSel.options[i2].textContent = T[lang][k];
+    if (trModeSel) ["trAsk", "trOffline", "trOnlineMode", "trNever"].forEach(function(k, i) {
+      trModeSel.options[i].textContent = T[lang][k];
     });
     shadow.querySelectorAll(".tabs button").forEach(function(b) {
       b.title = b.textContent;
@@ -3509,7 +3943,11 @@ button:active:not(:disabled) { transform: scale(.96); }
       engineSelect.options[0].textContent = T[lang].engineNative;
       engineSelect.options[1].textContent = T[lang].engineNeural;
       engineSelect.options[2].textContent = T[lang].engineLocal;
+      engineSelect.options[0].title = T[lang].tipNative;
+      engineSelect.options[1].title = T[lang].tipServer;
+      engineSelect.options[2].title = T[lang].tipLocal;
     }
+    renderVoiceInfo();
     var statusEl = shadow.getElementById("tts-zen-status");
     if (statusEl && (statusEl.textContent === T["es"].ready || statusEl.textContent === T["en"].ready)) {
       statusEl.textContent = T[lang].ready;
@@ -3528,12 +3966,6 @@ button:active:not(:disabled) { transform: scale(.96); }
       if (tool.dataset.spacing === "down") tool.title = T[lang].lessSpacing;
       if (tool.dataset.spacing === "up") tool.title = T[lang].moreSpacing;
     });
-    for (var i = 0; i < ALL_SITES.length; i++) {
-      if (ALL_SITES[i].id === "generic") {
-        ALL_SITES[i].name = T[lang].generic;
-        ALL_SITES[i].domain = T[lang].otherSites;
-      }
-    }
     var addInput = shadow.getElementById("tts-zen-add-site-input");
     if (addInput) addInput.placeholder = T[lang].addSitePlaceholder;
     var addBtn = shadow.getElementById("tts-zen-add-site-btn");
@@ -3541,6 +3973,57 @@ button:active:not(:disabled) { transform: scale(.96); }
     if (shadow.getElementById("tts-zen-sites-overlay") && !shadow.getElementById("tts-zen-sites-overlay").classList.contains("hidden")) {
       renderSitesList();
     }
+    tipify(shadow);
+  }
+  function tipify(shadow) {
+    shadow.querySelectorAll("#tts-zen-panel button[title], #tts-zen-collapsed[title], .preview-tool[title], #tts-zen-preview-close, #tts-zen-sites-close").forEach(function(b) {
+      var text = b.getAttribute("title");
+      if (!text) return;
+      b.setAttribute("data-tip", text);
+      b.setAttribute("aria-label", text);
+      b.removeAttribute("title");
+    });
+  }
+  function setupTooltips(shadow) {
+    var tip = shadow.getElementById("tts-zen-tip");
+    var timer2 = null, current2 = null;
+    function hide() {
+      clearTimeout(timer2);
+      current2 = null;
+      tip.hidden = true;
+    }
+    function show(el) {
+      tip.textContent = el.getAttribute("data-tip");
+      tip.hidden = false;
+      var r = el.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
+      var top = r.top - h - 8 > 4 ? r.top - h - 8 : r.bottom + 8;
+      var left = Math.max(6, Math.min(window.innerWidth - w - 6, r.left + r.width / 2 - w / 2));
+      tip.style.top = top + "px";
+      tip.style.left = left + "px";
+    }
+    shadow.addEventListener("pointerover", function(e) {
+      var el = e.target.closest && e.target.closest("[data-tip]");
+      if (el === current2) return;
+      hide();
+      if (!el || el.classList.contains("dragging")) return;
+      current2 = el;
+      timer2 = setTimeout(function() {
+        if (current2 === el) show(el);
+      }, 380);
+    });
+    shadow.addEventListener("pointerout", function(e) {
+      var to = e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest("[data-tip]");
+      if (to !== current2) hide();
+    });
+    shadow.addEventListener("pointerdown", hide, true);
+    shadow.addEventListener("focusin", function(e) {
+      var el = e.target.closest && e.target.closest("[data-tip]");
+      if (el && el.matches(":focus-visible")) {
+        current2 = el;
+        show(el);
+      }
+    });
+    shadow.addEventListener("focusout", hide);
   }
   function getEl(id) {
     const host = document.getElementById("tts-zen-host");
@@ -3669,12 +4152,6 @@ button:active:not(:disabled) { transform: scale(.96); }
   async function createPanel(shadow, handlers) {
     await loadSettings();
     await loadCollapsedState();
-    await loadSiteSettings();
-    if (!isCurrentSiteAllowed()) {
-      var hostEl = document.getElementById("tts-zen-host");
-      if (hostEl) hostEl.remove();
-      return;
-    }
     const style = document.createElement("style");
     style.textContent = PANEL_CSS;
     shadow.appendChild(style);
@@ -3712,14 +4189,18 @@ button:active:not(:disabled) { transform: scale(.96); }
       settingsPanel.classList.toggle("collapsed");
     });
     setupTabs(shadow);
+    setupTooltips(shadow);
     const voiceSelect = shadow.getElementById("tts-zen-voice");
     voiceSelect.addEventListener("change", function() {
       if (state.currentEngine === "local") {
         state.localVoice = voiceSelect.value;
         updateLocalRow();
+        warmLocalVoice();
       } else state.currentVoice = voiceSelect.value;
       syncShared();
       saveSettings();
+      renderVoiceInfo();
+      if (handlers.onVoice) handlers.onVoice();
     });
     shadow.getElementById("tts-zen-local-dl").addEventListener("click", downloadLocalVoice);
     setupColors(shadow);
@@ -3737,6 +4218,7 @@ button:active:not(:disabled) { transform: scale(.96); }
       window.__tts_zen_state.currentEngine = engineSelect.value;
       saveSettings();
       await loadVoices();
+      if (handlers.onEngine) handlers.onEngine(state.currentEngine);
     });
     const langSelect = shadow.getElementById("tts-zen-lang");
     langSelect.value = state.lang;
@@ -3767,6 +4249,11 @@ button:active:not(:disabled) { transform: scale(.96); }
       engineSelect.value = "server";
       engineSelect.dispatchEvent(new Event("change"));
     });
+    var autoOpen = shadow.getElementById("tts-zen-autoopen");
+    autoOpen.addEventListener("change", function() {
+      setAutoSite(currentHost(), autoOpen.checked);
+    });
+    loadAutoSites();
     var inlineTr = shadow.getElementById("tts-zen-inline-tr");
     inlineTr.checked = state.inlineTr;
     inlineTr.addEventListener("change", function() {
@@ -4012,7 +4499,7 @@ button:active:not(:disabled) { transform: scale(.96); }
   }
   function applyCorner() {
     var corner = state.corner || "br";
-    ["tts-zen-panel", "tts-zen-collapsed"].forEach(function(id) {
+    ["tts-zen-panel", "tts-zen-collapsed", "tts-zen-bubble-ghost"].forEach(function(id) {
       var el = getEl(id);
       if (el) el.dataset.corner = corner;
     });
@@ -4023,42 +4510,72 @@ button:active:not(:disabled) { transform: scale(.96); }
     applyCorner();
   }
   var suppressClick = false;
+  function nearestCorner(cx, cy) {
+    return (cy < window.innerHeight / 2 ? "t" : "b") + (cx < window.innerWidth / 2 ? "l" : "r");
+  }
   function setupBubble(shadow) {
     var bubble = shadow.getElementById("tts-zen-collapsed");
+    var ghost = shadow.getElementById("tts-zen-bubble-ghost");
     var drag = null;
+    var reduce = function() {
+      return window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    };
+    function frame() {
+      if (!drag || !drag.moved) return;
+      var k = reduce() ? 1 : 0.35;
+      drag.cx += (drag.tx - drag.cx) * k;
+      drag.cy += (drag.ty - drag.cy) * k;
+      bubble.style.transform = "translate(" + drag.cx.toFixed(1) + "px," + drag.cy.toFixed(1) + "px) scale(1.08)";
+      var r = drag.home;
+      var corner = nearestCorner(r.left + r.width / 2 + drag.cx, r.top + r.height / 2 + drag.cy);
+      if (ghost.dataset.corner !== corner) ghost.dataset.corner = corner;
+      drag.raf = requestAnimationFrame(frame);
+    }
     bubble.addEventListener("pointerdown", function(e) {
       if (e.button !== 0) return;
-      drag = { x: e.clientX, y: e.clientY, moved: false, id: e.pointerId };
+      var home = bubble.getBoundingClientRect();
+      drag = { x: e.clientX, y: e.clientY, moved: false, id: e.pointerId, home, tx: 0, ty: 0, cx: 0, cy: 0 };
       bubble.setPointerCapture(e.pointerId);
     });
     bubble.addEventListener("pointermove", function(e) {
       if (!drag) return;
       var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
       if (!drag.moved && Math.hypot(dx, dy) < 5) return;
-      drag.moved = true;
-      bubble.classList.add("dragging");
-      bubble.style.transform = "translate(" + dx + "px," + dy + "px) scale(1.08)";
+      var r = drag.home, m = 6;
+      drag.tx = Math.max(m - r.left, Math.min(window.innerWidth - m - r.right, dx));
+      drag.ty = Math.max(m - r.top, Math.min(window.innerHeight - m - r.bottom, dy));
+      if (!drag.moved) {
+        drag.moved = true;
+        bubble.getAnimations().forEach(function(a) {
+          a.cancel();
+        });
+        bubble.classList.add("dragging");
+        ghost.dataset.corner = state.corner || "br";
+        ghost.classList.add("show");
+        drag.raf = requestAnimationFrame(frame);
+      }
     });
-    function end(e) {
+    function end() {
       if (!drag) return;
       var d = drag;
       drag = null;
+      cancelAnimationFrame(d.raf);
+      ghost.classList.remove("show");
       if (!d.moved) return;
       suppressClick = true;
       var before = bubble.getBoundingClientRect();
-      var cx = before.left + before.width / 2, cy = before.top + before.height / 2;
-      var corner = (cy < window.innerHeight / 2 ? "t" : "b") + (cx < window.innerWidth / 2 ? "l" : "r");
+      var corner = nearestCorner(before.left + before.width / 2, before.top + before.height / 2);
       bubble.style.transform = "";
-      bubble.classList.remove("dragging");
       setCorner(corner);
       var after = bubble.getBoundingClientRect();
-      bubble.style.transform = "translate(" + (before.left - after.left) + "px," + (before.top - after.top) + "px)";
-      void bubble.offsetWidth;
-      bubble.classList.add("settling");
-      bubble.style.transform = "";
-      setTimeout(function() {
-        bubble.classList.remove("settling");
-      }, 450);
+      var dx = before.left - after.left, dy = before.top - after.top;
+      bubble.classList.remove("dragging");
+      if (reduce() || !bubble.animate) return;
+      var dist = Math.hypot(dx, dy);
+      bubble.animate([
+        { transform: "translate(" + dx + "px," + dy + "px) scale(1.08)" },
+        { transform: "translate(0,0) scale(1)" }
+      ], { duration: Math.round(Math.max(350, Math.min(650, 300 + dist * 0.45))), easing: "cubic-bezier(.34,1.3,.64,1)" });
     }
     bubble.addEventListener("pointerup", end);
     bubble.addEventListener("pointercancel", end);
@@ -4081,8 +4598,20 @@ button:active:not(:disabled) { transform: scale(.96); }
         return;
       } else return;
       e.preventDefault();
-      setCorner(v + h);
+      moveBubbleTo(v + h);
     });
+  }
+  function moveBubbleTo(corner) {
+    var bubble = getEl("tts-zen-collapsed");
+    if (!bubble || corner === state.corner) return;
+    var before = bubble.getBoundingClientRect();
+    setCorner(corner);
+    var after = bubble.getBoundingClientRect();
+    if (!bubble.animate || window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    bubble.animate([
+      { transform: "translate(" + (before.left - after.left) + "px," + (before.top - after.top) + "px)" },
+      { transform: "translate(0,0)" }
+    ], { duration: 480, easing: "cubic-bezier(.34,1.3,.64,1)" });
   }
   var panelCollapsed = false;
   async function loadCollapsedState() {
@@ -4127,6 +4656,7 @@ button:active:not(:disabled) { transform: scale(.96); }
     renderPreviewContent(content);
     applyPreviewStyle();
     overlay.classList.remove("hidden");
+    suppressCaption(true);
   }
   function renderPreviewContent(content) {
     var sentences2 = window.__tts_zen_sentences || [];
@@ -4162,6 +4692,7 @@ button:active:not(:disabled) { transform: scale(.96); }
   }
   function closeOverlay(overlay) {
     if (!overlay || overlay.classList.contains("hidden")) return;
+    suppressCaption(false);
     overlay.classList.add("closing");
     overlay.style.opacity = "0";
     setTimeout(function() {
@@ -4214,121 +4745,124 @@ button:active:not(:disabled) { transform: scale(.96); }
     btn.textContent = "";
     btn.insertAdjacentHTML("beforeend", isPlaying ? PAUSE_ICON : PLAY_ICON);
   }
-  var ALL_SITES = [
-    { id: "wattpad.com", name: "Wattpad", domain: "wattpad.com" },
-    { id: "archiveofourown.org", name: "AO3", domain: "archiveofourown.org" },
-    { id: "fanfiction.net", name: "FanFiction", domain: "fanfiction.net" },
-    { id: "webnovel.com", name: "Webnovel", domain: "webnovel.com" },
-    { id: "generic", name: "Gen\xE9rico", domain: "otros sitios" }
+  var PRESETS = [
+    { id: "archiveofourown.org", name: "Archive of Our Own", icon: "icons/sites/ao3.svg", what: "presetNext" },
+    { id: "fanfiction.net", name: "FanFiction.net", icon: "icons/sites/fanfiction.svg", what: "presetNext" },
+    { id: "wattpad.com", name: "Wattpad", icon: "icons/sites/wattpad.svg", what: "presetNext" },
+    { id: "webnovel.com", name: "Webnovel", icon: "icons/sites/webnovel.svg", what: "presetScroll" }
   ];
-  var fallbackIcons = {
-    "wattpad.com": "icons/sites/wattpad.svg",
-    "archiveofourown.org": "icons/sites/ao3.svg",
-    "fanfiction.net": "icons/sites/fanfiction.svg",
-    "webnovel.com": "icons/sites/webnovel.svg"
-  };
-  function faviconUrl(domain) {
-    if (domain === "otros sitios") return "";
-    return "https://www.google.com/s2/favicons?domain=" + domain + "&sz=32";
+  var autoSites = [];
+  function currentHost() {
+    return window.location.hostname;
   }
-  function faviconFallback(domain) {
-    var path = fallbackIcons[domain];
-    if (!path) return "";
+  async function loadAutoSites() {
+    try {
+      autoSites = (await browser.storage.local.get("autoSites")).autoSites || [];
+    } catch (_) {
+      autoSites = [];
+    }
+    renderAutoOpen();
+  }
+  async function saveAutoSites() {
+    try {
+      await browser.storage.local.set({ autoSites });
+    } catch (_) {
+    }
+    renderAutoOpen();
+  }
+  function setAutoSite(host, on) {
+    if (!host) return;
+    autoSites = autoSites.filter(function(h) {
+      return h !== host;
+    });
+    if (on) autoSites.push(host);
+    saveAutoSites();
+  }
+  function renderAutoOpen() {
+    var box = getEl("tts-zen-autoopen");
+    if (box) {
+      box.checked = autoSites.includes(currentHost());
+      box.disabled = !currentHost() || window.location.protocol === "moz-extension:";
+    }
+    var row = getEl("tts-zen-autoopen-row");
+    if (row) row.hidden = !currentHost() || window.location.protocol === "moz-extension:";
+    var overlay = getEl("tts-zen-sites-overlay");
+    if (overlay && !overlay.classList.contains("hidden")) renderSitesList();
+  }
+  function iconUrl(path) {
     try {
       return browser.runtime.getURL(path);
     } catch (_) {
       return "";
     }
   }
-  var enabledSites = {};
-  async function loadSiteSettings() {
-    try {
-      var stored = await browser.storage.local.get(["enabledSites", "customSites"]);
-      if (stored.enabledSites) {
-        enabledSites = stored.enabledSites;
-      } else {
-        ALL_SITES.forEach(function(s) {
-          enabledSites[s.id] = true;
-        });
-      }
-      if (stored.customSites) {
-        stored.customSites.forEach(function(s) {
-          if (!ALL_SITES.some(function(x) {
-            return x.id === s.id;
-          })) {
-            ALL_SITES.push(s);
-            if (enabledSites[s.id] === void 0) enabledSites[s.id] = true;
-          }
-        });
-      }
-      window.__tts_zen_enabled_sites = enabledSites;
-    } catch (_) {
-      ALL_SITES.forEach(function(s) {
-        enabledSites[s.id] = true;
-      });
-      window.__tts_zen_enabled_sites = enabledSites;
-    }
-  }
-  async function saveSiteSettings() {
-    var custom = ALL_SITES.filter(function(s) {
-      return !["wattpad.com", "archiveofourown.org", "fanfiction.net", "webnovel.com", "generic"].includes(s.id);
-    });
-    try {
-      await browser.storage.local.set({ enabledSites, customSites: custom });
-    } catch (_) {
-    }
-    window.__tts_zen_enabled_sites = enabledSites;
-  }
   function renderSitesList() {
     var list = getEl("tts-zen-sites-list");
     if (!list) return;
     list.replaceChildren();
-    ALL_SITES.forEach(function(site2) {
-      var enabled = enabledSites[site2.id] !== false;
-      var row = document.createElement("div");
-      row.className = "site-row";
+    function section(text) {
+      var h = document.createElement("div");
+      h.className = "sites-section";
+      h.textContent = text;
+      list.appendChild(h);
+    }
+    function row(icon, name, detail, action) {
+      var r = document.createElement("div");
+      r.className = "site-row";
       var left = document.createElement("div");
       left.className = "site-row-left";
-      if (site2.id === "generic") {
-        var iconDiv = document.createElement("div");
-        iconDiv.className = "site-row-icon";
-        iconDiv.textContent = "+";
-        left.appendChild(iconDiv);
+      if (icon) {
+        var img = document.createElement("img");
+        img.className = "site-row-icon";
+        img.src = icon;
+        img.width = 20;
+        img.height = 20;
+        img.alt = "";
+        left.appendChild(img);
       } else {
-        var iconImg = document.createElement("img");
-        iconImg.className = "site-row-icon";
-        iconImg.src = faviconUrl(site2.domain);
-        iconImg.width = 20;
-        iconImg.height = 20;
-        iconImg.onerror = function() {
-          var fb = faviconFallback(site2.id);
-          if (fb) this.src = fb;
-        };
-        left.appendChild(iconImg);
+        var dot = document.createElement("div");
+        dot.className = "site-row-icon";
+        dot.textContent = "\u25C6";
+        left.appendChild(dot);
       }
       var info = document.createElement("div");
       info.className = "site-row-info";
-      var nameEl = document.createElement("div");
-      nameEl.className = "site-row-name";
-      nameEl.textContent = site2.name;
-      var domainEl = document.createElement("div");
-      domainEl.className = "site-row-domain";
-      domainEl.textContent = site2.domain;
-      info.appendChild(nameEl);
-      info.appendChild(domainEl);
+      var n = document.createElement("div");
+      n.className = "site-row-name";
+      n.textContent = name;
+      var d = document.createElement("div");
+      d.className = "site-row-domain";
+      d.textContent = detail;
+      info.append(n, d);
       left.appendChild(info);
-      row.appendChild(left);
-      var toggle = document.createElement("button");
-      toggle.className = "site-toggle" + (enabled ? " on" : "");
-      toggle.dataset.site = site2.id;
-      row.appendChild(toggle);
-      toggle.addEventListener("click", function() {
-        var siteId = this.dataset.site;
-        enabledSites[siteId] = !(enabledSites[siteId] !== false);
-        this.classList.toggle("on", enabledSites[siteId] !== false);
-        saveSiteSettings();
+      r.appendChild(left);
+      if (action) r.appendChild(action);
+      list.appendChild(r);
+    }
+    section(t("presetsTitle"));
+    PRESETS.forEach(function(p) {
+      row(iconUrl(p.icon), p.name, p.id + " \xB7 " + t(p.what));
+    });
+    row(null, t("generic"), t("presetGeneric"));
+    section(t("autoTitle"));
+    var hint = document.createElement("p");
+    hint.className = "sites-hint";
+    hint.textContent = t("autoHint");
+    list.appendChild(hint);
+    autoSites.slice().sort().forEach(function(host) {
+      var del = document.createElement("button");
+      del.type = "button";
+      del.className = "site-remove";
+      del.textContent = "\u2715";
+      del.setAttribute("data-tip", t("remove"));
+      del.setAttribute("aria-label", t("remove") + " " + host);
+      del.addEventListener("click", function() {
+        setAutoSite(host, false);
       });
-      list.appendChild(row);
+      var preset = PRESETS.find(function(p) {
+        return host.endsWith(p.id);
+      });
+      row(preset ? iconUrl(preset.icon) : null, host, preset ? preset.name : t("generic"), del);
     });
     var addRow = document.createElement("div");
     addRow.className = "site-row site-add-row";
@@ -4338,23 +4872,14 @@ button:active:not(:disabled) { transform: scale(.96); }
     input.placeholder = t("addSitePlaceholder");
     var addBtn = document.createElement("button");
     addBtn.id = "tts-zen-add-site-btn";
+    addBtn.type = "button";
     addBtn.textContent = t("addSite");
-    addRow.appendChild(input);
-    addRow.appendChild(addBtn);
+    addRow.append(input, addBtn);
     list.appendChild(addRow);
     addBtn.addEventListener("click", function() {
-      var domain = input.value.trim().toLowerCase();
-      if (!domain || domain === "otros sitios") return;
-      domain = domain.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
-      if (!domain.includes(".")) return;
-      if (ALL_SITES.some(function(s) {
-        return s.id === domain;
-      })) return;
-      ALL_SITES.push({ id: domain, name: domain.split(".")[0], domain });
-      enabledSites[domain] = true;
-      saveSiteSettings();
-      input.value = "";
-      renderSitesList();
+      var domain = input.value.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+      if (!domain.includes(".") || autoSites.includes(domain)) return;
+      setAutoSite(domain, true);
     });
     input.addEventListener("keydown", function(e) {
       if (e.key === "Enter") addBtn.click();
@@ -4363,19 +4888,31 @@ button:active:not(:disabled) { transform: scale(.96); }
   function showSitesModal() {
     renderSitesList();
     var overlay = getEl("tts-zen-sites-overlay");
-    if (overlay) overlay.classList.remove("hidden");
+    if (overlay) {
+      overlay.classList.remove("hidden");
+      suppressCaption(true);
+    }
   }
   function hideSitesModal() {
     closeOverlay(getEl("tts-zen-sites-overlay"));
   }
-  function isCurrentSiteAllowed() {
-    var sites = window.__tts_zen_enabled_sites || enabledSites;
-    var host = window.location.hostname;
-    for (var siteId in sites) {
-      if (siteId === "generic") continue;
-      if (host.includes(siteId)) return sites[siteId] !== false;
+  function setPanelVisible(on) {
+    var host = document.getElementById("tts-zen-host");
+    if (!host) return;
+    var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (on) {
+      host.style.display = "";
+      if (!reduce && host.animate) host.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 180, easing: "ease-out" });
+      return;
     }
-    return sites["generic"] !== false;
+    var done = function() {
+      host.style.display = "none";
+    };
+    if (reduce || !host.animate) {
+      done();
+      return;
+    }
+    host.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 160, easing: "ease-in" }).onfinish = done;
   }
 
   // src/sites.js
@@ -4876,13 +5413,59 @@ button:active:not(:disabled) { transform: scale(.96); }
   }
 
   // src/engines/local.js
-  var AHEAD = 2;
+  var AHEAD = 4;
+  var MAX_PIECE = 160;
+  function piecesOf(text) {
+    var out = [];
+    var start = 0;
+    while (text.length - start > MAX_PIECE) {
+      var span = text.slice(start, start + MAX_PIECE);
+      var cut = -1;
+      var re = /[,;:—–]\s/g, m;
+      while (m = re.exec(span)) if (m.index > 40) cut = m.index + 1;
+      if (cut < 0) cut = span.lastIndexOf(" ");
+      if (cut <= 0) cut = MAX_PIECE;
+      out.push({ text: text.slice(start, start + cut).trim(), offset: start });
+      start += cut;
+      while (text[start] === " ") start++;
+    }
+    if (start < text.length) out.push({ text: text.slice(start).trim(), offset: start });
+    return out.filter(function(p) {
+      return p.text;
+    });
+  }
+  function wavMs(buf) {
+    try {
+      var v = new DataView(buf);
+      var rate = v.getUint32(24, true), bytesPerSample = v.getUint16(34, true) / 8 * v.getUint16(22, true);
+      return (buf.byteLength - 44) / (rate * bytesPerSample) * 1e3;
+    } catch (_) {
+      return 0;
+    }
+  }
+  var speed = { voice: null, samples: [] };
+  function report(voice, ms, audioMs) {
+    if (!(audioMs > 0) || !(ms >= 0)) return;
+    if (speed.voice !== voice) speed = { voice, samples: [] };
+    speed.samples.push(ms / audioMs);
+    if (speed.samples.length > 8) speed.samples.shift();
+    if (speed.samples.length < 3) return;
+    var avg = speed.samples.reduce(function(a, b) {
+      return a + b;
+    }, 0) / speed.samples.length;
+    try {
+      window.dispatchEvent(new CustomEvent("zentts-voice-speed", { detail: { voice, ratio: avg } }));
+    } catch (_) {
+    }
+  }
   function createLocalEngine() {
     var player2 = createAudioPlayer();
     var running = null;
-    function synth(ctx, i) {
-      return browser.runtime.sendMessage({ action: "local_speak", text: ctx.sentences[i].text, voiceId: ctx.localVoice }).then(function(resp) {
+    function synth(ctx, piece) {
+      var voice = ctx.localVoice;
+      return browser.runtime.sendMessage({ action: "local_speak", text: piece.text, voiceId: voice }).then(function(resp) {
         if (!resp || !resp.success) throw new Error(resp && resp.error || "piper");
+        report(voice, resp.ms, wavMs(resp.audio));
         return new Blob([resp.audio], { type: "audio/wav" });
       });
     }
@@ -4903,29 +5486,42 @@ button:active:not(:disabled) { transform: scale(.96); }
       play: async function(start, ctx) {
         var run = { cancelled: false };
         running = run;
-        var queue = {};
-        function want(i2) {
-          if (i2 < ctx.sentences.length && !queue[i2]) {
-            queue[i2] = synth(ctx, i2);
-            queue[i2].catch(function() {
+        var pieces = [];
+        var nextSentence = start;
+        function fill(upTo) {
+          while (pieces.length <= upTo && nextSentence < ctx.sentences.length) {
+            var i = nextSentence++;
+            piecesOf(ctx.sentences[i].text).forEach(function(p, k2) {
+              pieces.push({ i, first: k2 === 0, text: p.text, offset: p.offset });
             });
           }
         }
-        for (var i = start; i < ctx.sentences.length; i++) {
-          for (var k = 0; k <= AHEAD; k++) want(i + k);
+        var queue = {};
+        function want(n2) {
+          fill(n2);
+          if (n2 < pieces.length && !queue[n2]) {
+            queue[n2] = synth(ctx, pieces[n2]);
+            queue[n2].catch(function() {
+            });
+          }
+        }
+        for (var n = 0; ; n++) {
+          fill(n);
+          if (n >= pieces.length) return;
+          for (var k = 0; k <= AHEAD; k++) want(n + k);
+          var piece = pieces[n];
           var blob;
           try {
-            blob = await queue[i];
+            blob = await queue[n];
           } catch (e) {
-            e.at = i;
+            e.at = piece.i;
             throw e;
           }
-          delete queue[i];
+          delete queue[n];
           if (run.cancelled) return;
-          ctx.onSentence(i);
-          var len = ctx.sentences[i].text.length;
+          if (piece.first) ctx.onSentence(piece.i);
           await player2.play(blob, ctx.rate(), function(t2, duration) {
-            if (duration > 0 && isFinite(duration)) ctx.onWord(i, Math.floor(Math.min(0.999, t2 / duration) * len));
+            if (duration > 0 && isFinite(duration)) ctx.onWord(piece.i, piece.offset + Math.floor(Math.min(0.999, t2 / duration) * piece.text.length));
           });
           if (run.cancelled) return;
         }
@@ -4964,12 +5560,21 @@ button:active:not(:disabled) { transform: scale(.96); }
       hooks.onState(s);
     }
     function context(run2) {
-      var opts = hooks.options();
+      var localOverride = null;
       return {
         sentences: sentences2,
-        voice: opts.voice,
-        localVoice: opts.localVoice,
-        lang: opts.lang,
+        get voice() {
+          return hooks.options().voice;
+        },
+        get localVoice() {
+          return localOverride || hooks.options().localVoice;
+        },
+        set localVoice(v) {
+          localOverride = v;
+        },
+        get lang() {
+          return hooks.options().lang;
+        },
         rate: function() {
           return hooks.options().rate;
         },
@@ -5132,297 +5737,9 @@ button:active:not(:disabled) { transform: scale(.96); }
     }
   }
 
-  // src/highlight.js
-  var SENTENCE = "zentts-sentence";
-  var WORD = "zentts-word";
-  var PICK = "zentts-pick";
-  var INK = "#1b1916";
-  var MARK = "#f6e7b0";
-  var WORD_MARK = "#e3b04b";
-  var supported = typeof CSS !== "undefined" && CSS.highlights && typeof Highlight !== "undefined";
-  function ensureStyles() {
-    if (document.getElementById("zentts-highlight")) return;
-    var style = document.createElement("style");
-    style.id = "zentts-highlight";
-    style.textContent = "::highlight(" + SENTENCE + ") { background-color: " + MARK + "; color: " + INK + "; }\n::highlight(" + WORD + ") { background-color: " + WORD_MARK + "; color: " + INK + "; }\n::highlight(" + PICK + ") { background-color: #dbe6f3; color: " + INK + "; text-decoration: underline dotted 2px #2f5d8a; }";
-    (document.head || document.documentElement).appendChild(style);
-  }
-  function compactChars(ch) {
-    if (/\s/.test(ch)) return "";
-    if (ch === "\u2026") return "...";
-    return ch;
-  }
-  function compact(text) {
-    var out = "";
-    for (var i = 0; i < text.length; i++) out += compactChars(text[i]);
-    return out;
-  }
-  var indexes = /* @__PURE__ */ new WeakMap();
-  function indexOf(el) {
-    var raw = el.textContent;
-    var cached = indexes.get(el);
-    if (cached && cached.raw === raw) return cached;
-    var text = "";
-    var map = [];
-    var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
-      acceptNode: function(n) {
-        var p = n.parentNode && n.parentNode.nodeName;
-        return p === "SCRIPT" || p === "STYLE" ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
-      }
-    });
-    for (var node = walker.nextNode(); node; node = walker.nextNode()) {
-      var data = node.data;
-      for (var i = 0; i < data.length; i++) {
-        var c = compactChars(data[i]);
-        for (var k = 0; k < c.length; k++) {
-          text += c[k];
-          map.push({ node, offset: i });
-        }
-      }
-    }
-    var idx = { raw, text, map };
-    indexes.set(el, idx);
-    return idx;
-  }
-  function rangeFromCompact(idx, start, end) {
-    if (start < 0 || end > idx.map.length || start >= end) return null;
-    var a = idx.map[start];
-    var b = idx.map[end - 1];
-    var r = document.createRange();
-    r.setStart(a.node, a.offset);
-    r.setEnd(b.node, b.offset + 1);
-    return r;
-  }
-  function find(idx, needle, hint) {
-    if (!needle) return -1;
-    var at = idx.text.indexOf(needle, Math.max(0, (hint || 0) - 8));
-    if (at === -1) at = idx.text.indexOf(needle);
-    return at;
-  }
-  var current = null;
-  var fallbackEl = null;
-  var fallbackStyle = null;
-  function clearFallback() {
-    if (!fallbackEl) return;
-    fallbackEl.style.background = fallbackStyle.background;
-    fallbackEl.style.boxShadow = fallbackStyle.boxShadow;
-    fallbackEl.style.color = fallbackStyle.color;
-    fallbackEl = null;
-  }
-  function markParagraph(el) {
-    if (el === fallbackEl) return;
-    clearFallback();
-    if (!el || !el.isConnected) return;
-    fallbackStyle = { background: el.style.background, boxShadow: el.style.boxShadow, color: el.style.color };
-    el.style.background = MARK;
-    el.style.boxShadow = "-6px 0 0 " + MARK + ", 6px 0 0 " + MARK;
-    el.style.color = INK;
-    fallbackEl = el;
-  }
-  function scrollIfNeeded(target) {
-    var rect = target.getBoundingClientRect();
-    var margin = Math.min(120, window.innerHeight * 0.15);
-    if (rect.top >= margin && rect.bottom <= window.innerHeight - margin) return;
-    var el = target.startContainer ? target.startContainer.parentElement : target;
-    if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "center" });
-  }
-  function clear() {
-    if (supported) {
-      CSS.highlights.delete(SENTENCE);
-      CSS.highlights.delete(WORD);
-    }
-    clearFallback();
-    current = null;
-  }
-  function showSentence(el, sentence, words, hint) {
-    if (supported) CSS.highlights.delete(WORD);
-    if (!el || !el.isConnected) {
-      clear();
-      return;
-    }
-    if (supported) {
-      ensureStyles();
-      var idx = indexOf(el);
-      var needle = compact(sentence);
-      var at = find(idx, needle, hint);
-      var range = at >= 0 ? rangeFromCompact(idx, at, at + needle.length) : null;
-      if (range) {
-        clearFallback();
-        var wordRanges = [];
-        var pos = at;
-        (words || []).forEach(function(w) {
-          var wn = compact(w.text);
-          var wAt = wn ? idx.text.indexOf(wn, pos) : -1;
-          if (wAt >= 0 && wAt < at + needle.length) {
-            wordRanges.push(rangeFromCompact(idx, wAt, wAt + wn.length));
-            pos = wAt + wn.length;
-          } else {
-            wordRanges.push(null);
-          }
-        });
-        CSS.highlights.set(SENTENCE, new Highlight(range));
-        current = { el, range, words: wordRanges };
-        scrollIfNeeded(range);
-        return;
-      }
-    }
-    if (supported) CSS.highlights.delete(SENTENCE);
-    current = { el, range: null, words: [] };
-    markParagraph(el);
-    scrollIfNeeded(el);
-  }
-  function showWord(i) {
-    if (!supported || !current || !current.range) return;
-    var r = current.words[i];
-    if (r) CSS.highlights.set(WORD, new Highlight(r));
-    else CSS.highlights.delete(WORD);
-  }
-  function caretAt(x, y) {
-    if (document.caretPositionFromPoint) {
-      var p = document.caretPositionFromPoint(x, y);
-      return p ? { node: p.offsetNode, offset: p.offset } : null;
-    }
-    if (document.caretRangeFromPoint) {
-      var r = document.caretRangeFromPoint(x, y);
-      return r ? { node: r.startContainer, offset: r.startOffset } : null;
-    }
-    return null;
-  }
-  function sentenceAtPoint(x, y, paragraphs2, sentences2) {
-    var caret = caretAt(x, y);
-    if (!caret || !caret.node) return -1;
-    var p = -1;
-    for (var i = 0; i < paragraphs2.length; i++) {
-      if (paragraphs2[i].el && paragraphs2[i].el.contains(caret.node)) {
-        p = i;
-        break;
-      }
-    }
-    if (p < 0) return -1;
-    var idx = indexOf(paragraphs2[p].el);
-    var pos = 0;
-    for (var k = 0; k < idx.map.length; k++) {
-      var m = idx.map[k];
-      if (m.node === caret.node && m.offset >= caret.offset) {
-        pos = k;
-        break;
-      }
-      pos = k;
-    }
-    var first = -1, found = -1;
-    for (var j = 0; j < sentences2.length; j++) {
-      var s = sentences2[j];
-      if (s.refIdx !== p) continue;
-      if (first < 0) first = j;
-      if (s.hint <= pos) found = j;
-    }
-    return found >= 0 ? found : first;
-  }
-  function showPick(el, sentence, hint) {
-    if (!supported || !el) return;
-    ensureStyles();
-    var idx = indexOf(el);
-    var needle = compact(sentence);
-    var at = find(idx, needle, hint);
-    var range = at >= 0 ? rangeFromCompact(idx, at, at + needle.length) : null;
-    if (!range) {
-      range = document.createRange();
-      range.selectNodeContents(el);
-    }
-    CSS.highlights.set(PICK, new Highlight(range));
-  }
-  function clearPick() {
-    if (supported) CSS.highlights.delete(PICK);
-  }
-  var caption = null;
-  var CAPTION_CSS = ":host { all: initial; }\n.cap { box-sizing: border-box; max-width: 680px; padding: 8px 12px; border-radius: 6px; background: #fbf8f1; color: " + INK + '; border: 1px solid #ddd4c3; border-left: 3px solid #9a3b25; box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 8px 22px rgba(0,0,0,.14); font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; transition: opacity .18s ease, transform .22s cubic-bezier(.2,.8,.2,1); }\n.cap.enter { opacity: 0; transform: translateY(-4px); }\n.w { border-radius: 2px; transition: background-color .12s ease; }\n.w.on { background: ' + WORD_MARK + "; }\n@media (prefers-color-scheme: dark) { .cap { background: #23201c; color: #e9e2d4; border-color: #3a352e; border-left-color: #d9785c; } .w.on { color: " + INK + "; } }\n@media (prefers-reduced-motion: reduce) { .cap, .w { transition: none; } }";
-  function captionHost() {
-    if (caption && caption.host.isConnected) return caption;
-    var host = document.createElement("div");
-    host.id = "zentts-caption";
-    host.style.cssText = "position:absolute;top:0;left:0;z-index:2147483000;pointer-events:none;display:none;";
-    var root = host.attachShadow({ mode: "open" });
-    var style = document.createElement("style");
-    style.textContent = CAPTION_CSS;
-    var box = document.createElement("div");
-    box.className = "cap";
-    root.append(style, box);
-    document.documentElement.appendChild(host);
-    caption = { host, box, text: null, words: [], el: null };
-    window.addEventListener("resize", placeCaption, { passive: true });
-    return caption;
-  }
-  function placeCaption() {
-    if (!caption || !caption.el || caption.host.style.display === "none") return;
-    if (!caption.el.isConnected) {
-      hideCaption();
-      return;
-    }
-    var r = caption.el.getBoundingClientRect();
-    var width = Math.min(Math.max(r.width, 260), 680, window.innerWidth - 16);
-    var left = Math.max(8, Math.min(r.left, window.innerWidth - width - 8));
-    caption.host.style.width = width + "px";
-    var h = caption.box.offsetHeight;
-    var below = r.bottom + 8;
-    var top = below + h > window.innerHeight - 8 && r.top - h - 8 > 8 ? r.top - h - 8 : below;
-    caption.host.style.left = left + window.scrollX + "px";
-    caption.host.style.top = top + window.scrollY + "px";
-  }
-  function showCaption(el, text, words) {
-    if (!el || !el.isConnected) {
-      hideCaption();
-      return;
-    }
-    var c = captionHost();
-    c.el = el;
-    c.host.style.display = "block";
-    if (c.text !== text) {
-      c.text = text;
-      c.box.replaceChildren();
-      c.words = [];
-      var last = 0;
-      (words || []).forEach(function(w) {
-        if (w.start > last) c.box.appendChild(document.createTextNode(text.slice(last, w.start)));
-        var span = document.createElement("span");
-        span.className = "w";
-        span.textContent = w.text;
-        c.box.appendChild(span);
-        c.words.push(span);
-        last = w.start + w.text.length;
-      });
-      if (last < text.length) c.box.appendChild(document.createTextNode(text.slice(last)));
-      c.box.classList.add("enter");
-      void c.box.offsetWidth;
-      c.box.classList.remove("enter");
-    }
-    placeCaption();
-  }
-  function showCaptionWord(i) {
-    if (!caption || caption.host.style.display === "none") return;
-    caption.words.forEach(function(span, k) {
-      span.classList.toggle("on", k === i);
-    });
-  }
-  function hideCaption() {
-    if (!caption) return;
-    caption.host.style.display = "none";
-    caption.text = null;
-    caption.el = null;
-  }
-
   // src/content.js
   var RESTRICTED_PROTOCOLS = ["edge:", "about:", "file:", "chrome:", "moz-extension:"];
-  function shouldInject() {
-    var proto = window.location.protocol;
-    if (RESTRICTED_PROTOCOLS.includes(proto)) return false;
-    var sites = window.__tts_zen_enabled_sites || {};
-    var host = window.location.hostname;
-    for (var siteId in sites) {
-      if (siteId === "generic") continue;
-      if (host.includes(siteId)) return sites[siteId] !== false;
-    }
-    return sites["generic"] !== false;
-  }
+  var embed = window.__zentts_embed || null;
   window.__tts_zen_state = {
     currentVoice: "es-ES-AlvaroNeural",
     localVoice: "es_ES-davefx-medium",
@@ -5488,7 +5805,21 @@ button:active:not(:disabled) { transform: scale(.96); }
     var s = (T2[st().lang] || T2.es)[key] || key;
     return arg !== void 0 ? s.replace("%s", arg) : s;
   }
-  var site = siteFor(window.location.hostname);
+  var site = embed ? {
+    id: "pdf",
+    container: function() {
+      return null;
+    },
+    paragraphs: function() {
+      return [];
+    },
+    chapterKey: function() {
+      return embed.key;
+    },
+    nextUrl: function() {
+      return null;
+    }
+  } : siteFor(window.location.hostname);
   var chapterDoc = document;
   var chapterUrl = new URL(window.location.href);
   function isHidden(el) {
@@ -5500,6 +5831,13 @@ button:active:not(:disabled) { transform: scale(.96); }
     return text.replace(/[\t ]+/g, " ").replace(/\.{3,}/g, "\u2026").replace(/\s+([.,!?])/g, "$1").replace(/\.([A-ZÁÉÍÓÚÑ])/g, ". $1").replace(/ {2,}/g, " ").trim();
   }
   function extractParagraphs() {
+    if (embed) {
+      return embed.paragraphs().map(function(p) {
+        return { el: p.el, text: cleanText(p.text) };
+      }).filter(function(p) {
+        return p.text.length >= 2;
+      });
+    }
     var container = site.container(document);
     if (container) {
       var paras = site.paragraphs(container).filter(function(el) {
@@ -5746,6 +6084,10 @@ button:active:not(:disabled) { transform: scale(.96); }
     var bg = background = { gen, done: false, progress: 0, waiters: [] };
     try {
       for (var k = 0; k < rest.length; k += BATCH) {
+        while (plan.mode === "offline" && st().currentEngine === "local" && player.state === "playing" && gen === chapterGen && paragraphs.length - readingParagraph() > BATCH * 2) {
+          await nextSentenceTick();
+        }
+        if (gen !== chapterGen) return;
         var batch = rest.slice(k, k + BATCH);
         var out;
         try {
@@ -5776,6 +6118,17 @@ button:active:not(:disabled) { transform: scale(.96); }
       notifyWaiters();
       if (gen === chapterGen && player.state === "playing") setStatus(playingStatus());
     }
+  }
+  function readingParagraph() {
+    var s = sentences[player.index];
+    return s ? s.refIdx : 0;
+  }
+  var sentenceTicks = [];
+  function nextSentenceTick() {
+    return new Promise(function(r) {
+      sentenceTicks.push(r);
+      setTimeout(r, 4e3);
+    });
   }
   function playingStatus() {
     var base = engineNote || ts("playing");
@@ -5830,6 +6183,11 @@ button:active:not(:disabled) { transform: scale(.96); }
       return { voice: s.currentVoice, localVoice: s.localVoice, rate: s.currentRate || 1, lang };
     },
     onSentence: function(i) {
+      var ticks = sentenceTicks;
+      sentenceTicks = [];
+      ticks.forEach(function(r) {
+        r();
+      });
       var s = sentences[i];
       setCounter(i + 1, sentences.length);
       currentWord = -1;
@@ -6193,11 +6551,22 @@ button:active:not(:disabled) { transform: scale(.96); }
   browser.runtime.onMessage.addListener(function(msg) {
     if (msg && msg.action === "tr_progress") setTranslateProgress(msg.fraction);
   });
+  var restartOnResume = false;
   function handlePause() {
     if (player.state === "playing") player.pause();
-    else if (player.state === "paused") player.resume();
+    else if (player.state === "paused") {
+      if (restartOnResume) {
+        restartOnResume = false;
+        player.start(player.index, st().currentEngine || "native");
+      } else player.resume();
+    }
+  }
+  function applyVoiceChange() {
+    if (player.state === "playing") player.start(player.index, st().currentEngine || "native");
+    else if (player.state === "paused") restartOnResume = true;
   }
   function handleStop() {
+    restartOnResume = false;
     stopContentObserver();
     player.stop();
     clearHighlight();
@@ -6211,14 +6580,14 @@ button:active:not(:disabled) { transform: scale(.96); }
   function handleNext() {
     if (player.index >= 0) player.jump(player.index + 1);
   }
-  window.__tts_zen_enabled_sites = { "wattpad.com": true, "archiveofourown.org": true, "fanfiction.net": true, "webnovel.com": true, "generic": true };
+  var panelReady = null;
   function injectPanel() {
     const host = document.createElement("div");
     host.id = "tts-zen-host";
     host.style.cssText = "position:fixed;bottom:24px;right:24px;z-index:999999;";
     document.body.appendChild(host);
     const shadow = host.attachShadow({ mode: "open" });
-    createPanel(shadow, {
+    return createPanel(shadow, {
       onRead: handleRead,
       onRestart: handleRestart,
       onPause: handlePause,
@@ -6230,6 +6599,8 @@ button:active:not(:disabled) { transform: scale(.96); }
       },
       onPick: togglePick,
       onTranslate: onTranslateChoice,
+      onVoice: applyVoiceChange,
+      onEngine: applyVoiceChange,
       onInlineTr: function(on) {
         if (!on) {
           hideCaption();
@@ -6250,14 +6621,52 @@ button:active:not(:disabled) { transform: scale(.96); }
       checkPendingAutoplay();
       pruneProgress();
     });
-    window.addEventListener("pagehide", flushProgress);
-    window.addEventListener("popstate", function() {
-      if (chapterUrl.href !== window.location.href) window.location.reload();
+  }
+  function whenBody() {
+    return new Promise(function(r) {
+      (function wait() {
+        if (document.body) r();
+        else requestAnimationFrame(wait);
+      })();
     });
   }
-  function tryInject() {
-    if (document.body) injectPanel();
-    else requestAnimationFrame(tryInject);
+  async function showPanel() {
+    if (!panelReady) {
+      panelReady = whenBody().then(injectPanel);
+      window.addEventListener("pagehide", flushProgress);
+      window.addEventListener("popstate", function() {
+        if (chapterUrl.href !== window.location.href) window.location.reload();
+      });
+    } else {
+      await panelReady;
+      setPanelVisible(true);
+    }
   }
-  if (shouldInject()) tryInject();
+  async function hidePanel() {
+    if (!panelReady) return;
+    await panelReady;
+    endPick();
+    if (player.state !== "idle") handleStop();
+    setPanelVisible(false);
+  }
+  browser.runtime.onMessage.addListener(function(msg) {
+    if (msg && msg.action === "panel_toggle") {
+      if (msg.on) showPanel();
+      else hidePanel();
+    }
+  });
+  async function boot() {
+    if (embed) {
+      showPanel();
+      return;
+    }
+    if (RESTRICTED_PROTOCOLS.includes(window.location.protocol) || window.top !== window) return;
+    var state2 = null;
+    try {
+      state2 = await browser.runtime.sendMessage({ action: "panel_state" });
+    } catch (_) {
+    }
+    if (state2 && state2.on) showPanel();
+  }
+  boot();
 })();

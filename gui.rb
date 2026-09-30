@@ -138,7 +138,7 @@ L = {
     start: 'Iniciar servidor',
     stop: 'Detener',
     open_zen: 'Abrir Zen Browser',
-    version: 'zenTTS 0.4'
+    version: 'zenTTS 1.0'
   },
   en: {
     status_header: 'Neural voice server',
@@ -152,7 +152,7 @@ L = {
     start: 'Start server',
     stop: 'Stop',
     open_zen: 'Open Zen Browser',
-    version: 'zenTTS 0.4'
+    version: 'zenTTS 1.0'
   }
 }
 
