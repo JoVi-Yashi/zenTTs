@@ -135,6 +135,9 @@ const PANEL_HTML = `
           <input type="checkbox" id="tts-zen-inline-tr">
           <span id="tts-zen-inline-tr-label">Mostrar la traducción junto al texto</span>
         </label>
+        <div class="setting-row">
+          <button type="button" class="link-btn" id="tts-zen-open-library">Abrir la biblioteca de PDF</button>
+        </div>
        </section>
        <section class="tab-page" data-page="tr" role="tabpanel">
         <div class="setting-row">
@@ -809,6 +812,7 @@ var T = {
     infoNative: 'Voz del navegador · al instante', infoNativeRobotic: 'Voz del sistema (espeak) · suena robótica',
     infoServer: 'Neural · la más natural; necesita el servidor',
     slowVoice: 'En tu equipo esta voz se genera más despacio de lo que suena (x%s), por eso hay pausas entre frases. Prueba una de calidad Normal o Ligera.',
+    openLibrary: 'Abrir la biblioteca de PDF',
     autoOpen: 'Abrir siempre en este sitio', presetsTitle: 'Sitios con extractor propio',
     presetNext: 'solo la historia · capítulo siguiente en la misma página', presetScroll: 'solo la historia · sigue el scroll infinito',
     presetGeneric: 'cualquier otra página · extractor de artículos', autoTitle: 'Abrir siempre en',
@@ -853,6 +857,7 @@ var T = {
     infoNative: 'Browser voice · instant', infoNativeRobotic: 'System voice (espeak) · sounds robotic',
     infoServer: 'Neural · the most natural; needs the server',
     slowVoice: 'On your computer this voice takes longer to generate than to play (x%s), hence the pauses between sentences. Try a Standard or Light one.',
+    openLibrary: 'Open the PDF library',
     autoOpen: 'Always open on this site', presetsTitle: 'Sites with their own extractor',
     presetNext: 'just the story · next chapter in the same page', presetScroll: 'just the story · follows infinite scroll',
     presetGeneric: 'any other page · article extractor', autoTitle: 'Always open on',
@@ -1248,7 +1253,7 @@ function applyLanguage(shadow) {
   // Update settings label texts
   [['tts-zen-voice-label', 'voice'], ['tts-zen-engine-label', 'engine'], ['tts-zen-lang-label', 'uiLang'],
    ['tts-zen-tab-voice', 'tabVoice'], ['tts-zen-tab-read', 'tabRead'], ['tts-zen-tab-tr', 'tabTr'], ['tts-zen-tab-look', 'tabLook'],
-   ['tts-zen-inline-tr-label', 'inlineTr'], ['tts-zen-autoopen-label', 'autoOpen'], ['tts-zen-trmode-label', 'trMode'],
+   ['tts-zen-inline-tr-label', 'inlineTr'], ['tts-zen-open-library', 'openLibrary'], ['tts-zen-autoopen-label', 'autoOpen'], ['tts-zen-trmode-label', 'trMode'],
    ['tts-zen-neural-hint-text', 'neuralHint'], ['tts-zen-try-neural', 'tryNeural'],
    ['tts-zen-translate-title', 'translateTitle'], ['tts-zen-speed-text', 'speed'],
    ['tts-zen-autonext-label', 'autoNext'], ['tts-zen-restart', 'restart'],
@@ -1614,6 +1619,11 @@ export async function createPanel(shadow, handlers) {
   shadow.getElementById('tts-zen-try-neural').addEventListener('click', function() {
     engineSelect.value = 'server';
     engineSelect.dispatchEvent(new Event('change'));
+  });
+
+  shadow.getElementById('tts-zen-open-library').addEventListener('click', function() {
+    if (window.location.protocol === 'moz-extension:') { window.location.href = browser.runtime.getURL('library.html'); return; }
+    browser.runtime.sendMessage({ action: 'open_library' }).catch(function() {});
   });
 
   var autoOpen = shadow.getElementById('tts-zen-autoopen');

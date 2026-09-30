@@ -60,6 +60,8 @@ Promise.all([
     external: ['fs', 'path', 'crypto', 'worker_threads', 'node:worker_threads'] }),
   // PDF reader page: pdf.js + the same reading code as the content script
   esbuild.build({ ...common, entryPoints: ['src/reader.js'], outfile: 'reader.js', format: 'esm', target: 'es2022' }),
+  // PDF library page (the 3D shelf)
+  esbuild.build({ ...common, entryPoints: ['src/library.js'], outfile: 'library.js', format: 'esm', target: 'es2022' }),
 ])
   .then(copyVendor)
   .catch(() => process.exit(1));

@@ -266,7 +266,7 @@ function captionHost() {
   if (caption && caption.host.isConnected) return caption;
   var host = document.createElement("div");
   host.id = "zentts-caption";
-  host.style.cssText = "position:absolute;top:0;left:0;z-index:999998;pointer-events:none;display:none;";
+  host.style.cssText = "position:fixed;top:0;left:0;z-index:999998;pointer-events:none;display:none;";
   var root = host.attachShadow({ mode: "open" });
   var style = document.createElement("style");
   style.textContent = CAPTION_CSS;
@@ -274,26 +274,40 @@ function captionHost() {
   box.className = "cap";
   root.append(style, box);
   document.documentElement.appendChild(host);
-  caption = { host, box, text: null, words: [], el: null };
-  window.addEventListener("resize", placeCaption, { passive: true });
+  caption = { host, box, text: null, words: [], el: null, raf: 0, ro: null };
+  document.addEventListener("scroll", schedulePlace, { passive: true, capture: true });
+  window.addEventListener("resize", schedulePlace, { passive: true });
+  if (window.visualViewport) window.visualViewport.addEventListener("resize", schedulePlace, { passive: true });
+  if (typeof ResizeObserver !== "undefined") caption.ro = new ResizeObserver(schedulePlace);
   return caption;
+}
+function schedulePlace() {
+  if (!caption || caption.raf || caption.host.style.display === "none") return;
+  caption.raf = requestAnimationFrame(function() {
+    caption.raf = 0;
+    placeCaption();
+  });
 }
 function placeCaption() {
   if (!caption || !caption.el || caption.host.style.display === "none") return;
-  caption.host.style.visibility = suppressed ? "hidden" : "";
   if (!caption.el.isConnected) {
     hideCaption();
     return;
   }
   var r = boxOf(caption.el);
-  var width = Math.min(Math.max(r.width, 260), 680, window.innerWidth - 16);
-  var left = Math.max(8, Math.min(r.left, window.innerWidth - width - 8));
+  var vw = window.innerWidth, vh = window.innerHeight, m = 8;
+  var away = r.bottom < 0 || r.top > vh || !r.width && !r.height;
+  caption.host.style.visibility = suppressed || away ? "hidden" : "";
+  if (away) return;
+  var width = Math.min(Math.max(r.width, 260), 680, vw - 2 * m);
+  var left = Math.max(m, Math.min(r.left, vw - width - m));
   caption.host.style.width = width + "px";
   var h = caption.box.offsetHeight;
-  var below = r.bottom + 8;
-  var top = below + h > window.innerHeight - 8 && r.top - h - 8 > 8 ? r.top - h - 8 : below;
-  caption.host.style.left = left + window.scrollX + "px";
-  caption.host.style.top = top + window.scrollY + "px";
+  var top;
+  if (r.bottom + m + h <= vh - m) top = r.bottom + m;
+  else if (r.top - m - h >= m) top = r.top - m - h;
+  else top = Math.max(m, vh - h - m);
+  caption.host.style.transform = "translate(" + Math.round(left) + "px," + Math.round(top) + "px)";
 }
 function showCaption(el, text, words) {
   if (!el || !el.isConnected) {
@@ -301,6 +315,13 @@ function showCaption(el, text, words) {
     return;
   }
   var c = captionHost();
+  if (c.el !== el && c.ro) {
+    c.ro.disconnect();
+    partsOf(el).forEach(function(p) {
+      if (getComputedStyle(p).display !== "contents") c.ro.observe(p);
+    });
+    c.ro.observe(document.documentElement);
+  }
   c.el = el;
   c.host.style.display = "block";
   if (c.text !== text) {
@@ -332,13 +353,17 @@ function showCaptionWord(i) {
 }
 function hideCaption() {
   if (!caption) return;
+  if (caption.ro) caption.ro.disconnect();
   caption.host.style.display = "none";
   caption.text = null;
   caption.el = null;
 }
 function suppressCaption(on) {
   suppressed = !!on;
-  if (caption) caption.host.style.visibility = suppressed ? "hidden" : "";
+  if (caption) {
+    caption.host.style.visibility = suppressed ? "hidden" : "";
+    placeCaption();
+  }
 }
 var SENTENCE, WORD, PICK, INK, MARK, WORD_MARK, supported, theme, indexes, current, fallbackEl, fallbackStyle, caption, suppressed, CAPTION_CSS;
 var init_highlight = __esm({
@@ -2876,6 +2901,7 @@ function applyLanguage(shadow2) {
     ["tts-zen-tab-tr", "tabTr"],
     ["tts-zen-tab-look", "tabLook"],
     ["tts-zen-inline-tr-label", "inlineTr"],
+    ["tts-zen-open-library", "openLibrary"],
     ["tts-zen-autoopen-label", "autoOpen"],
     ["tts-zen-trmode-label", "trMode"],
     ["tts-zen-neural-hint-text", "neuralHint"],
@@ -3231,6 +3257,14 @@ async function createPanel(shadow2, handlers) {
     engineSelect.value = "server";
     engineSelect.dispatchEvent(new Event("change"));
   });
+  shadow2.getElementById("tts-zen-open-library").addEventListener("click", function() {
+    if (window.location.protocol === "moz-extension:") {
+      window.location.href = browser.runtime.getURL("library.html");
+      return;
+    }
+    browser.runtime.sendMessage({ action: "open_library" }).catch(function() {
+    });
+  });
   var autoOpen = shadow2.getElementById("tts-zen-autoopen");
   autoOpen.addEventListener("change", function() {
     setAutoSite(currentHost(), autoOpen.checked);
@@ -3438,8 +3472,8 @@ function selectTab(shadow2, name, focus) {
 }
 function fitTabHeight(shadow2) {
   var pages = shadow2.querySelector(".tab-pages");
-  var active = shadow2.querySelector(".tab-page.active");
-  if (pages && active) pages.style.height = active.offsetHeight + "px";
+  var active2 = shadow2.querySelector(".tab-page.active");
+  if (pages && active2) pages.style.height = active2.offsetHeight + "px";
 }
 function setupTabs(shadow2) {
   var tabs = shadow2.getElementById("tts-zen-tabs");
@@ -4015,6 +4049,9 @@ var init_panel = __esm({
           <input type="checkbox" id="tts-zen-inline-tr">
           <span id="tts-zen-inline-tr-label">Mostrar la traducci\xF3n junto al texto</span>
         </label>
+        <div class="setting-row">
+          <button type="button" class="link-btn" id="tts-zen-open-library">Abrir la biblioteca de PDF</button>
+        </div>
        </section>
        <section class="tab-page" data-page="tr" role="tabpanel">
         <div class="setting-row">
@@ -4748,6 +4785,7 @@ button:active:not(:disabled) { transform: scale(.96); }
         infoNativeRobotic: "Voz del sistema (espeak) \xB7 suena rob\xF3tica",
         infoServer: "Neural \xB7 la m\xE1s natural; necesita el servidor",
         slowVoice: "En tu equipo esta voz se genera m\xE1s despacio de lo que suena (x%s), por eso hay pausas entre frases. Prueba una de calidad Normal o Ligera.",
+        openLibrary: "Abrir la biblioteca de PDF",
         autoOpen: "Abrir siempre en este sitio",
         presetsTitle: "Sitios con extractor propio",
         presetNext: "solo la historia \xB7 cap\xEDtulo siguiente en la misma p\xE1gina",
@@ -4855,6 +4893,7 @@ button:active:not(:disabled) { transform: scale(.96); }
         infoNativeRobotic: "System voice (espeak) \xB7 sounds robotic",
         infoServer: "Neural \xB7 the most natural; needs the server",
         slowVoice: "On your computer this voice takes longer to generate than to play (x%s), hence the pauses between sentences. Try a Standard or Light one.",
+        openLibrary: "Open the PDF library",
         autoOpen: "Always open on this site",
         presetsTitle: "Sites with their own extractor",
         presetNext: "just the story \xB7 next chapter in the same page",
@@ -4969,13 +5008,127 @@ function relNext(doc, url) {
   var link = doc.querySelector('link[rel="next"][href], a[rel="next"][href]');
   return link ? absolute(link.getAttribute("href"), url) : null;
 }
+function setActiveChapter(el) {
+  active = el;
+}
+function deepQueryAll(root, selector) {
+  var out = Array.prototype.slice.call(root.querySelectorAll(selector));
+  var walker = (root.ownerDocument || root).createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+  for (var n = walker.nextNode(); n; n = walker.nextNode()) {
+    if (n.shadowRoot) out = out.concat(deepQueryAll(n.shadowRoot, selector));
+  }
+  return out;
+}
+function chapterNodes(doc) {
+  return deepQueryAll(doc, CHAPTER_SEL).filter(function(el) {
+    var up = el.parentElement && el.parentElement.closest(CHAPTER_SEL);
+    return !up;
+  });
+}
+function idFromUrl(href) {
+  var m = String(href || "").match(/\/book\/[^/]*?(\d{6,})[^/]*\/[^/]*?(\d{6,})/) || String(href || "").match(/(\d{8,})(?!.*\d{8,})/);
+  return m ? m[m.length - 1] : null;
+}
+function chapterIdOf(el) {
+  for (var n = el; n && n.nodeType === 1; n = n.parentElement) {
+    var v = n.getAttribute("data-cid") || n.getAttribute("data-chapter-id") || n.getAttribute("data-chapterid") || n.getAttribute("data-id");
+    if (v && /\d{6,}/.test(v)) return v.match(/\d{6,}/)[0];
+    if (n.id && /\d{6,}/.test(n.id)) return n.id.match(/\d{6,}/)[0];
+  }
+  return null;
+}
+function webnovelChapter(doc) {
+  var list = chapterNodes(doc);
+  if (!list.length) return null;
+  if (active && active.isConnected && list.indexOf(active) >= 0) return active;
+  var id = doc.location ? idFromUrl(doc.location.href) : null;
+  if (id) {
+    var byId = list.find(function(el) {
+      return chapterIdOf(el) === id;
+    });
+    if (byId) return byId;
+  }
+  if (doc.defaultView) {
+    var h = doc.defaultView.innerHeight;
+    var seen = list.find(function(el) {
+      var r = el.getBoundingClientRect();
+      return r.bottom > 0 && r.top < h;
+    });
+    if (seen) return seen;
+  }
+  return list[0];
+}
+function chapterAfter(doc, current2) {
+  var list = chapterNodes(doc);
+  var i = list.indexOf(current2);
+  var next = i >= 0 ? list[i + 1] : null;
+  return next && visibleText(next).length > 20 ? next : null;
+}
+function scrollerOf(el) {
+  for (var n = el && el.parentElement; n; n = n.parentElement) {
+    var cs = getComputedStyle(n);
+    if (/(auto|scroll)/.test(cs.overflowY) && n.scrollHeight > n.clientHeight + 4) return n;
+  }
+  return null;
+}
+function pullMore(current2) {
+  var last = current2 && (current2.lastElementChild || current2);
+  if (last && last.scrollIntoView) last.scrollIntoView({ block: "end" });
+  var box = scrollerOf(current2);
+  if (box) {
+    box.scrollTop = box.scrollHeight;
+    box.dispatchEvent(new Event("scroll"));
+  }
+  var doc = current2 && current2.ownerDocument || document;
+  var win = doc.defaultView || window;
+  win.scrollTo(0, doc.documentElement.scrollHeight);
+  win.dispatchEvent(new Event("scroll"));
+}
+function labelOf(el) {
+  return [el.textContent, el.getAttribute("title"), el.getAttribute("aria-label")].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+}
+function nextControl(doc, current2, url) {
+  var rel = doc.querySelector('link[rel="next"][href], a[rel="next"][href]');
+  if (rel) return { href: absolute(rel.getAttribute("href"), url) };
+  var candidates = deepQueryAll(doc, 'a, button, [role="button"]').filter(function(el2) {
+    if (el2.disabled || el2.getAttribute("aria-disabled") === "true") return false;
+    var label = labelOf(el2);
+    var cls = (typeof el2.className === "string" ? el2.className : "") + " " + (el2.id || "");
+    return label.length < 40 && NEXT_WORDS.test(label) || /(^|[\s_-])next([\s_-]|chapter|$)/i.test(cls);
+  });
+  for (var i = 0; i < candidates.length; i++) {
+    var el = candidates[i];
+    var href = el.tagName === "A" && el.getAttribute("href");
+    if (href && !/^(#|javascript:)/i.test(href)) return { href: absolute(href, url) };
+    if (el.tagName !== "A" || href) return { button: el };
+  }
+  var id = current2 && chapterIdOf(current2) || idFromUrl(url && url.href);
+  if (id) {
+    var links = deepQueryAll(doc, 'a[href*="/book/"]');
+    var at = links.findIndex(function(a) {
+      return idFromUrl(a.href) === id;
+    });
+    for (var k = at + 1; at >= 0 && k < links.length; k++) {
+      var other = idFromUrl(links[k].href);
+      if (other && other !== id) return { href: links[k].href };
+    }
+  }
+  return null;
+}
+function isLocked(el) {
+  if (!el) return false;
+  if (LOCKED.test(visibleText(el).slice(0, 4e3))) return true;
+  return Array.prototype.some.call(el.querySelectorAll('[class*="ock"]'), function(n) {
+    return /(^|[\s_-])(un)?lock(ed)?([\s_-]|$)/i.test(typeof n.className === "string" ? n.className : "");
+  });
+}
 function siteFor(host) {
   for (var i = 0; i < SITES.length; i++) {
     if (SITES[i].test(host)) return SITES[i];
   }
   return GENERIC;
 }
-var BLOCKS, SITES, GENERIC;
+var BLOCKS, SITES, CHAPTER_SEL, active, NEXT_WORDS, LOCKED, GENERIC;
 var init_sites = __esm({
   "src/sites.js"() {
     BLOCKS = "p, h1, h2, h3, h4, h5, h6, li, blockquote, pre";
@@ -5052,24 +5205,43 @@ var init_sites = __esm({
       },
       {
         id: "webnovel",
+        // Chapters load one after another in the same page (infinite scroll), so
+        // the "next chapter" is found in the page itself: see content.js
+        inPage: true,
         test: function(host) {
           return host.includes("webnovel.com");
         },
         container: function(doc) {
-          return doc.querySelector('.cha-words, .cha-content, .chapter-content, .read-content, [class*="cha-words"], [class*="cha-content"]');
+          return webnovelChapter(doc);
         },
         paragraphs: function(c) {
           return paragraphsIn(c, "p");
         },
-        chapterKey: function(url) {
-          return "webnovel:" + url.pathname;
+        chapterKey: function(url, container) {
+          var id = container && chapterIdOf(container);
+          return "webnovel:" + (id || url.pathname);
         },
-        // Webnovel already loads chapters by infinite scroll (see the content observer)
         nextUrl: function() {
           return null;
+        },
+        nextContainer: function(doc, current2) {
+          return chapterAfter(doc, current2);
+        },
+        pullMore: function(current2) {
+          pullMore(current2);
+        },
+        nextControl: function(doc, current2, url) {
+          return nextControl(doc, current2, url);
+        },
+        isLocked: function(el) {
+          return isLocked(el);
         }
       }
     ];
+    CHAPTER_SEL = '.cha-content, .cha-words, .chapter-content, .read-content, [class*="cha-content"], [class*="cha-words"]';
+    active = null;
+    NEXT_WORDS = /^\s*(next(\s+chapter)?|siguiente(\s+cap[ií]tulo)?|cap[ií]tulo\s+siguiente|pr[oó]ximo(\s+cap[ií]tulo)?|下一章)\s*[›»>→]*\s*$/i;
+    LOCKED = /unlock (this )?chapter|desbloquear|locked chapter|cap[ií]tulo bloqueado|premium chapter/i;
     GENERIC = {
       id: "generic",
       test: function() {
@@ -5829,6 +6001,8 @@ function ts(key, arg) {
       fallback_native: "Sin voz neural \u2014 usando la voz del navegador",
       nextLoading: "Cargando el cap\xEDtulo siguiente\u2026",
       nextFailed: "No se pudo cargar el cap\xEDtulo siguiente",
+      nextNotFound: "No se encontr\xF3 el cap\xEDtulo siguiente",
+      nextLocked: "El cap\xEDtulo siguiente est\xE1 bloqueado",
       chapterDone: "Cap\xEDtulo terminado",
       pressRead: "Pulsa Leer para continuar"
     },
@@ -5850,6 +6024,8 @@ function ts(key, arg) {
       fallback_native: "No neural voice \u2014 using the browser voice",
       nextLoading: "Loading the next chapter\u2026",
       nextFailed: "Could not load the next chapter",
+      nextNotFound: "Could not find the next chapter",
+      nextLocked: "The next chapter is locked",
       chapterDone: "Chapter finished",
       pressRead: "Press Read to continue"
     }
@@ -5901,7 +6077,7 @@ function extractParagraphs() {
   return [];
 }
 function splitIntoSentences(text) {
-  var parts = text.match(/[^.!?…\n]+[.!?…]*["'»”’)]*\s*/g) || [text];
+  var parts = text.match(/(?:[^.!?…\n]|\.(?=\d))+[.!?…]*["'»”’)]*\s*/g) || [text];
   return parts.map(function(p) {
     return p.trim();
   }).filter(function(p) {
@@ -6210,7 +6386,9 @@ async function prepareChapter() {
   background = null;
   chapterTranslation = null;
   st().speechLang = null;
-  chapterKey = site.chapterKey(chapterUrl);
+  currentContainer = site.container(document);
+  if (site.inPage) setActiveChapter(currentContainer);
+  chapterKey = site.chapterKey(chapterUrl, currentContainer);
   chapterHash = textHash(paras.map(function(p) {
     return p.text;
   }).join("\n"));
@@ -6260,7 +6438,7 @@ async function startReading(fromIndex) {
   player.start(fromIndex || 0, st().currentEngine || "native");
 }
 async function offerResume() {
-  var key = site.chapterKey(chapterUrl);
+  var key = site.chapterKey(chapterUrl, site.container(document));
   var saved = await loadProgress(key);
   resumeAt = saved && saved.index > 0 ? saved : null;
   setResume(resumeAt ? { index: resumeAt.index, total: resumeAt.total } : null);
@@ -6283,7 +6461,7 @@ async function handleRead() {
   startReading(from);
 }
 function handleRestart() {
-  clearProgress(chapterKey || site.chapterKey(chapterUrl));
+  clearProgress(chapterKey || site.chapterKey(chapterUrl, site.container(document)));
   resumeAt = null;
   setResume(null);
   startReading(0);
@@ -6308,7 +6486,87 @@ function prefetchNextChapter() {
   nextChapter.promise.catch(function() {
   });
 }
+function waitFor(test, ms) {
+  return new Promise(function(resolve) {
+    var found = test();
+    if (found) {
+      resolve(found);
+      return;
+    }
+    var done = false;
+    function finish(v) {
+      if (done) return;
+      done = true;
+      mo.disconnect();
+      clearInterval(nudge);
+      clearTimeout(timer2);
+      resolve(v);
+    }
+    var mo = new MutationObserver(function() {
+      var v = test();
+      if (v) finish(v);
+    });
+    mo.observe(document.documentElement, { childList: true, subtree: true });
+    var nudge = setInterval(function() {
+      var v = test();
+      if (v) finish(v);
+      else if (site.pullMore) site.pullMore(currentContainer);
+    }, 1500);
+    var timer2 = setTimeout(function() {
+      finish(test() || null);
+    }, ms);
+  });
+}
+async function readInPage(next) {
+  setActiveChapter(next);
+  chapterUrl = new URL(window.location.href);
+  prepared = false;
+  clearHighlight();
+  next.scrollIntoView({ behavior: "smooth", block: "start" });
+  startReading(0);
+}
+async function advanceInPage() {
+  setStatus(ts("nextLoading"));
+  stopContentObserver();
+  var cur = currentContainer;
+  var next = site.nextContainer(document, cur);
+  if (!next) {
+    site.pullMore(cur);
+    next = await waitFor(function() {
+      return site.nextContainer(document, cur);
+    }, 1e4);
+  }
+  if (next) {
+    if (site.isLocked(next)) {
+      setStatus(ts("nextLocked"), true);
+      return;
+    }
+    return readInPage(next);
+  }
+  var ctl = site.nextControl(document, cur, chapterUrl);
+  if (ctl && ctl.href) {
+    try {
+      await browser.storage.local.set({ pendingAutoplay: { url: ctl.href, ts: Date.now() } });
+    } catch (_) {
+    }
+    window.location.href = ctl.href;
+    return;
+  }
+  if (ctl && ctl.button) {
+    var before = window.location.href;
+    ctl.button.click();
+    next = await waitFor(function() {
+      var n = site.nextContainer(document, cur);
+      if (n) return n;
+      var now = site.container(document);
+      return window.location.href !== before && now && now !== cur && now.isConnected ? now : null;
+    }, 1e4);
+    if (next) return site.isLocked(next) ? setStatus(ts("nextLocked"), true) : readInPage(next);
+  }
+  setStatus(site.isLocked(cur) ? ts("nextLocked") : ts("nextNotFound"), true);
+}
 async function goToNextChapter() {
+  if (site.inPage) return advanceInPage();
   prefetchNextChapter();
   if (!nextChapter) {
     setStatus(ts("chapterDone"));
@@ -6356,7 +6614,8 @@ async function checkPendingAutoplay() {
     var p = got.pendingAutoplay;
     if (!p) return;
     await browser.storage.local.remove("pendingAutoplay");
-    if (p.url !== window.location.href || Date.now() - p.ts > 12e4) return;
+    var target = new URL(p.url);
+    if (target.hostname !== window.location.hostname || Date.now() - p.ts > 12e4) return;
     setStatus(ts("pressRead"));
     startReading(0);
   } catch (_) {
@@ -6366,7 +6625,7 @@ function startContentObserver() {
   stopContentObserver();
   if (site.id !== "webnovel" && site.id !== "generic") return;
   var target = site.container(document) || document.body;
-  var root = target.parentElement || document.body;
+  var root = site.inPage ? target : target.parentElement || document.body;
   observedLength = paragraphs.length;
   contentObserver = new MutationObserver(function() {
     checkForNewParagraphs(root);
@@ -6602,7 +6861,7 @@ async function boot() {
   }
   if (state2 && state2.on) showPanel();
 }
-var import_readability, RESTRICTED_PROTOCOLS, embed, site, chapterDoc, chapterUrl, chapterTranslation, pendingOffer, FIRST_CHARS, BATCH, background, chapterGen, chapterEls, sentenceTicks, currentWord, paragraphs, sentences, chapterKey, chapterHash, resumeAt, prepared, nextChapter, engineNote, player, contentObserver, observedLength, checking, picking, restartOnResume, panelReady;
+var import_readability, RESTRICTED_PROTOCOLS, embed, site, chapterDoc, chapterUrl, chapterTranslation, pendingOffer, FIRST_CHARS, BATCH, background, chapterGen, chapterEls, sentenceTicks, currentWord, paragraphs, sentences, chapterKey, currentContainer, chapterHash, resumeAt, prepared, nextChapter, engineNote, player, contentObserver, observedLength, checking, picking, restartOnResume, panelReady;
 var init_content = __esm({
   "src/content.js"() {
     import_readability = __toESM(require_readability());
@@ -6656,6 +6915,7 @@ var init_content = __esm({
     paragraphs = [];
     sentences = [];
     chapterKey = null;
+    currentContainer = null;
     chapterHash = null;
     resumeAt = null;
     prepared = false;
@@ -6677,6 +6937,7 @@ var init_content = __esm({
         setCounter(i + 1, sentences.length);
         currentWord = -1;
         var el = s && paragraphs[s.refIdx] ? paragraphs[s.refIdx].el : null;
+        if (embed && el) window.dispatchEvent(new CustomEvent("zentts-reading", { detail: { el } }));
         showSentence(el, s ? s.text : "", s ? s.words : [], s ? s.hint : 0);
         if (chapterTranslation && st().inlineTr !== false && s && el) showCaption(el, s.text, s.words);
         else hideCaption();
@@ -6697,8 +6958,8 @@ var init_content = __esm({
       },
       onState: function(state2) {
         var playing = state2 === "playing";
-        var active = state2 !== "idle";
-        setButtonsEnabled({ read: !active, pause: active, stop: active, prev: active, next: active });
+        var active2 = state2 !== "idle";
+        setButtonsEnabled({ read: !active2, pause: active2, stop: active2, prev: active2, next: active2 });
         setPauseIcon(playing);
         if (state2 === "playing") setStatus(playingStatus());
         if (state2 === "paused") setStatus(ts("paused"));
@@ -6739,6 +7000,17 @@ var init_content = __esm({
     });
     restartOnResume = false;
     panelReady = null;
+    window.addEventListener("zentts-seek", function(e) {
+      if (player.state === "idle" || !e.detail) return;
+      var p = paragraphs.findIndex(function(x) {
+        return x.el === e.detail.el;
+      });
+      if (p < 0) return;
+      var i = sentences.findIndex(function(s) {
+        return s.refIdx === p;
+      });
+      if (i >= 0) player.jump(i);
+    });
     browser.runtime.onMessage.addListener(function(msg) {
       if (msg && msg.action === "panel_toggle") {
         if (msg.on) showPanel();
@@ -27957,6 +28229,111 @@ var __webpack_exports__version = __webpack_exports__.version;
 
 // src/reader.js
 init_highlight();
+
+// src/books.js
+var KEY = "library";
+var DEFAULT_SETTINGS = { wood: "oak", sort: "recent", size: "m", keepCopies: true };
+function bookId(key) {
+  var h = 2166136261;
+  for (var i = 0; i < key.length; i++) {
+    h ^= key.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return "b" + (h >>> 0).toString(36);
+}
+async function loadLibrary() {
+  var got = {};
+  try {
+    got = (await browser.storage.local.get(KEY))[KEY] || {};
+  } catch (_) {
+  }
+  return {
+    books: got.books || {},
+    tags: got.tags || [],
+    settings: Object.assign({}, DEFAULT_SETTINGS, got.settings || {})
+  };
+}
+async function saveLibrary(lib) {
+  try {
+    await browser.storage.local.set({ [KEY]: lib });
+  } catch (_) {
+  }
+}
+async function updateBook(id, patch) {
+  var lib = await loadLibrary();
+  var book = Object.assign({ id, tags: [], addedAt: Date.now() }, lib.books[id] || {}, patch);
+  lib.books[id] = book;
+  await saveLibrary(lib);
+  return book;
+}
+async function libraryDir(create) {
+  var root = await navigator.storage.getDirectory();
+  return root.getDirectoryHandle("library", { create });
+}
+async function bookDir(id, create) {
+  var lib = await libraryDir(create);
+  return lib.getDirectoryHandle(id, { create });
+}
+async function writeFile(id, name, blob) {
+  var dir = await bookDir(id, true);
+  var handle = await dir.getFileHandle(name, { create: true });
+  var w = await handle.createWritable();
+  await w.write(blob);
+  await w.close();
+}
+async function readFile(id, name) {
+  try {
+    var dir = await bookDir(id, false);
+    return await (await dir.getFileHandle(name)).getFile();
+  } catch (_) {
+    return null;
+  }
+}
+function dominantColor(canvas) {
+  try {
+    var small = document.createElement("canvas");
+    small.width = 24;
+    small.height = 32;
+    var ctx = small.getContext("2d");
+    ctx.drawImage(canvas, 0, 0, 24, 32);
+    var d = ctx.getImageData(0, 0, 24, 32).data;
+    var r = 0, g = 0, b = 0, n = 0;
+    for (var i = 0; i < d.length; i += 4) {
+      if (d[i] > 235 && d[i + 1] > 235 && d[i + 2] > 235) continue;
+      r += d[i];
+      g += d[i + 1];
+      b += d[i + 2];
+      n++;
+    }
+    if (n < 20) return null;
+    r /= n;
+    g /= n;
+    b /= n;
+    var max = Math.max(r, g, b), min = Math.min(r, g, b);
+    if (max - min < 28) return null;
+    return "#" + [r, g, b].map(function(v) {
+      return Math.round(v * 0.72).toString(16).padStart(2, "0");
+    }).join("");
+  } catch (_) {
+    return null;
+  }
+}
+var CLOTH = ["#7b2e22", "#2f4f6e", "#3d5a3e", "#6b3f5e", "#8a5a1f", "#44505a", "#5c3a27", "#2c5a57"];
+function clothColor(id) {
+  var h = 0;
+  for (var i = 0; i < id.length; i++) h = h * 31 + id.charCodeAt(i) >>> 0;
+  return CLOTH[h % CLOTH.length];
+}
+function realAuthor(a) {
+  return a && !/^(anonymous|unknown|author|user|admin|desconocido)$/i.test(a.trim()) ? a.trim() : "";
+}
+function canvasBlob(canvas, type, quality) {
+  return new Promise(function(resolve) {
+    canvas.toBlob(resolve, type || "image/webp", quality || 0.85);
+  });
+}
+
+// src/reader.js
 __webpack_exports__GlobalWorkerOptions.workerSrc = browser.runtime.getURL("vendor/pdfjs/pdf.worker.min.mjs");
 var ES = (function() {
   try {
@@ -27970,7 +28347,7 @@ var S = ES ? {
   dropNamed: "Suelta aqu\xED %s o el\xEDgelo para leerlo.",
   dropAny: "Suelta aqu\xED un PDF o el\xEDgelo para leerlo.",
   choose: "Elegir PDF",
-  why: "Firefox no deja que las extensiones lean archivos de tu equipo por su cuenta: hace falta que lo abras t\xFA una vez.",
+  why: "Firefox no deja que las extensiones lean archivos de tu equipo por su cuenta: hace falta que lo abras t\xFA una vez. Despu\xE9s queda en tu biblioteca.",
   allowTitle: "Permitir leer este PDF",
   allowText: "zenTTS necesita permiso para descargar el PDF de %s.",
   allow: "Permitir y abrir",
@@ -27979,13 +28356,19 @@ var S = ES ? {
   pages: "%s p\xE1gs.",
   other: "Abrir otro PDF",
   failed: "No se pudo abrir el PDF: %s",
-  noText: "Este PDF no tiene texto seleccionable (parece escaneado), as\xED que no se puede leer en voz alta."
+  noText: "Este PDF no tiene texto seleccionable (parece escaneado), as\xED que no se puede leer en voz alta.",
+  toc: "\xCDndice",
+  noToc: "Este PDF no tiene \xEDndice.",
+  library: "Biblioteca",
+  page: "p\xE1g. %s / %s",
+  close: "Cerrar",
+  missing: "La copia de este libro ya no est\xE1 en la biblioteca. \xC1brelo de nuevo para leerlo."
 } : {
   dropTitle: "Open the PDF",
   dropNamed: "Drop %s here or choose it to read it.",
   dropAny: "Drop a PDF here or choose one to read it.",
   choose: "Choose PDF",
-  why: "Firefox doesn't let extensions read files on your computer by themselves: you need to open it once.",
+  why: "Firefox doesn't let extensions read files on your computer by themselves: you need to open it once. After that it stays in your library.",
   allowTitle: "Allow reading this PDF",
   allowText: "zenTTS needs permission to download the PDF from %s.",
   allow: "Allow and open",
@@ -27994,7 +28377,13 @@ var S = ES ? {
   pages: "%s pages",
   other: "Open another PDF",
   failed: "Could not open the PDF: %s",
-  noText: "This PDF has no selectable text (it looks scanned), so it can't be read aloud."
+  noText: "This PDF has no selectable text (it looks scanned), so it can't be read aloud.",
+  toc: "Contents",
+  noToc: "This PDF has no table of contents.",
+  library: "Library",
+  page: "p. %s / %s",
+  close: "Close",
+  missing: "This book's copy is no longer in the library. Open it again to read it."
 };
 function f(s) {
   var a = [].slice.call(arguments, 1);
@@ -28008,6 +28397,7 @@ function $(id) {
 }
 var params = new URLSearchParams(location.search);
 var src = params.get("src");
+var fromShelf = params.get("book");
 function fileName(url) {
   try {
     return decodeURIComponent(new URL(url).pathname.split("/").pop()) || "documento.pdf";
@@ -28089,6 +28479,14 @@ async function askForAccess(url) {
   return fetchBytes(url);
 }
 async function getDocumentBytes() {
+  if (fromShelf) {
+    var lib = await loadLibrary();
+    var book = lib.books[fromShelf];
+    var file = await readFile(fromShelf, "pdf");
+    if (book && file) return { data: new Uint8Array(await file.arrayBuffer()), name: book.name || book.title, key: book.key };
+    if (book && book.src && /^https?:/i.test(book.src)) src = book.src;
+    else throw new Error(S.missing);
+  }
   if (src && /^https?:/i.test(src)) {
     var name = fileName(src);
     try {
@@ -28099,7 +28497,14 @@ async function getDocumentBytes() {
   }
   return askForFile(src ? fileName(src) : null);
 }
-function lineOf(items) {
+function median(xs) {
+  if (!xs.length) return 0;
+  var s = xs.slice().sort(function(a, b) {
+    return a - b;
+  });
+  return s[Math.floor(s.length / 2)];
+}
+function segmentText(items) {
   var text = "";
   for (var i = 0; i < items.length; i++) {
     var it = items[i], prev = items[i - 1];
@@ -28108,47 +28513,114 @@ function lineOf(items) {
   }
   return text.replace(/\s+/g, " ").trim();
 }
-function linesOf(items) {
-  var lines = [];
-  var cur = null;
-  items.forEach(function(it) {
-    if (!it.str && !it.eol) return;
-    if (cur && Math.abs(it.y - cur.y) <= Math.max(cur.h, it.h) * 0.5) {
-      cur.items.push(it);
-      cur.h = Math.max(cur.h, it.h);
-    } else {
-      cur = { items: [it], y: it.y, h: it.h };
-      lines.push(cur);
-    }
-  });
-  lines.forEach(function(l) {
-    l.items = l.items.filter(function(it) {
-      return it.str;
+function segmentsOf(items, pageWidth) {
+  var rows = [];
+  items.filter(function(it) {
+    return it.str;
+  }).sort(function(a, b) {
+    return b.y - a.y || a.x - b.x;
+  }).forEach(function(it) {
+    var row = rows.find(function(r) {
+      return Math.abs(r.y - it.y) <= Math.max(r.h, it.h) * 0.5;
     });
-    l.x = l.items.length ? Math.min.apply(null, l.items.map(function(it) {
-      return it.x;
-    })) : 0;
-    l.right = l.items.length ? Math.max.apply(null, l.items.map(function(it) {
-      return it.x + it.w;
-    })) : 0;
-    l.text = lineOf(l.items);
+    if (row) {
+      row.items.push(it);
+      row.h = Math.max(row.h, it.h);
+    } else rows.push({ y: it.y, h: it.h, items: [it] });
   });
-  return lines.filter(function(l) {
-    return l.text;
+  var segs = [];
+  rows.forEach(function(r) {
+    r.items.sort(function(a, b) {
+      return a.x - b.x;
+    });
+    var cur = null;
+    r.items.forEach(function(it) {
+      var gap = cur ? it.x - cur.right : 0;
+      if (!cur || gap > Math.max(r.h * 2.2, pageWidth * 0.035)) {
+        cur = { y: r.y, h: r.h, items: [], x: it.x, right: it.x + it.w };
+        segs.push(cur);
+      }
+      cur.items.push(it);
+      cur.right = Math.max(cur.right, it.x + it.w);
+    });
   });
+  segs.forEach(function(sg) {
+    sg.text = segmentText(sg.items);
+  });
+  return segs.filter(function(sg) {
+    return sg.text;
+  });
+}
+function gutterOf(segs, pageWidth) {
+  if (segs.length < 8) return null;
+  var bins = 200, step = pageWidth / bins, used = new Array(bins).fill(0);
+  segs.forEach(function(sg) {
+    for (var b2 = Math.max(0, Math.floor(sg.x / step)); b2 <= Math.min(bins - 1, Math.floor(sg.right / step)); b2++) used[b2]++;
+  });
+  var allowed = Math.max(1, Math.floor(segs.length * 0.12));
+  var best = null, start2 = -1;
+  for (var b = Math.floor(bins * 0.3); b <= Math.ceil(bins * 0.7); b++) {
+    if (used[b] <= allowed) {
+      if (start2 < 0) start2 = b;
+    } else if (start2 >= 0) {
+      if (!best || b - start2 > best.w) best = { from: start2, w: b - start2 };
+      start2 = -1;
+    }
+  }
+  if (start2 >= 0) {
+    var end = Math.ceil(bins * 0.7) + 1;
+    if (!best || end - start2 > best.w) best = { from: start2, w: end - start2 };
+  }
+  if (!best || best.w * step < pageWidth * 0.015) return null;
+  var g0 = best.from * step, g1 = (best.from + best.w) * step;
+  var left = segs.filter(function(sg) {
+    return sg.right <= g1;
+  }).length;
+  var right = segs.filter(function(sg) {
+    return sg.x >= g0;
+  }).length;
+  return left >= 3 && right >= 3 ? { from: g0, to: g1 } : null;
+}
+function readingOrder(segs, pageWidth) {
+  var g = gutterOf(segs, pageWidth);
+  var top = segs.slice().sort(function(a, b) {
+    return b.y - a.y || a.x - b.x;
+  });
+  if (!g) {
+    top.forEach(function(sg) {
+      sg.col = 0;
+    });
+    return top;
+  }
+  var out = [], band = [];
+  function flush2() {
+    ["l", "r"].forEach(function(side) {
+      band.filter(function(sg) {
+        return sg.side === side;
+      }).forEach(function(sg) {
+        out.push(sg);
+      });
+    });
+    band = [];
+  }
+  top.forEach(function(sg) {
+    if (sg.right <= g.to + 1) sg.side = "l";
+    else if (sg.x >= g.from - 1) sg.side = "r";
+    else sg.side = "span";
+    sg.col = sg.side === "r" ? 1 : 0;
+    if (sg.side === "span") {
+      flush2();
+      out.push(sg);
+    } else band.push(sg);
+  });
+  flush2();
+  return out;
 }
 function shape(text) {
   return text.toLowerCase().replace(/\d+/g, "#").replace(/\s+/g, " ").trim();
 }
 function isPageNumber(text) {
   return /^(p(á|a)g(ina|e)?\.?\s*)?[\divxlcdm]{1,5}(\s*(\/|de|of)\s*\d+)?$/i.test(text.trim());
-}
-function median(xs) {
-  if (!xs.length) return 0;
-  var s = xs.slice().sort(function(a, b) {
-    return a - b;
-  });
-  return s[Math.floor(s.length / 2)];
 }
 function markRunning(pages) {
   var counts = {};
@@ -28172,6 +28644,7 @@ function markRunning(pages) {
     });
   });
 }
+var ENDS = /[.!?:»"”…)]$/;
 function paragraphsOf(pages) {
   var paras = [];
   var cur = null;
@@ -28182,24 +28655,26 @@ function paragraphsOf(pages) {
     var gaps = [];
     for (var i = 1; i < lines.length; i++) {
       var g = lines[i - 1].y - lines[i].y;
-      if (g > 0) gaps.push(g);
+      if (g > 0 && lines[i - 1].col === lines[i].col) gaps.push(g);
     }
     var lead = median(gaps) || 14;
     var width = Math.max.apply(null, lines.map(function(l) {
       return l.right - l.x;
     }).concat([1]));
-    var left = median(lines.map(function(l) {
-      return l.x;
-    }));
     lines.forEach(function(l, i2) {
       var prev = lines[i2 - 1];
       var brk = !cur;
-      if (!brk && prev) {
+      if (!brk && prev && prev.col === l.col && prev.y > l.y) {
         var gap = prev.y - l.y;
-        var ended = /[.!?:»"”…)]$/.test(prev.text);
-        brk = gap > lead * 1.45 || gap < 0 || Math.abs(l.h - prev.h) > prev.h * 0.25 || ended && prev.right - prev.x < width * 0.8 || ended && l.x - left > l.h * 0.8;
-      } else if (!brk && !prev) {
-        brk = /[.!?:»"”…)]$/.test(cur.lines[cur.lines.length - 1].text);
+        var ended = ENDS.test(prev.text);
+        var colLeft = median(lines.filter(function(x) {
+          return x.col === l.col;
+        }).map(function(x) {
+          return x.x;
+        }));
+        brk = gap > lead * 1.45 || Math.abs(l.h - prev.h) > prev.h * 0.25 || ended && prev.right - prev.x < width * 0.8 * (pg.cols > 1 ? 0.5 : 1) || ended && l.x - colLeft > l.h * 0.8;
+      } else if (!brk) {
+        brk = ENDS.test(cur.lines[cur.lines.length - 1].text) || Math.abs(l.h - cur.lines[cur.lines.length - 1].h) > l.h * 0.25;
       }
       if (brk) {
         cur = { lines: [] };
@@ -28219,9 +28694,7 @@ function buildParagraphs(paras) {
       if (!part || part.page !== l.page) {
         part = { page: l.page, el: document.createElement("div") };
         part.el.className = "para";
-        var first = l.items[0] && l.items[0].span;
-        if (first && first.parentNode) first.parentNode.insertBefore(part.el, first);
-        else l.page.layer.appendChild(part.el);
+        l.page.layer.appendChild(part.el);
         parts.push(part);
       }
       l.items.forEach(function(it) {
@@ -28236,9 +28709,12 @@ function buildParagraphs(paras) {
     var text = p.lines.map(function(l) {
       return l.text;
     }).join(" ").replace(/(\p{Ll})- (\p{Ll})/gu, "$1-$2");
-    return { el, text };
+    var first = p.lines[0];
+    return { el, text, page: first.page.n, y: first.y, h: first.h };
   });
 }
+var pageDivs = [];
+var viewports = [];
 async function renderDocument(doc) {
   var container = $("pages");
   var width = Math.min(860, document.documentElement.clientWidth - 32);
@@ -28259,6 +28735,7 @@ async function renderDocument(doc) {
     var viewport = page.getViewport({ scale: width / base.width });
     var div = document.createElement("div");
     div.className = "page";
+    div.dataset.page = n;
     div.style.width = Math.floor(viewport.width) + "px";
     div.style.height = Math.floor(viewport.height) + "px";
     div.style.setProperty("--scale-factor", viewport.scale);
@@ -28270,6 +28747,8 @@ async function renderDocument(doc) {
     num.textContent = n;
     div.appendChild(num);
     container.appendChild(div);
+    pageDivs.push(div);
+    viewports.push(viewport);
     div.__draw = /* @__PURE__ */ (function(page2, viewport2, div2) {
       return function() {
         var canvas = document.createElement("canvas");
@@ -28292,14 +28771,278 @@ async function renderDocument(doc) {
       var span = spans[k++];
       items.push({ str: it.str, eol: it.hasEOL, x: it.transform[4], y: it.transform[5], w: it.width, h: Math.abs(it.transform[3]) || it.height || 10, span });
     });
-    pages.push({ n, height: base.height, layer, lines: linesOf(items) });
+    var lines = readingOrder(segmentsOf(items, base.width), base.width);
+    pages.push({
+      n,
+      height: base.height,
+      width: base.width,
+      layer,
+      lines,
+      cols: lines.some(function(l) {
+        return l.col === 1;
+      }) ? 2 : 1
+    });
   }
   return pages;
+}
+async function renderThumb(doc, n) {
+  var page = await doc.getPage(n);
+  var base = page.getViewport({ scale: 1 });
+  var vp = page.getViewport({ scale: 360 / base.width });
+  var canvas = document.createElement("canvas");
+  canvas.width = Math.floor(vp.width);
+  canvas.height = Math.floor(vp.height);
+  var ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  await page.render({ canvasContext: ctx, viewport: vp }).promise;
+  return canvas;
+}
+async function shelve(doc, got, title, author) {
+  var id = bookId(got.key);
+  var lib = await loadLibrary();
+  var prev = lib.books[id] || {};
+  var patch = {
+    key: got.key,
+    title: prev.titleEdited ? prev.title : title,
+    author: prev.authorEdited ? prev.author : author || prev.author || "",
+    name: got.name,
+    pages: doc.numPages,
+    openedAt: Date.now(),
+    src: src && /^https?:/i.test(src) ? src : prev.src || null,
+    size: got.data.byteLength
+  };
+  if (lib.settings.keepCopies && !await readFile(id, "pdf")) {
+    try {
+      await writeFile(id, "pdf", new Blob([got.data], { type: "application/pdf" }));
+      patch.hasFile = true;
+    } catch (_) {
+    }
+  }
+  var book = await updateBook(id, patch);
+  try {
+    if (!await readFile(id, "cover")) {
+      var c = await renderThumb(doc, 1);
+      await writeFile(id, "cover", await canvasBlob(c));
+      if (!book.color) await updateBook(id, { color: dominantColor(c) || clothColor(id) });
+      c.width = c.height = 0;
+    }
+  } catch (e) {
+    console.error("[zenTTS] cover:", e.message || e);
+  }
+  (async function() {
+    try {
+      if (doc.numPages > 1 && !await readFile(id, "back")) {
+        var b = await renderThumb(doc, doc.numPages);
+        await writeFile(id, "back", await canvasBlob(b));
+        b.width = b.height = 0;
+      }
+    } catch (e) {
+      console.error("[zenTTS] cover:", e.message || e);
+    }
+  })();
+  return id;
+}
+var bookKey = null;
+var currentPage = 1;
+var saveTimer = null;
+function trackPages(total) {
+  var visible = /* @__PURE__ */ new Map();
+  var io = new IntersectionObserver(function(entries) {
+    entries.forEach(function(e) {
+      visible.set(+e.target.dataset.page, e.intersectionRatio);
+    });
+    var best = currentPage, ratio = -1;
+    visible.forEach(function(r, n) {
+      if (r > ratio) {
+        ratio = r;
+        best = n;
+      }
+    });
+    if (best !== currentPage) {
+      currentPage = best;
+      $("doc-page").textContent = f(S.page, currentPage, total);
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(savePosition, 800);
+    }
+  }, { threshold: [0, 0.25, 0.5, 0.75, 1] });
+  pageDivs.forEach(function(d) {
+    io.observe(d);
+  });
+  $("doc-page").textContent = f(S.page, currentPage, total);
+}
+function savePosition() {
+  if (!bookKey) return;
+  var div = pageDivs[currentPage - 1];
+  var frac = div ? Math.max(0, Math.min(1, -div.getBoundingClientRect().top / div.offsetHeight)) : 0;
+  updateBook(bookKey, { lastPage: currentPage, pageFrac: +frac.toFixed(3), progress: +(currentPage / pageDivs.length).toFixed(4), readAt: Date.now() });
+}
+function goToPage(n, pdfY) {
+  var div = pageDivs[n - 1];
+  if (!div) return;
+  var offset = 0;
+  if (pdfY != null && viewports[n - 1]) offset = Math.max(0, viewports[n - 1].convertToViewportPoint(0, pdfY)[1] - 40);
+  window.scrollTo({ top: div.getBoundingClientRect().top + window.scrollY - 60 + offset, behavior: "auto" });
+}
+var tocEntries = [];
+async function resolveDest(doc, dest) {
+  try {
+    if (typeof dest === "string") dest = await doc.getDestination(dest);
+    if (!Array.isArray(dest) || !dest[0]) return null;
+    var index = typeof dest[0] === "object" ? await doc.getPageIndex(dest[0]) : dest[0];
+    var kind = dest[1] && dest[1].name;
+    var y = kind === "XYZ" ? dest[3] : kind === "FitH" || kind === "FitBH" ? dest[2] : null;
+    return { page: index + 1, y: typeof y === "number" ? y : null };
+  } catch (_) {
+    return null;
+  }
+}
+function headingsOf(pages) {
+  var sizes = [];
+  pages.forEach(function(pg) {
+    pg.lines.forEach(function(l) {
+      if (!l.skip) sizes.push(l.h);
+    });
+  });
+  var body = median(sizes) || 10;
+  var out = [];
+  pages.forEach(function(pg) {
+    pg.lines.forEach(function(l) {
+      if (l.skip || l.h < body * 1.3 || l.text.length > 90 || l.text.length < 2) return;
+      var prev = out[out.length - 1];
+      if (prev && prev.page === pg.n && Math.abs(prev.h - l.h) < 0.5 && prev.y - l.y < l.h * 1.6) {
+        prev.title += " " + l.text;
+        prev.y = l.y;
+        return;
+      }
+      out.push({ title: l.text, page: pg.n, y: l.y + l.h, h: l.h, items: [] });
+    });
+  });
+  var top = Math.max.apply(null, out.map(function(x) {
+    return x.h;
+  }).concat([0]));
+  var tree = [];
+  out.forEach(function(x) {
+    if (x.h >= top * 0.92 || !tree.length) tree.push(x);
+    else tree[tree.length - 1].items.push(x);
+  });
+  return tree;
+}
+async function buildToc(doc, pages) {
+  var list = $("toc-list");
+  var outline = null;
+  try {
+    outline = await doc.getOutline();
+  } catch (_) {
+  }
+  var tree = [];
+  async function convert(items) {
+    var out = [];
+    for (var i = 0; i < (items || []).length; i++) {
+      var it = items[i];
+      var at = await resolveDest(doc, it.dest);
+      out.push({ title: it.title, page: at && at.page, y: at && at.y, items: await convert(it.items) });
+    }
+    return out;
+  }
+  if (outline && outline.length) tree = await convert(outline);
+  else tree = headingsOf(pages);
+  list.replaceChildren();
+  tocEntries = [];
+  if (!tree.length) {
+    var none = document.createElement("p");
+    none.className = "toc-empty";
+    none.textContent = S.noToc;
+    list.appendChild(none);
+    return;
+  }
+  function render(items, parent, depth) {
+    var ul = document.createElement("ul");
+    items.forEach(function(it) {
+      var li = document.createElement("li");
+      var row = document.createElement("div");
+      row.className = "toc-row";
+      row.style.paddingLeft = 8 + depth * 14 + "px";
+      if (it.items && it.items.length) {
+        var tog = document.createElement("button");
+        tog.type = "button";
+        tog.className = "toc-toggle";
+        tog.textContent = "\u25B8";
+        tog.setAttribute("aria-expanded", "false");
+        tog.onclick = function() {
+          var open = li.classList.toggle("open");
+          tog.setAttribute("aria-expanded", String(open));
+        };
+        row.appendChild(tog);
+      } else {
+        var sp = document.createElement("span");
+        sp.className = "toc-toggle";
+        row.appendChild(sp);
+      }
+      var a = document.createElement("button");
+      a.type = "button";
+      a.className = "toc-link";
+      a.textContent = it.title;
+      var pg = document.createElement("span");
+      pg.className = "toc-page";
+      pg.textContent = it.page || "";
+      a.appendChild(pg);
+      a.onclick = function() {
+        if (it.page) jumpTo(it.page, it.y);
+      };
+      row.appendChild(a);
+      li.appendChild(row);
+      if (it.page) tocEntries.push({ page: it.page, y: it.y == null ? Infinity : it.y, li });
+      if (it.items && it.items.length) render(it.items, li, depth + 1);
+      ul.appendChild(li);
+    });
+    parent.appendChild(ul);
+  }
+  render(tree, list, 0);
+}
+var paragraphsRef = [];
+function jumpTo(page, y) {
+  goToPage(page, y);
+  var target = paragraphsRef.find(function(p) {
+    return p.page > page || p.page === page && (y == null || p.y <= y + 2);
+  });
+  if (target) window.dispatchEvent(new CustomEvent("zentts-seek", { detail: { el: target.el } }));
+  if (window.innerWidth < 900) toggleToc(false);
+}
+function markSection(page, y) {
+  var current2 = null;
+  tocEntries.forEach(function(e) {
+    if (e.page < page || e.page === page && e.y >= y - 2) current2 = e;
+  });
+  tocEntries.forEach(function(e) {
+    e.li.classList.toggle("current", e === current2);
+  });
+  if (current2) {
+    for (var p = current2.li.parentElement; p && p.id !== "toc-list"; p = p.parentElement) if (p.tagName === "LI") p.classList.add("open");
+  }
+}
+function toggleToc(on) {
+  var open = on === void 0 ? !document.body.classList.contains("toc-open") : on;
+  document.body.classList.toggle("toc-open", open);
+  $("toc-btn").setAttribute("aria-expanded", String(open));
 }
 async function start() {
   $("open-other").textContent = S.other;
   $("open-other").onclick = function() {
     location.href = browser.runtime.getURL("reader.html");
+  };
+  $("toc-btn").textContent = S.toc;
+  $("toc-btn").onclick = function() {
+    toggleToc();
+  };
+  $("toc-title").textContent = S.toc;
+  $("toc-close").setAttribute("aria-label", S.close);
+  $("toc-close").onclick = function() {
+    toggleToc(false);
+  };
+  $("library-btn").textContent = S.library;
+  $("library-btn").onclick = function() {
+    location.href = browser.runtime.getURL("library.html");
   };
   var got;
   try {
@@ -28307,13 +29050,14 @@ async function start() {
   } catch (e) {
     show("loading");
     $("loading-text").textContent = f(S.failed, e.message);
+    $("loading-bar").parentNode.hidden = true;
     return;
   }
   show("loading");
   $("loading-text").textContent = S.loading;
   var doc;
   try {
-    doc = await __webpack_exports__getDocument({ data: got.data }).promise;
+    doc = await __webpack_exports__getDocument({ data: got.data.slice(0) }).promise;
   } catch (e) {
     $("loading-text").textContent = f(S.failed, e.message);
     return;
@@ -28323,21 +29067,47 @@ async function start() {
     meta = await doc.getMetadata();
   } catch (_) {
   }
-  var title = meta && meta.info && meta.info.Title || got.name;
+  var title = meta && meta.info && meta.info.Title || got.name.replace(/\.pdf$/i, "");
+  var author = realAuthor(meta && meta.info && meta.info.Author);
   document.title = title + " \xB7 zenTTS";
   $("doc-title").textContent = title;
   $("doc-pages").textContent = f(S.pages, doc.numPages);
   $("open-other").hidden = false;
+  try {
+    bookKey = await shelve(doc, got, title, author);
+  } catch (e) {
+    console.error("[zenTTS] library:", e.message || e);
+  }
   var pages = await renderDocument(doc);
   markRunning(pages);
   var paras = buildParagraphs(paragraphsOf(pages));
+  paragraphsRef = paras;
   $("loading").hidden = true;
+  $("toc-btn").hidden = false;
   if (!paras.length) {
     show("loading");
     $("loading-text").textContent = S.noText;
     $("loading-bar").parentNode.hidden = true;
     return;
   }
+  buildToc(doc, pages);
+  var lib = await loadLibrary();
+  var book = bookKey && lib.books[bookKey];
+  if (book && book.lastPage > 1) {
+    currentPage = book.lastPage;
+    goToPage(book.lastPage);
+    var div = pageDivs[book.lastPage - 1];
+    if (div && book.pageFrac) window.scrollBy(0, div.offsetHeight * book.pageFrac);
+  }
+  trackPages(doc.numPages);
+  window.addEventListener("zentts-reading", function(e) {
+    var p = paras.find(function(x) {
+      return x.el === e.detail.el;
+    });
+    if (!p) return;
+    markSection(p.page, p.y);
+    if (bookKey) updateBook(bookKey, { readPage: p.page });
+  });
   window.__zentts_embed = {
     key: got.key,
     title,
@@ -28348,4 +29118,5 @@ async function start() {
   setHighlightTheme("overlay");
   await Promise.resolve().then(() => (init_content(), content_exports));
 }
+window.addEventListener("pagehide", savePosition);
 start();

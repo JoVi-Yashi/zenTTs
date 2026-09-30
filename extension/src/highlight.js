@@ -294,7 +294,9 @@ export function clearPick() {
 // When the text is read translated, the sentence being spoken is shown in a
 // small card right under the original paragraph (above it if there is no room),
 // with the spoken word marked. It lives in its own shadow root, so the site's
-// styles and DOM are untouched.
+// styles and DOM are untouched. The card is fixed to the viewport and follows
+// the paragraph on every scroll (of the page or of any inner scroller, as on
+// Webnovel), resize and layout change.
 
 var caption = null;   // { host, box, text, words: [span], el }
 var suppressed = false; // a panel dialog is open
@@ -317,9 +319,8 @@ function captionHost() {
   if (caption && caption.host.isConnected) return caption;
   var host = document.createElement('div');
   host.id = 'zentts-caption';
-  // Child of <html>: absolute positions are page coordinates, whatever <body> does
   // Below the panel (999999), so the panel's reading view and dialogs cover it
-  host.style.cssText = 'position:absolute;top:0;left:0;z-index:999998;pointer-events:none;display:none;';
+  host.style.cssText = 'position:fixed;top:0;left:0;z-index:999998;pointer-events:none;display:none;';
   var root = host.attachShadow({ mode: 'open' });
   var style = document.createElement('style');
   style.textContent = CAPTION_CSS;
@@ -327,29 +328,48 @@ function captionHost() {
   box.className = 'cap';
   root.append(style, box);
   document.documentElement.appendChild(host);
-  caption = { host: host, box: box, text: null, words: [], el: null };
-  window.addEventListener('resize', placeCaption, { passive: true });
+  caption = { host: host, box: box, text: null, words: [], el: null, raf: 0, ro: null };
+  // Capture: scroll events of inner scrollers don't bubble to window
+  document.addEventListener('scroll', schedulePlace, { passive: true, capture: true });
+  window.addEventListener('resize', schedulePlace, { passive: true });
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', schedulePlace, { passive: true });
+  if (typeof ResizeObserver !== 'undefined') caption.ro = new ResizeObserver(schedulePlace);
   return caption;
+}
+
+function schedulePlace() {
+  if (!caption || caption.raf || caption.host.style.display === 'none') return;
+  caption.raf = requestAnimationFrame(function() { caption.raf = 0; placeCaption(); });
 }
 
 function placeCaption() {
   if (!caption || !caption.el || caption.host.style.display === 'none') return;
-  caption.host.style.visibility = suppressed ? 'hidden' : '';
   if (!caption.el.isConnected) { hideCaption(); return; }
   var r = boxOf(caption.el);
-  var width = Math.min(Math.max(r.width, 260), 680, window.innerWidth - 16);
-  var left = Math.max(8, Math.min(r.left, window.innerWidth - width - 8));
+  var vw = window.innerWidth, vh = window.innerHeight, m = 8;
+  // Out of sight (scrolled away): hide until the paragraph is back
+  var away = r.bottom < 0 || r.top > vh || (!r.width && !r.height);
+  caption.host.style.visibility = suppressed || away ? 'hidden' : '';
+  if (away) return;
+  var width = Math.min(Math.max(r.width, 260), 680, vw - 2 * m);
+  var left = Math.max(m, Math.min(r.left, vw - width - m));
   caption.host.style.width = width + 'px';
   var h = caption.box.offsetHeight;
-  var below = r.bottom + 8;
-  var top = below + h > window.innerHeight - 8 && r.top - h - 8 > 8 ? r.top - h - 8 : below;
-  caption.host.style.left = (left + window.scrollX) + 'px';
-  caption.host.style.top = (top + window.scrollY) + 'px';
+  var top;
+  if (r.bottom + m + h <= vh - m) top = r.bottom + m;            // under the paragraph
+  else if (r.top - m - h >= m) top = r.top - m - h;             // above it
+  else top = Math.max(m, vh - h - m);                           // paragraph taller than the view: keep at the bottom edge
+  caption.host.style.transform = 'translate(' + Math.round(left) + 'px,' + Math.round(top) + 'px)';
 }
 
 export function showCaption(el, text, words) {
   if (!el || !el.isConnected) { hideCaption(); return; }
   var c = captionHost();
+  if (c.el !== el && c.ro) {
+    c.ro.disconnect();
+    partsOf(el).forEach(function(p) { if (getComputedStyle(p).display !== 'contents') c.ro.observe(p); });
+    c.ro.observe(document.documentElement);
+  }
   c.el = el;
   c.host.style.display = 'block';
   if (c.text !== text) {
@@ -381,6 +401,7 @@ export function showCaptionWord(i) {
 
 export function hideCaption() {
   if (!caption) return;
+  if (caption.ro) caption.ro.disconnect();
   caption.host.style.display = 'none';
   caption.text = null;
   caption.el = null;
@@ -389,5 +410,5 @@ export function hideCaption() {
 // Hidden while the panel shows "Extracted text" or "Sites", back afterwards
 export function suppressCaption(on) {
   suppressed = !!on;
-  if (caption) caption.host.style.visibility = suppressed ? 'hidden' : '';
+  if (caption) { caption.host.style.visibility = suppressed ? 'hidden' : ''; placeCaption(); }
 }

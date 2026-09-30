@@ -2426,7 +2426,7 @@
     if (caption && caption.host.isConnected) return caption;
     var host = document.createElement("div");
     host.id = "zentts-caption";
-    host.style.cssText = "position:absolute;top:0;left:0;z-index:999998;pointer-events:none;display:none;";
+    host.style.cssText = "position:fixed;top:0;left:0;z-index:999998;pointer-events:none;display:none;";
     var root = host.attachShadow({ mode: "open" });
     var style = document.createElement("style");
     style.textContent = CAPTION_CSS;
@@ -2434,26 +2434,40 @@
     box.className = "cap";
     root.append(style, box);
     document.documentElement.appendChild(host);
-    caption = { host, box, text: null, words: [], el: null };
-    window.addEventListener("resize", placeCaption, { passive: true });
+    caption = { host, box, text: null, words: [], el: null, raf: 0, ro: null };
+    document.addEventListener("scroll", schedulePlace, { passive: true, capture: true });
+    window.addEventListener("resize", schedulePlace, { passive: true });
+    if (window.visualViewport) window.visualViewport.addEventListener("resize", schedulePlace, { passive: true });
+    if (typeof ResizeObserver !== "undefined") caption.ro = new ResizeObserver(schedulePlace);
     return caption;
+  }
+  function schedulePlace() {
+    if (!caption || caption.raf || caption.host.style.display === "none") return;
+    caption.raf = requestAnimationFrame(function() {
+      caption.raf = 0;
+      placeCaption();
+    });
   }
   function placeCaption() {
     if (!caption || !caption.el || caption.host.style.display === "none") return;
-    caption.host.style.visibility = suppressed ? "hidden" : "";
     if (!caption.el.isConnected) {
       hideCaption();
       return;
     }
     var r = boxOf(caption.el);
-    var width = Math.min(Math.max(r.width, 260), 680, window.innerWidth - 16);
-    var left = Math.max(8, Math.min(r.left, window.innerWidth - width - 8));
+    var vw = window.innerWidth, vh = window.innerHeight, m = 8;
+    var away = r.bottom < 0 || r.top > vh || !r.width && !r.height;
+    caption.host.style.visibility = suppressed || away ? "hidden" : "";
+    if (away) return;
+    var width = Math.min(Math.max(r.width, 260), 680, vw - 2 * m);
+    var left = Math.max(m, Math.min(r.left, vw - width - m));
     caption.host.style.width = width + "px";
     var h = caption.box.offsetHeight;
-    var below = r.bottom + 8;
-    var top = below + h > window.innerHeight - 8 && r.top - h - 8 > 8 ? r.top - h - 8 : below;
-    caption.host.style.left = left + window.scrollX + "px";
-    caption.host.style.top = top + window.scrollY + "px";
+    var top;
+    if (r.bottom + m + h <= vh - m) top = r.bottom + m;
+    else if (r.top - m - h >= m) top = r.top - m - h;
+    else top = Math.max(m, vh - h - m);
+    caption.host.style.transform = "translate(" + Math.round(left) + "px," + Math.round(top) + "px)";
   }
   function showCaption(el, text, words) {
     if (!el || !el.isConnected) {
@@ -2461,6 +2475,13 @@
       return;
     }
     var c = captionHost();
+    if (c.el !== el && c.ro) {
+      c.ro.disconnect();
+      partsOf(el).forEach(function(p) {
+        if (getComputedStyle(p).display !== "contents") c.ro.observe(p);
+      });
+      c.ro.observe(document.documentElement);
+    }
     c.el = el;
     c.host.style.display = "block";
     if (c.text !== text) {
@@ -2492,13 +2513,17 @@
   }
   function hideCaption() {
     if (!caption) return;
+    if (caption.ro) caption.ro.disconnect();
     caption.host.style.display = "none";
     caption.text = null;
     caption.el = null;
   }
   function suppressCaption(on) {
     suppressed = !!on;
-    if (caption) caption.host.style.visibility = suppressed ? "hidden" : "";
+    if (caption) {
+      caption.host.style.visibility = suppressed ? "hidden" : "";
+      placeCaption();
+    }
   }
 
   // src/panel.js
@@ -2632,6 +2657,9 @@
           <input type="checkbox" id="tts-zen-inline-tr">
           <span id="tts-zen-inline-tr-label">Mostrar la traducci\xF3n junto al texto</span>
         </label>
+        <div class="setting-row">
+          <button type="button" class="link-btn" id="tts-zen-open-library">Abrir la biblioteca de PDF</button>
+        </div>
        </section>
        <section class="tab-page" data-page="tr" role="tabpanel">
         <div class="setting-row">
@@ -3365,6 +3393,7 @@ button:active:not(:disabled) { transform: scale(.96); }
       infoNativeRobotic: "Voz del sistema (espeak) \xB7 suena rob\xF3tica",
       infoServer: "Neural \xB7 la m\xE1s natural; necesita el servidor",
       slowVoice: "En tu equipo esta voz se genera m\xE1s despacio de lo que suena (x%s), por eso hay pausas entre frases. Prueba una de calidad Normal o Ligera.",
+      openLibrary: "Abrir la biblioteca de PDF",
       autoOpen: "Abrir siempre en este sitio",
       presetsTitle: "Sitios con extractor propio",
       presetNext: "solo la historia \xB7 cap\xEDtulo siguiente en la misma p\xE1gina",
@@ -3472,6 +3501,7 @@ button:active:not(:disabled) { transform: scale(.96); }
       infoNativeRobotic: "System voice (espeak) \xB7 sounds robotic",
       infoServer: "Neural \xB7 the most natural; needs the server",
       slowVoice: "On your computer this voice takes longer to generate than to play (x%s), hence the pauses between sentences. Try a Standard or Light one.",
+      openLibrary: "Open the PDF library",
       autoOpen: "Always open on this site",
       presetsTitle: "Sites with their own extractor",
       presetNext: "just the story \xB7 next chapter in the same page",
@@ -3889,6 +3919,7 @@ button:active:not(:disabled) { transform: scale(.96); }
       ["tts-zen-tab-tr", "tabTr"],
       ["tts-zen-tab-look", "tabLook"],
       ["tts-zen-inline-tr-label", "inlineTr"],
+      ["tts-zen-open-library", "openLibrary"],
       ["tts-zen-autoopen-label", "autoOpen"],
       ["tts-zen-trmode-label", "trMode"],
       ["tts-zen-neural-hint-text", "neuralHint"],
@@ -4254,6 +4285,14 @@ button:active:not(:disabled) { transform: scale(.96); }
       engineSelect.value = "server";
       engineSelect.dispatchEvent(new Event("change"));
     });
+    shadow.getElementById("tts-zen-open-library").addEventListener("click", function() {
+      if (window.location.protocol === "moz-extension:") {
+        window.location.href = browser.runtime.getURL("library.html");
+        return;
+      }
+      browser.runtime.sendMessage({ action: "open_library" }).catch(function() {
+      });
+    });
     var autoOpen = shadow.getElementById("tts-zen-autoopen");
     autoOpen.addEventListener("change", function() {
       setAutoSite(currentHost(), autoOpen.checked);
@@ -4466,8 +4505,8 @@ button:active:not(:disabled) { transform: scale(.96); }
   }
   function fitTabHeight(shadow) {
     var pages = shadow.querySelector(".tab-pages");
-    var active = shadow.querySelector(".tab-page.active");
-    if (pages && active) pages.style.height = active.offsetHeight + "px";
+    var active2 = shadow.querySelector(".tab-page.active");
+    if (pages && active2) pages.style.height = active2.offsetHeight + "px";
   }
   function setupTabs(shadow) {
     var tabs = shadow.getElementById("tts-zen-tabs");
@@ -5024,24 +5063,157 @@ button:active:not(:disabled) { transform: scale(.96); }
     },
     {
       id: "webnovel",
+      // Chapters load one after another in the same page (infinite scroll), so
+      // the "next chapter" is found in the page itself: see content.js
+      inPage: true,
       test: function(host) {
         return host.includes("webnovel.com");
       },
       container: function(doc) {
-        return doc.querySelector('.cha-words, .cha-content, .chapter-content, .read-content, [class*="cha-words"], [class*="cha-content"]');
+        return webnovelChapter(doc);
       },
       paragraphs: function(c) {
         return paragraphsIn(c, "p");
       },
-      chapterKey: function(url) {
-        return "webnovel:" + url.pathname;
+      chapterKey: function(url, container) {
+        var id = container && chapterIdOf(container);
+        return "webnovel:" + (id || url.pathname);
       },
-      // Webnovel already loads chapters by infinite scroll (see the content observer)
       nextUrl: function() {
         return null;
+      },
+      nextContainer: function(doc, current2) {
+        return chapterAfter(doc, current2);
+      },
+      pullMore: function(current2) {
+        pullMore(current2);
+      },
+      nextControl: function(doc, current2, url) {
+        return nextControl(doc, current2, url);
+      },
+      isLocked: function(el) {
+        return isLocked(el);
       }
     }
   ];
+  var CHAPTER_SEL = '.cha-content, .cha-words, .chapter-content, .read-content, [class*="cha-content"], [class*="cha-words"]';
+  var active = null;
+  function setActiveChapter(el) {
+    active = el;
+  }
+  function deepQueryAll(root, selector) {
+    var out = Array.prototype.slice.call(root.querySelectorAll(selector));
+    var walker = (root.ownerDocument || root).createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+    for (var n = walker.nextNode(); n; n = walker.nextNode()) {
+      if (n.shadowRoot) out = out.concat(deepQueryAll(n.shadowRoot, selector));
+    }
+    return out;
+  }
+  function chapterNodes(doc) {
+    return deepQueryAll(doc, CHAPTER_SEL).filter(function(el) {
+      var up = el.parentElement && el.parentElement.closest(CHAPTER_SEL);
+      return !up;
+    });
+  }
+  function idFromUrl(href) {
+    var m = String(href || "").match(/\/book\/[^/]*?(\d{6,})[^/]*\/[^/]*?(\d{6,})/) || String(href || "").match(/(\d{8,})(?!.*\d{8,})/);
+    return m ? m[m.length - 1] : null;
+  }
+  function chapterIdOf(el) {
+    for (var n = el; n && n.nodeType === 1; n = n.parentElement) {
+      var v = n.getAttribute("data-cid") || n.getAttribute("data-chapter-id") || n.getAttribute("data-chapterid") || n.getAttribute("data-id");
+      if (v && /\d{6,}/.test(v)) return v.match(/\d{6,}/)[0];
+      if (n.id && /\d{6,}/.test(n.id)) return n.id.match(/\d{6,}/)[0];
+    }
+    return null;
+  }
+  function webnovelChapter(doc) {
+    var list = chapterNodes(doc);
+    if (!list.length) return null;
+    if (active && active.isConnected && list.indexOf(active) >= 0) return active;
+    var id = doc.location ? idFromUrl(doc.location.href) : null;
+    if (id) {
+      var byId = list.find(function(el) {
+        return chapterIdOf(el) === id;
+      });
+      if (byId) return byId;
+    }
+    if (doc.defaultView) {
+      var h = doc.defaultView.innerHeight;
+      var seen = list.find(function(el) {
+        var r = el.getBoundingClientRect();
+        return r.bottom > 0 && r.top < h;
+      });
+      if (seen) return seen;
+    }
+    return list[0];
+  }
+  function chapterAfter(doc, current2) {
+    var list = chapterNodes(doc);
+    var i = list.indexOf(current2);
+    var next = i >= 0 ? list[i + 1] : null;
+    return next && visibleText(next).length > 20 ? next : null;
+  }
+  function scrollerOf(el) {
+    for (var n = el && el.parentElement; n; n = n.parentElement) {
+      var cs = getComputedStyle(n);
+      if (/(auto|scroll)/.test(cs.overflowY) && n.scrollHeight > n.clientHeight + 4) return n;
+    }
+    return null;
+  }
+  function pullMore(current2) {
+    var last = current2 && (current2.lastElementChild || current2);
+    if (last && last.scrollIntoView) last.scrollIntoView({ block: "end" });
+    var box = scrollerOf(current2);
+    if (box) {
+      box.scrollTop = box.scrollHeight;
+      box.dispatchEvent(new Event("scroll"));
+    }
+    var doc = current2 && current2.ownerDocument || document;
+    var win = doc.defaultView || window;
+    win.scrollTo(0, doc.documentElement.scrollHeight);
+    win.dispatchEvent(new Event("scroll"));
+  }
+  var NEXT_WORDS = /^\s*(next(\s+chapter)?|siguiente(\s+cap[ií]tulo)?|cap[ií]tulo\s+siguiente|pr[oó]ximo(\s+cap[ií]tulo)?|下一章)\s*[›»>→]*\s*$/i;
+  function labelOf(el) {
+    return [el.textContent, el.getAttribute("title"), el.getAttribute("aria-label")].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+  }
+  function nextControl(doc, current2, url) {
+    var rel = doc.querySelector('link[rel="next"][href], a[rel="next"][href]');
+    if (rel) return { href: absolute(rel.getAttribute("href"), url) };
+    var candidates = deepQueryAll(doc, 'a, button, [role="button"]').filter(function(el2) {
+      if (el2.disabled || el2.getAttribute("aria-disabled") === "true") return false;
+      var label = labelOf(el2);
+      var cls = (typeof el2.className === "string" ? el2.className : "") + " " + (el2.id || "");
+      return label.length < 40 && NEXT_WORDS.test(label) || /(^|[\s_-])next([\s_-]|chapter|$)/i.test(cls);
+    });
+    for (var i = 0; i < candidates.length; i++) {
+      var el = candidates[i];
+      var href = el.tagName === "A" && el.getAttribute("href");
+      if (href && !/^(#|javascript:)/i.test(href)) return { href: absolute(href, url) };
+      if (el.tagName !== "A" || href) return { button: el };
+    }
+    var id = current2 && chapterIdOf(current2) || idFromUrl(url && url.href);
+    if (id) {
+      var links = deepQueryAll(doc, 'a[href*="/book/"]');
+      var at = links.findIndex(function(a) {
+        return idFromUrl(a.href) === id;
+      });
+      for (var k = at + 1; at >= 0 && k < links.length; k++) {
+        var other = idFromUrl(links[k].href);
+        if (other && other !== id) return { href: links[k].href };
+      }
+    }
+    return null;
+  }
+  var LOCKED = /unlock (this )?chapter|desbloquear|locked chapter|cap[ií]tulo bloqueado|premium chapter/i;
+  function isLocked(el) {
+    if (!el) return false;
+    if (LOCKED.test(visibleText(el).slice(0, 4e3))) return true;
+    return Array.prototype.some.call(el.querySelectorAll('[class*="ock"]'), function(n) {
+      return /(^|[\s_-])(un)?lock(ed)?([\s_-]|$)/i.test(typeof n.className === "string" ? n.className : "");
+    });
+  }
   var GENERIC = {
     id: "generic",
     test: function() {
@@ -5786,6 +5958,8 @@ button:active:not(:disabled) { transform: scale(.96); }
         fallback_native: "Sin voz neural \u2014 usando la voz del navegador",
         nextLoading: "Cargando el cap\xEDtulo siguiente\u2026",
         nextFailed: "No se pudo cargar el cap\xEDtulo siguiente",
+        nextNotFound: "No se encontr\xF3 el cap\xEDtulo siguiente",
+        nextLocked: "El cap\xEDtulo siguiente est\xE1 bloqueado",
         chapterDone: "Cap\xEDtulo terminado",
         pressRead: "Pulsa Leer para continuar"
       },
@@ -5807,6 +5981,8 @@ button:active:not(:disabled) { transform: scale(.96); }
         fallback_native: "No neural voice \u2014 using the browser voice",
         nextLoading: "Loading the next chapter\u2026",
         nextFailed: "Could not load the next chapter",
+        nextNotFound: "Could not find the next chapter",
+        nextLocked: "The next chapter is locked",
         chapterDone: "Chapter finished",
         pressRead: "Press Read to continue"
       }
@@ -5875,7 +6051,7 @@ button:active:not(:disabled) { transform: scale(.96); }
     return [];
   }
   function splitIntoSentences(text) {
-    var parts = text.match(/[^.!?…\n]+[.!?…]*["'»”’)]*\s*/g) || [text];
+    var parts = text.match(/(?:[^.!?…\n]|\.(?=\d))+[.!?…]*["'»”’)]*\s*/g) || [text];
     return parts.map(function(p) {
       return p.trim();
     }).filter(function(p) {
@@ -6180,6 +6356,7 @@ button:active:not(:disabled) { transform: scale(.96); }
   var paragraphs = [];
   var sentences = [];
   var chapterKey = null;
+  var currentContainer = null;
   var chapterHash = null;
   var resumeAt = null;
   var prepared = false;
@@ -6201,6 +6378,7 @@ button:active:not(:disabled) { transform: scale(.96); }
       setCounter(i + 1, sentences.length);
       currentWord = -1;
       var el = s && paragraphs[s.refIdx] ? paragraphs[s.refIdx].el : null;
+      if (embed && el) window.dispatchEvent(new CustomEvent("zentts-reading", { detail: { el } }));
       showSentence(el, s ? s.text : "", s ? s.words : [], s ? s.hint : 0);
       if (chapterTranslation && st().inlineTr !== false && s && el) showCaption(el, s.text, s.words);
       else hideCaption();
@@ -6221,8 +6399,8 @@ button:active:not(:disabled) { transform: scale(.96); }
     },
     onState: function(state2) {
       var playing = state2 === "playing";
-      var active = state2 !== "idle";
-      setButtonsEnabled({ read: !active, pause: active, stop: active, prev: active, next: active });
+      var active2 = state2 !== "idle";
+      setButtonsEnabled({ read: !active2, pause: active2, stop: active2, prev: active2, next: active2 });
       setPauseIcon(playing);
       if (state2 === "playing") setStatus(playingStatus());
       if (state2 === "paused") setStatus(ts("paused"));
@@ -6270,7 +6448,9 @@ button:active:not(:disabled) { transform: scale(.96); }
     background = null;
     chapterTranslation = null;
     st().speechLang = null;
-    chapterKey = site.chapterKey(chapterUrl);
+    currentContainer = site.container(document);
+    if (site.inPage) setActiveChapter(currentContainer);
+    chapterKey = site.chapterKey(chapterUrl, currentContainer);
     chapterHash = textHash(paras.map(function(p) {
       return p.text;
     }).join("\n"));
@@ -6320,7 +6500,7 @@ button:active:not(:disabled) { transform: scale(.96); }
     player.start(fromIndex || 0, st().currentEngine || "native");
   }
   async function offerResume() {
-    var key = site.chapterKey(chapterUrl);
+    var key = site.chapterKey(chapterUrl, site.container(document));
     var saved = await loadProgress(key);
     resumeAt = saved && saved.index > 0 ? saved : null;
     setResume(resumeAt ? { index: resumeAt.index, total: resumeAt.total } : null);
@@ -6343,7 +6523,7 @@ button:active:not(:disabled) { transform: scale(.96); }
     startReading(from);
   }
   function handleRestart() {
-    clearProgress(chapterKey || site.chapterKey(chapterUrl));
+    clearProgress(chapterKey || site.chapterKey(chapterUrl, site.container(document)));
     resumeAt = null;
     setResume(null);
     startReading(0);
@@ -6368,7 +6548,87 @@ button:active:not(:disabled) { transform: scale(.96); }
     nextChapter.promise.catch(function() {
     });
   }
+  function waitFor(test, ms) {
+    return new Promise(function(resolve) {
+      var found = test();
+      if (found) {
+        resolve(found);
+        return;
+      }
+      var done = false;
+      function finish(v) {
+        if (done) return;
+        done = true;
+        mo.disconnect();
+        clearInterval(nudge);
+        clearTimeout(timer2);
+        resolve(v);
+      }
+      var mo = new MutationObserver(function() {
+        var v = test();
+        if (v) finish(v);
+      });
+      mo.observe(document.documentElement, { childList: true, subtree: true });
+      var nudge = setInterval(function() {
+        var v = test();
+        if (v) finish(v);
+        else if (site.pullMore) site.pullMore(currentContainer);
+      }, 1500);
+      var timer2 = setTimeout(function() {
+        finish(test() || null);
+      }, ms);
+    });
+  }
+  async function readInPage(next) {
+    setActiveChapter(next);
+    chapterUrl = new URL(window.location.href);
+    prepared = false;
+    clearHighlight();
+    next.scrollIntoView({ behavior: "smooth", block: "start" });
+    startReading(0);
+  }
+  async function advanceInPage() {
+    setStatus(ts("nextLoading"));
+    stopContentObserver();
+    var cur = currentContainer;
+    var next = site.nextContainer(document, cur);
+    if (!next) {
+      site.pullMore(cur);
+      next = await waitFor(function() {
+        return site.nextContainer(document, cur);
+      }, 1e4);
+    }
+    if (next) {
+      if (site.isLocked(next)) {
+        setStatus(ts("nextLocked"), true);
+        return;
+      }
+      return readInPage(next);
+    }
+    var ctl = site.nextControl(document, cur, chapterUrl);
+    if (ctl && ctl.href) {
+      try {
+        await browser.storage.local.set({ pendingAutoplay: { url: ctl.href, ts: Date.now() } });
+      } catch (_) {
+      }
+      window.location.href = ctl.href;
+      return;
+    }
+    if (ctl && ctl.button) {
+      var before = window.location.href;
+      ctl.button.click();
+      next = await waitFor(function() {
+        var n = site.nextContainer(document, cur);
+        if (n) return n;
+        var now = site.container(document);
+        return window.location.href !== before && now && now !== cur && now.isConnected ? now : null;
+      }, 1e4);
+      if (next) return site.isLocked(next) ? setStatus(ts("nextLocked"), true) : readInPage(next);
+    }
+    setStatus(site.isLocked(cur) ? ts("nextLocked") : ts("nextNotFound"), true);
+  }
   async function goToNextChapter() {
+    if (site.inPage) return advanceInPage();
     prefetchNextChapter();
     if (!nextChapter) {
       setStatus(ts("chapterDone"));
@@ -6416,7 +6676,8 @@ button:active:not(:disabled) { transform: scale(.96); }
       var p = got.pendingAutoplay;
       if (!p) return;
       await browser.storage.local.remove("pendingAutoplay");
-      if (p.url !== window.location.href || Date.now() - p.ts > 12e4) return;
+      var target = new URL(p.url);
+      if (target.hostname !== window.location.hostname || Date.now() - p.ts > 12e4) return;
       setStatus(ts("pressRead"));
       startReading(0);
     } catch (_) {
@@ -6428,7 +6689,7 @@ button:active:not(:disabled) { transform: scale(.96); }
     stopContentObserver();
     if (site.id !== "webnovel" && site.id !== "generic") return;
     var target = site.container(document) || document.body;
-    var root = target.parentElement || document.body;
+    var root = site.inPage ? target : target.parentElement || document.body;
     observedLength = paragraphs.length;
     contentObserver = new MutationObserver(function() {
       checkForNewParagraphs(root);
@@ -6658,6 +6919,17 @@ button:active:not(:disabled) { transform: scale(.96); }
     if (player.state !== "idle") handleStop();
     setPanelVisible(false);
   }
+  window.addEventListener("zentts-seek", function(e) {
+    if (player.state === "idle" || !e.detail) return;
+    var p = paragraphs.findIndex(function(x) {
+      return x.el === e.detail.el;
+    });
+    if (p < 0) return;
+    var i = sentences.findIndex(function(s) {
+      return s.refIdx === p;
+    });
+    if (i >= 0) player.jump(i);
+  });
   browser.runtime.onMessage.addListener(function(msg) {
     if (msg && msg.action === "panel_toggle") {
       if (msg.on) showPanel();

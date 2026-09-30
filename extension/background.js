@@ -13211,6 +13211,9 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case "panel_state":
       isActive(sender.tab).then((on2) => sendResponse({ success: true, on: on2 })).catch(() => sendResponse({ success: true, on: false }));
       return true;
+    case "open_library":
+      browser.tabs.create({ url: browser.runtime.getURL("library.html"), index: sender.tab ? sender.tab.index + 1 : void 0 }).then(() => sendResponse({ success: true })).catch((err) => sendResponse({ success: false, error: err.message }));
+      return true;
     case "panel_set":
       if (sender.tab) setTabActive(sender.tab.id, !!message.on);
       sendResponse({ success: true });
@@ -13499,9 +13502,14 @@ function showBadge(tabId, on2) {
   browser.action.setTitle({ tabId, title: on2 ? "zenTTS \xB7 activo (clic para ocultar)" : "zenTTS \xB7 clic para mostrar" }).catch(() => {
   });
 }
-function openReader(tab) {
+async function openReader(tab) {
   const url = browser.runtime.getURL("reader.html") + "?src=" + encodeURIComponent(tab.url);
-  return browser.tabs.update(tab.id, { url });
+  try {
+    await browser.tabs.create({ url, index: tab.index + 1, openerTabId: tab.id });
+  } catch (e) {
+    console.error("[zenTTS] reader:", e.message || e);
+    await browser.tabs.create({ url });
+  }
 }
 async function toggle(tab) {
   if (!tab) return;
