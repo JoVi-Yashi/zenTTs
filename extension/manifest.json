@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "zenTTS",
-  "version": "0.5.0",
-  "description": "Floating TTS panel — read any page aloud. Native SpeechSynthesis or edge-tts neural voices. Wattpad, AO3, FanFiction support.",
+  "version": "1.0.0",
+  "description": "Reads the page aloud, sentence by sentence, marking where it is: fanfics, articles and PDFs. Browser, neural (edge-tts) or offline (Piper) voices, and offline translation.",
   "author": "JoVi-Yashi",
   "homepage_url": "https://github.com/JoVi-Yashi/zenTTs",
   "browser_specific_settings": {
@@ -43,7 +43,7 @@
     "type": "module"
   },
   "action": {
-    "default_title": "zenTTS",
+    "default_title": "zenTTS · clic para mostrar",
     "default_icon": {
       "16": "icons/icon-16.png",
       "32": "icons/icon-32.png",
@@ -72,5 +72,16 @@
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  },
+  "optional_host_permissions": [
+    "<all_urls>"
+  ],
+  "commands": {
+    "toggle-panel": {
+      "suggested_key": {
+        "default": "Alt+Shift+Z"
+      },
+      "description": "Show or hide the zenTTS panel in this tab"
+    }
   }
 }

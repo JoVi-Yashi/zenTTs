@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>zenTTS · PDF</title>
+<link rel="icon" href="icons/icon-32.png">
+<style>
+  :root {
+    --paper: #efe9dc; --sheet: #fbf8f1; --ink: #2a2622; --ink-soft: #6d655a; --rule: #ddd4c3; --accent: #9a3b25;
+    --serif: "Iowan Old Style", "Charter", "Source Serif 4", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --paper: #161412; --sheet: #23201c; --ink: #e9e2d4; --ink-soft: #a39a8b; --rule: #3a352e; --accent: #d9785c; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); font: 14px/1.5 var(--sans); }
+  .bar {
+    position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 14px;
+    padding: 10px 20px; background: color-mix(in srgb, var(--sheet) 92%, transparent);
+    border-bottom: 1px solid var(--rule); backdrop-filter: blur(6px);
+  }
+  .logo { font: 600 17px var(--serif); }
+  .logo em { font-style: italic; font-weight: 400; color: var(--accent); }
+  #doc-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-soft); }
+  #doc-pages { color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+  .btn {
+    padding: 5px 12px; border-radius: 4px; border: 1px solid var(--ink); background: transparent; color: var(--ink);
+    font: 13px var(--sans); cursor: pointer;
+  }
+  .btn:hover { background: color-mix(in srgb, var(--ink) 7%, transparent); }
+  .btn.main { background: var(--ink); color: var(--sheet); }
+  #pages { display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 28px 16px 160px; }
+  .page {
+    position: relative; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 8px 24px rgba(0,0,0,.10);
+    border-radius: 2px; overflow: hidden;
+  }
+  .page canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .page .num { position: absolute; right: -44px; bottom: 0; color: var(--ink-soft); font: italic 12px var(--serif); }
+  /* pdf.js text layer: invisible text over the rendered page, for highlighting and selection */
+  .textLayer { position: absolute; text-align: initial; inset: 0; overflow: clip; opacity: 1; line-height: 1;
+    text-size-adjust: none; forced-color-adjust: none; transform-origin: 0 0; z-index: 0; }
+  .textLayer :is(span, br) { color: transparent; position: absolute; white-space: pre; cursor: text; transform-origin: 0% 0%; }
+  .textLayer .para { display: contents; }
+  .textLayer .skip { opacity: .5; }
+  .center { max-width: 520px; margin: 12vh auto; padding: 32px; text-align: center; }
+  .center h1 { font: 600 24px var(--serif); margin: 0 0 8px; }
+  .center p { color: var(--ink-soft); margin: 8px 0 18px; }
+  #drop { border: 2px dashed var(--rule); border-radius: 10px; background: var(--sheet); transition: border-color .15s ease, background-color .15s ease; }
+  #drop.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, var(--sheet)); }
+  #drop-name { font-weight: 600; color: var(--ink); word-break: break-all; }
+  .muted { font-size: 12px; }
+  #loading .meter { height: 3px; background: var(--rule); border-radius: 2px; overflow: hidden; margin-top: 14px; }
+  #loading .meter i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s ease; }
+  [hidden] { display: none !important; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+  <header class="bar">
+    <span class="logo">zen<em>TTS</em></span>
+    <span id="doc-title"></span>
+    <span id="doc-pages"></span>
+    <button type="button" class="btn" id="open-other" hidden></button>
+    <input type="file" id="file" accept="application/pdf,.pdf" hidden>
+  </header>
+
+  <section id="drop" class="center" hidden>
+    <h1 id="drop-title"></h1>
+    <p id="drop-text"></p>
+    <button type="button" class="btn main" id="choose"></button>
+    <p class="muted" id="drop-why"></p>
+  </section>
+
+  <section id="allow" class="center" hidden>
+    <h1 id="allow-title"></h1>
+    <p id="allow-text"></p>
+    <button type="button" class="btn main" id="allow-btn"></button>
+  </section>
+
+  <section id="loading" class="center" hidden>
+    <p id="loading-text"></p>
+    <div class="meter"><i id="loading-bar"></i></div>
+  </section>
+
+  <main id="pages"></main>
+
+  <script type="module" src="reader.js"></script>
+</body>
+</html>

@@ -4,12 +4,14 @@
     <a href="README.md">Español</a> · <a href="README.en.md">English</a>
 </p>
 
-Un panel TTS que se inyecta en cualquier página con Shadow DOM. Extrae el texto, lo lee con **SpeechSynthesis nativo** o con **edge-tts** (45 voces neurales de Microsoft), y resalta cada oración en tiempo real. Incluye una **app de escritorio** para gestionar el servidor sin tocar la terminal.
+Un panel que lee en voz alta la página o el PDF que tienes abierto, marcando la oración y la palabra por donde va. Extrae solo la historia, la lee con la voz del **navegador**, con las **voces neurales** de Microsoft (edge-tts) o con una **voz local** sin conexión (Piper), y si está en otro idioma la **traduce** mientras escuchas. Incluye una **app de escritorio** para gestionar el servidor de voces neurales.
 
-Diseñado para lectores de Wattpad, AO3 y FanFiction. Construido sobre la [Web Speech API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Speech_API).
+Diseñado para lectores de Wattpad, AO3, FanFiction y Webnovel; funciona en cualquier artículo y en PDF.
+
+**Cómo se usa:** pulsa el botón de zenTTS en la barra del navegador (o `Alt+Mayús+Z`) y luego **Leer**. El panel no aparece por su cuenta en ninguna página.
 
 > [!WARNING]
-> La extensión se carga como complemento temporal en `about:debugging`. No está publicada en addons.mozilla.org.
+> La extensión aún no está publicada en addons.mozilla.org: se carga como complemento temporal en `about:debugging` (ver [Instalación](#instalación)).
 
 <p align="center"><img alt="zenTTS panel" src="docs/screenshot.png" width="640"></p>
 
@@ -82,15 +84,22 @@ make build-extension
 
 ### Cargar la extensión en Zen
 
-1. `about:debugging` → **Cargar complemento temporal**
-2. Selecciona `extension/manifest.json`
+- **Desde la release:** descarga `zentts-1.0.0.zip` de [Releases](https://github.com/JoVi-Yashi/zenTTs/releases/latest) → `about:debugging` → **Este Zen** → **Cargar complemento temporal** → elige el zip.
+- **Desde el código:** `make extension` (o `make build-extension` si ya instalaste dependencias) y en `about:debugging` elige `extension/manifest.json`. `make package` genera `dist/zentts-1.0.0.zip`.
 
 ---
 
 ## Características
 
-### Panel flotante
-Shadow DOM encapsulado. El CSS del sitio jamás interfiere. Aparece abajo a la derecha, colapsable a un círculo de 44px.
+### Aparece solo cuando lo llamas
+El botón de zenTTS en la barra del navegador (o `Alt+Mayús+Z`) muestra u oculta el panel en esa pestaña; se queda al recargar y al pasar de capítulo, y el botón lleva un punto mientras está activo. En ⚙ → Lectura → "Abrir siempre en este sitio" hace que se abra solo en ese dominio. El panel vive en Shadow DOM, así que el CSS del sitio no le afecta.
+
+### Lector de PDF
+En una pestaña con un PDF, el botón abre el lector de zenTTS: las páginas renderizadas con pdf.js, la frase y la palabra marcadas encima, sin encabezados repetidos ni números de página, y con "Continuar donde lo dejaste". Los PDF de internet se cargan solos (la primera vez puede pedir permiso para ese sitio). Firefox no deja que las extensiones lean archivos locales (`file://`), así que para un PDF de tu equipo el lector te pide soltarlo o elegirlo una vez.
+
+### Rendimiento de las voces y qué traducción elegir
+- Las voces Local de **alta calidad** hacen bastante más cálculo por segundo de audio y Piper corre en un solo hilo dentro del navegador: en equipos modestos pueden ir más lentas que la lectura y dejar pausas entre frases. zenTTS precarga la voz, parte las frases largas y genera varias por delante; si aun así no llega, lo avisa en ⚙ → Voz. La calidad **Normal** es el mejor equilibrio.
+- La traducción **en línea** (con el servidor) es la más precisa y casi instantánea. La **sin conexión** (Firefox Translations) es privada y funciona sin internet; es algo menos fina y usa la CPU, así que con voces Local se traduce al ritmo de la lectura para no competir con la voz.
 
 ### Dos motores TTS
 Elige entre SpeechSynthesis nativo (sin dependencias) o edge-tts con voces neurales de Microsoft. Cambias desde ⚙ → Motor sin reiniciar.
@@ -128,8 +137,8 @@ El panel sigue el modo claro u oscuro y, si tienes instalado un tema de Firefox,
 ### Continuar donde lo dejaste
 zenTTS recuerda la oración por la que ibas en cada capítulo. Al volver, el botón dice **Continuar · 34 / 120**; "Desde el inicio" empieza de nuevo.
 
-### Site Manager
-Activa o desactiva la herramienta por dominio con toggle switches. Favicons reales. Persiste entre sesiones.
+### Sitios compatibles
+El botón del globo muestra los sitios con extractor propio (AO3, FanFiction, Wattpad, Webnovel) y la lista de sitios donde el panel se abre solo, que puedes editar.
 
 ### App de escritorio
 GUI nativa con GTK3. Compatible Linux y Windows. Tema oscuro cálido, header bar del sistema, estado en tiempo real.
@@ -152,6 +161,8 @@ zenTTs/
 │   ├── src/progress.js     # Recordar la posición por capítulo
 │   ├── src/background.js   # Proxy al servidor + Piper
 │   ├── src/panel.js        # UI del panel, settings, sitios
+│   ├── src/reader.js       # Lector de PDF (pdf.js)
+│   ├── reader.html         # Página del lector
 │   └── icons/
 ├── server.rb               # API REST Ruby/Sinatra
 ├── gui.rb                  # App de escritorio GTK3

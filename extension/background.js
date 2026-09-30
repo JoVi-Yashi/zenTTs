@@ -13182,13 +13182,11 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
       status(message.from, message.to).then((st) => sendResponse(Object.assign({ success: true }, st))).catch((err) => sendResponse({ success: false, error: err.message }));
       return true;
     case "tr_download": {
-      const tabId = sender.tab && sender.tab.id;
       let last = 0;
       download(message.from, message.to, (fraction) => {
-        if (tabId === void 0 || fraction < 1 && Date.now() - last < 200) return;
+        if (fraction < 1 && Date.now() - last < 200) return;
         last = Date.now();
-        browser.tabs.sendMessage(tabId, { action: "tr_progress", from: message.from, to: message.to, fraction }).catch(() => {
-        });
+        notify(sender, { action: "tr_progress", from: message.from, to: message.to, fraction });
       }).then(() => sendResponse({ success: true })).catch((err) => sendResponse({ success: false, error: err.message }));
       return true;
     }
@@ -13208,7 +13206,17 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
       handleLocalVoices().then(sendResponse).catch((err) => sendResponse({ success: false, error: err.message }));
       return true;
     case "local_download":
-      handleLocalDownload(message.voiceId, sender.tab && sender.tab.id).then(sendResponse).catch((err) => sendResponse({ success: false, error: err.message }));
+      handleLocalDownload(message.voiceId, sender).then(sendResponse).catch((err) => sendResponse({ success: false, error: err.message }));
+      return true;
+    case "panel_state":
+      isActive(sender.tab).then((on2) => sendResponse({ success: true, on: on2 })).catch(() => sendResponse({ success: true, on: false }));
+      return true;
+    case "panel_set":
+      if (sender.tab) setTabActive(sender.tab.id, !!message.on);
+      sendResponse({ success: true });
+      return false;
+    case "local_warm":
+      warmVoice(message.voiceId).then(sendResponse).catch((err) => sendResponse({ success: false, error: err.message }));
       return true;
     case "local_speak":
       handleLocalSpeak(message.text, message.voiceId).then(sendResponse).catch((err) => sendResponse({ success: false, error: err.message }));
@@ -13374,7 +13382,7 @@ async function fetchWithProgress(url, onProgress) {
   return new Blob(chunks);
 }
 var downloads2 = {};
-async function handleLocalDownload(voiceId, tabId) {
+async function handleLocalDownload(voiceId, sender) {
   const path = PATH_MAP[voiceId];
   if (!path) throw new Error("unknown voice " + voiceId);
   if (!downloads2[voiceId]) {
@@ -13385,11 +13393,10 @@ async function handleLocalDownload(voiceId, tabId) {
       const config = await fetchWithProgress(`${base}/${path}.json`);
       let last = 0;
       const model = await fetchWithProgress(`${base}/${path}`, (loaded, total) => {
-        if (tabId === void 0 || Date.now() - last < 250) return;
+        if (Date.now() - last < 250) return;
         last = Date.now();
         const known = total || ((catalog || []).find((c) => c.key === voiceId) || {}).size || 0;
-        browser.tabs.sendMessage(tabId, { action: "local_progress", voiceId, loaded, total: known }).catch(() => {
-        });
+        notify(sender, { action: "local_progress", voiceId, loaded, total: known });
       });
       await saveFile(dir, file, model);
       await saveFile(dir, file + ".json", config);
@@ -13408,18 +13415,123 @@ async function sessionFor(voiceId) {
   session = await TtsSession.create({ voiceId, wasmPaths: WASM_PATHS });
   return session;
 }
-function handleLocalSpeak(text, voiceId) {
-  const job = queue.then(async () => {
-    const stored = await storedVoices();
-    if (!stored.includes(voiceId)) throw new Error("voice not downloaded: " + voiceId);
-    const tts = await sessionFor(voiceId);
-    const wav = await tts.predict(text);
-    return { success: true, audio: await wav.arrayBuffer() };
-  });
+var readyVoices = /* @__PURE__ */ new Set();
+async function ensureStored(voiceId) {
+  if (readyVoices.has(voiceId)) return;
+  if (!(await storedVoices()).includes(voiceId)) throw new Error("voice not downloaded: " + voiceId);
+  readyVoices.add(voiceId);
+}
+function enqueue(fn2) {
+  const job = queue.then(fn2);
   queue = job.catch(() => {
   });
   return job;
 }
+function warmVoice(voiceId) {
+  return enqueue(async () => {
+    await ensureStored(voiceId);
+    const t0 = performance.now();
+    await sessionFor(voiceId);
+    return { success: true, ms: Math.round(performance.now() - t0) };
+  });
+}
+function handleLocalSpeak(text, voiceId) {
+  return enqueue(async () => {
+    await ensureStored(voiceId);
+    const tts = await sessionFor(voiceId);
+    const t0 = performance.now();
+    const wav = await tts.predict(text);
+    return { success: true, audio: await wav.arrayBuffer(), ms: Math.round(performance.now() - t0) };
+  });
+}
+function notify(sender, msg) {
+  const tabId = sender && sender.tab && sender.tab.id;
+  if (tabId !== void 0) browser.tabs.sendMessage(tabId, msg).catch(() => {
+  });
+  if (sender && sender.url && sender.url.startsWith(browser.runtime.getURL(""))) {
+    browser.runtime.sendMessage(msg).catch(() => {
+    });
+  }
+}
+var TABS_KEY = "activeTabs";
+function hostOf(url) {
+  try {
+    return new URL(url).hostname;
+  } catch (_) {
+    return "";
+  }
+}
+function isPdfUrl(url) {
+  try {
+    return /\.pdf$/i.test(new URL(url).pathname);
+  } catch (_) {
+    return false;
+  }
+}
+async function tabStates() {
+  try {
+    return (await browser.storage.session.get(TABS_KEY))[TABS_KEY] || {};
+  } catch (_) {
+    return {};
+  }
+}
+async function isActive(tab) {
+  if (!tab) return false;
+  const states = await tabStates();
+  if (tab.id in states) return states[tab.id];
+  const { autoSites } = await browser.storage.local.get("autoSites");
+  return (autoSites || []).includes(hostOf(tab.url));
+}
+async function setTabActive(tabId, on2) {
+  const states = await tabStates();
+  states[tabId] = on2;
+  try {
+    await browser.storage.session.set({ [TABS_KEY]: states });
+  } catch (_) {
+  }
+  showBadge(tabId, on2);
+}
+function showBadge(tabId, on2) {
+  browser.action.setBadgeText({ tabId, text: on2 ? "\u25CF" : "" }).catch(() => {
+  });
+  browser.action.setBadgeBackgroundColor({ tabId, color: "#9a3b25" }).catch(() => {
+  });
+  browser.action.setTitle({ tabId, title: on2 ? "zenTTS \xB7 activo (clic para ocultar)" : "zenTTS \xB7 clic para mostrar" }).catch(() => {
+  });
+}
+function openReader(tab) {
+  const url = browser.runtime.getURL("reader.html") + "?src=" + encodeURIComponent(tab.url);
+  return browser.tabs.update(tab.id, { url });
+}
+async function toggle(tab) {
+  if (!tab) return;
+  if (isPdfUrl(tab.url)) return openReader(tab);
+  const on2 = !await isActive(tab);
+  await setTabActive(tab.id, on2);
+  browser.tabs.sendMessage(tab.id, { action: "panel_toggle", on: on2 }).catch(() => {
+  });
+}
+browser.action.onClicked.addListener(toggle);
+if (browser.commands && browser.commands.onCommand) {
+  browser.commands.onCommand.addListener(async (command) => {
+    if (command !== "toggle-panel") return;
+    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+    toggle(tab);
+  });
+}
+browser.tabs.onUpdated.addListener(async (tabId, info, tab) => {
+  if (info.status !== "complete") return;
+  showBadge(tabId, await isActive(tab));
+});
+browser.tabs.onRemoved.addListener(async (tabId) => {
+  const states = await tabStates();
+  if (!(tabId in states)) return;
+  delete states[tabId];
+  try {
+    await browser.storage.session.set({ [TABS_KEY]: states });
+  } catch (_) {
+  }
+});
 browser.theme.onUpdated.addListener(async ({ theme, windowId }) => {
   const tabs = await browser.tabs.query(windowId ? { windowId } : {});
   for (const tab of tabs) {

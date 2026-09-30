@@ -15,15 +15,50 @@ var WORD_MARK = '#e3b04b';
 
 var supported = typeof CSS !== 'undefined' && CSS.highlights && typeof Highlight !== 'undefined';
 
+// "page": opaque marks with dark text (web pages). "overlay": see-through
+// marks and no text color, for the PDF reader, whose text layer is invisible
+// and sits on top of the rendered page.
+var theme = 'page';
+export function setHighlightTheme(name) { theme = name; }
+
 function ensureStyles() {
   if (document.getElementById('zentts-highlight')) return;
   var style = document.createElement('style');
   style.id = 'zentts-highlight';
-  style.textContent =
-    '::highlight(' + SENTENCE + ') { background-color: ' + MARK + '; color: ' + INK + '; }\n' +
-    '::highlight(' + WORD + ') { background-color: ' + WORD_MARK + '; color: ' + INK + '; }\n' +
-    '::highlight(' + PICK + ') { background-color: #dbe6f3; color: ' + INK + '; text-decoration: underline dotted 2px #2f5d8a; }';
+  style.textContent = theme === 'overlay'
+    ? '::highlight(' + SENTENCE + ') { background-color: rgba(243, 214, 102, .38); }\n' +
+      '::highlight(' + WORD + ') { background-color: rgba(227, 160, 40, .55); }\n' +
+      '::highlight(' + PICK + ') { background-color: rgba(47, 93, 138, .22); }'
+    : '::highlight(' + SENTENCE + ') { background-color: ' + MARK + '; color: ' + INK + '; }\n' +
+      '::highlight(' + WORD + ') { background-color: ' + WORD_MARK + '; color: ' + INK + '; }\n' +
+      '::highlight(' + PICK + ') { background-color: #dbe6f3; color: ' + INK + '; text-decoration: underline dotted 2px #2f5d8a; }';
   (document.head || document.documentElement).appendChild(style);
+}
+
+// A paragraph can be made of several elements (a PDF paragraph that runs over
+// a page break): el.__zenttsParts lists them in reading order
+function partsOf(el) { return el && el.__zenttsParts ? el.__zenttsParts : [el]; }
+
+function containsNode(el, node) {
+  return partsOf(el).some(function(p) { return p && p.contains(node); });
+}
+
+// Box of a paragraph, also for parts without a box of their own (display: contents)
+function boxOf(el) {
+  var parts = partsOf(el);
+  if (parts.length === 1 && getComputedStyle(parts[0]).display !== 'contents') return parts[0].getBoundingClientRect();
+  var box = null;
+  parts.forEach(function(p) {
+    var r = document.createRange();
+    r.selectNodeContents(p);
+    var b = r.getBoundingClientRect();
+    if (!b.width && !b.height) return;
+    box = box ? { left: Math.min(box.left, b.left), top: Math.min(box.top, b.top), right: Math.max(box.right, b.right), bottom: Math.max(box.bottom, b.bottom) } : { left: b.left, top: b.top, right: b.right, bottom: b.bottom };
+  });
+  box = box || { left: 0, top: 0, right: 0, bottom: 0 };
+  box.width = box.right - box.left;
+  box.height = box.bottom - box.top;
+  return box;
 }
 
 // ---- Text → DOM positions ----
@@ -46,24 +81,27 @@ var indexes = new WeakMap();
 
 // { text, map[i] = {node, offset} } for one paragraph, rebuilt if it changed
 function indexOf(el) {
-  var raw = el.textContent;
+  var parts = partsOf(el);
+  var raw = parts.map(function(p) { return p.textContent; }).join('\n');
   var cached = indexes.get(el);
   if (cached && cached.raw === raw) return cached;
   var text = '';
   var map = [];
-  var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
-    acceptNode: function(n) {
-      var p = n.parentNode && n.parentNode.nodeName;
-      return p === 'SCRIPT' || p === 'STYLE' ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+  parts.forEach(function(part) {
+    var walker = document.createTreeWalker(part, NodeFilter.SHOW_TEXT, {
+      acceptNode: function(n) {
+        var p = n.parentNode && n.parentNode.nodeName;
+        return p === 'SCRIPT' || p === 'STYLE' ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    for (var node = walker.nextNode(); node; node = walker.nextNode()) {
+      var data = node.data;
+      for (var i = 0; i < data.length; i++) {
+        var c = compactChars(data[i]);
+        for (var k = 0; k < c.length; k++) { text += c[k]; map.push({ node: node, offset: i }); }
+      }
     }
   });
-  for (var node = walker.nextNode(); node; node = walker.nextNode()) {
-    var data = node.data;
-    for (var i = 0; i < data.length; i++) {
-      var c = compactChars(data[i]);
-      for (var k = 0; k < c.length; k++) { text += c[k]; map.push({ node: node, offset: i }); }
-    }
-  }
   var idx = { raw: raw, text: text, map: map };
   indexes.set(el, idx);
   return idx;
@@ -105,6 +143,14 @@ function markParagraph(el) {
   if (el === fallbackEl) return;
   clearFallback();
   if (!el || !el.isConnected) return;
+  // Parts without a box (PDF text layer): mark their text instead
+  if (supported && (el.__zenttsParts || getComputedStyle(el).display === 'contents')) {
+    ensureStyles();
+    var whole = new Highlight();
+    partsOf(el).forEach(function(p) { var r = document.createRange(); r.selectNodeContents(p); whole.add(r); });
+    CSS.highlights.set(SENTENCE, whole);
+    return;
+  }
   fallbackStyle = { background: el.style.background, boxShadow: el.style.boxShadow, color: el.style.color };
   el.style.background = MARK;
   el.style.boxShadow = '-6px 0 0 ' + MARK + ', 6px 0 0 ' + MARK;
@@ -113,10 +159,11 @@ function markParagraph(el) {
 }
 
 function scrollIfNeeded(target) {
-  var rect = target.getBoundingClientRect();
+  var rect = target.startContainer ? target.getBoundingClientRect() : boxOf(target);
   var margin = Math.min(120, window.innerHeight * 0.15);
   if (rect.top >= margin && rect.bottom <= window.innerHeight - margin) return;
-  var el = target.startContainer ? target.startContainer.parentElement : target;
+  var el = target.startContainer ? target.startContainer.parentElement : partsOf(target)[0];
+  if (el && getComputedStyle(el).display === 'contents') el = el.firstElementChild;
   if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
@@ -202,7 +249,7 @@ export function sentenceAtPoint(x, y, paragraphs, sentences) {
   if (!caret || !caret.node) return -1;
   var p = -1;
   for (var i = 0; i < paragraphs.length; i++) {
-    if (paragraphs[i].el && paragraphs[i].el.contains(caret.node)) { p = i; break; }
+    if (paragraphs[i].el && containsNode(paragraphs[i].el, caret.node)) { p = i; break; }
   }
   if (p < 0) return -1;
 
@@ -234,7 +281,7 @@ export function showPick(el, sentence, hint) {
   var range = at >= 0 ? rangeFromCompact(idx, at, at + needle.length) : null;
   if (!range) {
     range = document.createRange();
-    range.selectNodeContents(el);
+    range.selectNodeContents(partsOf(el)[0]);
   }
   CSS.highlights.set(PICK, new Highlight(range));
 }
@@ -250,6 +297,7 @@ export function clearPick() {
 // styles and DOM are untouched.
 
 var caption = null;   // { host, box, text, words: [span], el }
+var suppressed = false; // a panel dialog is open
 
 var CAPTION_CSS =
   ':host { all: initial; }\n' +
@@ -270,7 +318,8 @@ function captionHost() {
   var host = document.createElement('div');
   host.id = 'zentts-caption';
   // Child of <html>: absolute positions are page coordinates, whatever <body> does
-  host.style.cssText = 'position:absolute;top:0;left:0;z-index:2147483000;pointer-events:none;display:none;';
+  // Below the panel (999999), so the panel's reading view and dialogs cover it
+  host.style.cssText = 'position:absolute;top:0;left:0;z-index:999998;pointer-events:none;display:none;';
   var root = host.attachShadow({ mode: 'open' });
   var style = document.createElement('style');
   style.textContent = CAPTION_CSS;
@@ -285,8 +334,9 @@ function captionHost() {
 
 function placeCaption() {
   if (!caption || !caption.el || caption.host.style.display === 'none') return;
+  caption.host.style.visibility = suppressed ? 'hidden' : '';
   if (!caption.el.isConnected) { hideCaption(); return; }
-  var r = caption.el.getBoundingClientRect();
+  var r = boxOf(caption.el);
   var width = Math.min(Math.max(r.width, 260), 680, window.innerWidth - 16);
   var left = Math.max(8, Math.min(r.left, window.innerWidth - width - 8));
   caption.host.style.width = width + 'px';
@@ -334,4 +384,10 @@ export function hideCaption() {
   caption.host.style.display = 'none';
   caption.text = null;
   caption.el = null;
+}
+
+// Hidden while the panel shows "Extracted text" or "Sites", back afterwards
+export function suppressCaption(on) {
+  suppressed = !!on;
+  if (caption) caption.host.style.visibility = suppressed ? 'hidden' : '';
 }

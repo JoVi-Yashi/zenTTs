@@ -2,6 +2,7 @@
 // Page highlighting happens on the actual DOM, not in this panel
 
 import { applyPanelColors, themeTokens, parseColor, toHex } from './theme.js';
+import { suppressCaption } from './highlight.js';
 
 var ACCENT_PRESETS = ['#9a3b25', '#2f5d8a', '#3f7a4a', '#7a3b6e', '#b07a1c'];
 
@@ -18,7 +19,7 @@ const PANEL_HTML = `
           <circle cx="12" cy="12" r="3"></circle>
         </svg>
       </button>
-      <button id="tts-zen-sites-btn" title="Gestionar sitios">
+      <button id="tts-zen-sites-btn" title="Sitios compatibles">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="10"></circle>
           <line x1="2" y1="12" x2="22" y2="12"></line>
@@ -67,6 +68,14 @@ const PANEL_HTML = `
           <div class="select-wrap">
             <select id="tts-zen-voice"></select>
           </div>
+        </div>
+        <div class="setting-row" id="tts-zen-voice-info-row" hidden>
+          <label></label>
+          <div class="hint-text" id="tts-zen-voice-info"></div>
+        </div>
+        <div class="setting-row" id="tts-zen-slow-hint" hidden>
+          <label></label>
+          <div class="hint-text warn" id="tts-zen-slow-text"></div>
         </div>
         <div class="setting-row" id="tts-zen-voice-hint" hidden>
           <label></label>
@@ -117,6 +126,10 @@ const PANEL_HTML = `
         <label class="check-row">
           <input type="checkbox" id="tts-zen-autonext">
           <span id="tts-zen-autonext-label">Seguir con el siguiente capítulo</span>
+        </label>
+        <label class="check-row" id="tts-zen-autoopen-row">
+          <input type="checkbox" id="tts-zen-autoopen">
+          <span id="tts-zen-autoopen-label">Abrir siempre en este sitio</span>
         </label>
         <label class="check-row">
           <input type="checkbox" id="tts-zen-inline-tr">
@@ -239,6 +252,8 @@ const PANEL_HTML = `
   </div>
 </div>
 
+<div id="tts-zen-tip" role="tooltip" hidden></div>
+<div id="tts-zen-bubble-ghost" data-corner="br" aria-hidden="true"></div>
 <div id="tts-zen-collapsed" class="hidden" data-corner="br" role="button" tabindex="0" title="zenTTS">
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
@@ -276,7 +291,7 @@ const PANEL_HTML = `
 <div id="tts-zen-sites-overlay" class="hidden">
   <div id="tts-zen-sites-modal">
     <div id="tts-zen-sites-header">
-      <span>Sitios</span>
+      <span>Sitios compatibles</span>
       <button id="tts-zen-sites-close">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
           <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -526,6 +541,14 @@ button:active:not(:disabled) { transform: scale(.96); }
 .check-row { display: flex; align-items: flex-start; gap: 8px; font-size: 12px; line-height: 1.35; color: var(--ink-soft); cursor: pointer; }
 .check-row input { accent-color: var(--ink); margin: 1px 0 0; flex-shrink: 0; }
 
+.hint-text.warn { color: var(--accent); }
+#tts-zen-tip {
+  position: fixed; z-index: 10000000; max-width: 240px; padding: 5px 8px; border-radius: 4px;
+  background: var(--ink); color: var(--sheet); font: 12px/1.35 var(--sans);
+  box-shadow: 0 4px 14px rgba(0,0,0,.18); pointer-events: none;
+  animation: tip-in .14s ease;
+}
+@keyframes tip-in { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
 .hint-text { flex: 1; min-width: 0; font-size: 12px; line-height: 1.35; color: var(--ink-soft); }
 .link-btn {
   background: none; border: none; padding: 0; cursor: pointer; font: inherit;
@@ -622,8 +645,15 @@ button:active:not(:disabled) { transform: scale(.96); }
   transition: transform .16s ease, opacity .12s ease, visibility 0s .16s;
 }
 #tts-zen-collapsed:hover { color: var(--accent); }
-#tts-zen-collapsed.dragging { transition: none; cursor: grabbing; box-shadow: 0 8px 24px rgba(0,0,0,.22); }
-#tts-zen-collapsed.settling { transition: transform .42s cubic-bezier(.34,1.56,.64,1); }
+#tts-zen-collapsed.dragging { transition: none; cursor: grabbing; box-shadow: 0 10px 28px rgba(0,0,0,.24); }
+/* Where the bubble will land while it is being dragged */
+#tts-zen-bubble-ghost {
+  position: fixed; z-index: 999998; width: 40px; height: 40px; border-radius: 50%;
+  border: 2px dashed var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent);
+  opacity: 0; transform: scale(.6); pointer-events: none;
+  transition: opacity .18s ease, transform .22s cubic-bezier(.2,.8,.2,1), top .22s cubic-bezier(.2,.8,.2,1), left .22s cubic-bezier(.2,.8,.2,1), right .22s cubic-bezier(.2,.8,.2,1), bottom .22s cubic-bezier(.2,.8,.2,1);
+}
+#tts-zen-bubble-ghost.show { opacity: 1; transform: scale(1); }
 
 /* Modals */
 #tts-zen-preview-overlay, #tts-zen-sites-overlay {
@@ -711,20 +741,15 @@ button:active:not(:disabled) { transform: scale(.96); }
 .site-row-info { display: flex; flex-direction: column; min-width: 0; }
 .site-row-name { font-size: 14px; color: var(--ink); }
 .site-row-domain { font-size: 12px; color: var(--ink-soft); }
-.site-toggle {
-  width: 34px; height: 20px; border-radius: 10px; border: none; padding: 0;
-  cursor: pointer; position: relative; background: var(--rule); flex-shrink: 0;
-  transition: background .15s ease;
-}
-.site-toggle.on { background: var(--accent); }
-.site-toggle::after {
-  content: ''; position: absolute; top: 3px; left: 3px;
-  width: 14px; height: 14px; border-radius: 50%; background: var(--sheet);
-  transition: transform .15s ease;
-}
-.site-toggle.on::after { transform: translateX(14px); }
-
 .site-add-row { padding-top: 12px; }
+.sites-section { margin: 14px 0 2px; font-size: 12px; color: var(--ink-soft); font-variant: small-caps; letter-spacing: .04em; }
+.sites-section:first-child { margin-top: 4px; }
+.sites-hint { margin: 2px 0 6px; font-size: 12px; line-height: 1.4; color: var(--ink-soft); }
+.site-remove {
+  flex-shrink: 0; width: 24px; height: 24px; padding: 0; border: none; border-radius: 4px;
+  background: transparent; color: var(--ink-soft); cursor: pointer;
+}
+.site-remove:hover { background: var(--hover); color: var(--ink); }
 #tts-zen-add-site-input {
   flex: 1; min-width: 0; padding: 6px 8px; border-radius: 4px;
   border: 1px solid var(--rule); background: var(--sheet); color: var(--ink);
@@ -746,13 +771,13 @@ button:active:not(:disabled) { transform: scale(.96); }
 
 var T = {
   es: {
-    minimize: 'Minimizar', preview: 'Ver texto extraído', sites: 'Gestionar sitios',
+    minimize: 'Minimizar', preview: 'Ver texto extraído', sites: 'Sitios compatibles',
     settings: 'Ajustes', voice: 'Voz', engine: 'Motor', engineNative: 'Nativo (Browser)',
     engineNeural: 'Neural (edge-tts)', speed: 'Velocidad', langLabel: 'Idioma',
     langES: 'Español', langEN: 'English', prev: 'Anterior', next: 'Siguiente',
     read: 'Leer', ready: 'Listo', extractedText: 'Texto extraído', reduce: 'Reducir',
     increase: 'Aumentar', lessSpacing: 'Menos espacio', moreSpacing: 'Más espacio',
-    sitesModal: 'Sitios', loadingVoices: 'Cargando voces...',
+    sitesModal: 'Sitios compatibles', loadingVoices: 'Cargando voces...',
     loadingEdgeVoices: 'Cargando voces edge-tts...', serverUnavailable: 'Servidor no disponible',
     unknown: 'desconocido', line: 'Línea', noText: 'Sin texto — haz clic en Leer primero.',
     generic: 'Genérico', otherSites: 'otros sitios', addSite: 'Añadir',
@@ -774,16 +799,29 @@ var T = {
     trOffline: 'Paquete sin conexión', trOnlineMode: 'En línea', trNever: 'No traducir',
     remembered: 'Elecciones recordadas', forget: 'Olvidar', neuralHint: '¿Aún más natural? El motor Neural usa voces de Microsoft.',
     tryNeural: 'Usar Neural', qHigh: 'Alta calidad', qMedium: 'Normal', qLow: 'Ligera',
-    retry: 'No se pudo descargar · Reintentar', downloadPct: 'Descargando… %s'
+    retry: 'No se pudo descargar · Reintentar', downloadPct: 'Descargando… %s',
+    tipHigh: 'Alta calidad · la más natural; ~110 MB y tarda más en generar cada frase',
+    tipMedium: 'Normal · buen equilibrio entre naturalidad y rapidez; ~60 MB',
+    tipLow: 'Ligera · la más rápida y pequeña; suena más robótica',
+    tipNative: 'Voces del navegador: al instante, sin descargas; calidad según tu sistema',
+    tipServer: 'Voces neurales de Microsoft (edge-tts): las más naturales; necesita el servidor en marcha',
+    tipLocal: 'Piper en tu equipo: sin conexión una vez descargada la voz',
+    infoNative: 'Voz del navegador · al instante', infoNativeRobotic: 'Voz del sistema (espeak) · suena robótica',
+    infoServer: 'Neural · la más natural; necesita el servidor',
+    slowVoice: 'En tu equipo esta voz se genera más despacio de lo que suena (x%s), por eso hay pausas entre frases. Prueba una de calidad Normal o Ligera.',
+    autoOpen: 'Abrir siempre en este sitio', presetsTitle: 'Sitios con extractor propio',
+    presetNext: 'solo la historia · capítulo siguiente en la misma página', presetScroll: 'solo la historia · sigue el scroll infinito',
+    presetGeneric: 'cualquier otra página · extractor de artículos', autoTitle: 'Abrir siempre en',
+    autoHint: 'El panel aparece al pulsar el botón de zenTTS en la barra del navegador (Alt+Mayús+Z). En estos sitios se abre solo.'
   },
   en: {
-    minimize: 'Minimize', preview: 'View extracted text', sites: 'Manage sites',
+    minimize: 'Minimize', preview: 'View extracted text', sites: 'Supported sites',
     settings: 'Settings', voice: 'Voice', engine: 'Engine', engineNative: 'Native (Browser)',
     engineNeural: 'Neural (edge-tts)', speed: 'Speed', langLabel: 'Language',
     langES: 'Español', langEN: 'English', prev: 'Previous', next: 'Next',
     read: 'Read', ready: 'Ready', extractedText: 'Extracted text', reduce: 'Decrease',
     increase: 'Increase', lessSpacing: 'Less spacing', moreSpacing: 'More spacing',
-    sitesModal: 'Sites', loadingVoices: 'Loading voices...',
+    sitesModal: 'Supported sites', loadingVoices: 'Loading voices...',
     loadingEdgeVoices: 'Loading edge-tts voices...', serverUnavailable: 'Server unavailable',
     unknown: 'unknown', line: 'Line', noText: 'No text — click Read first.',
     generic: 'Generic', otherSites: 'other sites', addSite: 'Add',
@@ -805,7 +843,20 @@ var T = {
     trOffline: 'Offline pack', trOnlineMode: 'Online', trNever: "Don't translate",
     remembered: 'Remembered choices', forget: 'Forget', neuralHint: 'Even more natural? The Neural engine uses Microsoft voices.',
     tryNeural: 'Use Neural', qHigh: 'High quality', qMedium: 'Standard', qLow: 'Light',
-    retry: 'Download failed · Retry', downloadPct: 'Downloading… %s'
+    retry: 'Download failed · Retry', downloadPct: 'Downloading… %s',
+    tipHigh: 'High quality · the most natural; ~110 MB and slower to generate each sentence',
+    tipMedium: 'Standard · a good balance of naturalness and speed; ~60 MB',
+    tipLow: 'Light · the fastest and smallest; sounds more robotic',
+    tipNative: 'Browser voices: instant, nothing to download; quality depends on your system',
+    tipServer: 'Microsoft neural voices (edge-tts): the most natural; needs the server running',
+    tipLocal: 'Piper on your computer: offline once the voice is downloaded',
+    infoNative: 'Browser voice · instant', infoNativeRobotic: 'System voice (espeak) · sounds robotic',
+    infoServer: 'Neural · the most natural; needs the server',
+    slowVoice: 'On your computer this voice takes longer to generate than to play (x%s), hence the pauses between sentences. Try a Standard or Light one.',
+    autoOpen: 'Always open on this site', presetsTitle: 'Sites with their own extractor',
+    presetNext: 'just the story · next chapter in the same page', presetScroll: 'just the story · follows infinite scroll',
+    presetGeneric: 'any other page · article extractor', autoTitle: 'Always open on',
+    autoHint: 'The panel appears when you press the zenTTS button in the browser toolbar (Alt+Shift+Z). On these sites it opens by itself.'
   }
 };
 
@@ -1001,8 +1052,10 @@ async function loadLocalVoices() {
     if (region) parts.push(region);
     if (localStored.includes(v.key)) parts.push(t('downloaded'));
     else if (v.size) parts.push(Math.round(v.size / 1048576) + ' MB');
+    var q = QUALITY[v.quality] || 'qMedium';
     return {
-      name: v.key, label: parts.join(' · '), lang: v.language, size: v.size,
+      name: v.key, label: parts.join(' · '), lang: v.language, size: v.size, quality: q,
+      tip: t({ qHigh: 'tipHigh', qMedium: 'tipMedium', qLow: 'tipLow' }[q]),
       group: v.key.toLowerCase().startsWith(prefix) ? (QUALITY[v.quality] || 'qMedium') : null
     };
   });
@@ -1014,6 +1067,7 @@ async function loadLocalVoices() {
   }
   populateVoiceDropdown('localVoice');
   updateLocalRow();
+  warmLocalVoice();
 }
 
 // Sets a .fill-btn's label and water level (fraction 0..1, or null when idle)
@@ -1124,7 +1178,7 @@ function populateVoiceDropdown(key) {
     var opt = document.createElement('option');
     opt.value = v.name;
     opt.textContent = (v.label || v.name) + (withLang && v.label && v.label.indexOf(langLabel(v.lang)) !== 0 ? ' — ' + langLabel(v.lang) : '');
-    opt.title = v.name;
+    opt.title = v.tip ? v.tip + ' — ' + v.name : v.name;
     opt.selected = v.name === state[key];
     return opt;
   }
@@ -1142,7 +1196,51 @@ function populateVoiceDropdown(key) {
     select.appendChild(rest);
   }
   var chosen = state.voices.find(function(v) { return v.name === state[key]; });
-  select.title = chosen ? chosen.name : '';
+  select.title = chosen ? (chosen.tip ? chosen.tip + ' — ' : '') + chosen.name : '';
+  renderVoiceInfo();
+}
+
+// One line under the voice list describing the chosen voice
+function renderVoiceInfo() {
+  var row = getEl('tts-zen-voice-info-row'), el = getEl('tts-zen-voice-info');
+  if (!row || !el) return;
+  var text = '';
+  if (state.currentEngine === 'local') {
+    var v = (state.voices || []).find(function(x) { return x.name === state.localVoice; });
+    text = v && v.tip ? v.tip : '';
+  } else if (state.currentEngine === 'server') {
+    text = t('infoServer');
+  } else {
+    var n = (state.voices || []).find(function(x) { return x.name === state.currentVoice; });
+    if (n) text = n.robotic ? t('infoNativeRobotic') : t('infoNative');
+  }
+  el.textContent = text;
+  row.hidden = !text;
+  renderSlowHint();
+}
+
+var slowVoices = {};   // voiceId → generation time / audio time
+
+function renderSlowHint() {
+  var row = getEl('tts-zen-slow-hint');
+  if (!row) return;
+  var ratio = slowVoices[state.localVoice];
+  var show = state.currentEngine === 'local' && ratio > 1;
+  row.hidden = !show;
+  if (show) getEl('tts-zen-slow-text').textContent = tf('slowVoice', ratio.toFixed(1));
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('zentts-voice-speed', function(e) {
+    slowVoices[e.detail.voice] = e.detail.ratio;
+    renderSlowHint();
+  });
+}
+
+// Loads the chosen Piper voice in the background page before it is needed
+function warmLocalVoice() {
+  if (state.currentEngine !== 'local' || !localStored.includes(state.localVoice)) return;
+  try { browser.runtime.sendMessage({ action: 'local_warm', voiceId: state.localVoice }).catch(function() {}); } catch (_) {}
 }
 
 function applyLanguage(shadow) {
@@ -1150,7 +1248,7 @@ function applyLanguage(shadow) {
   // Update settings label texts
   [['tts-zen-voice-label', 'voice'], ['tts-zen-engine-label', 'engine'], ['tts-zen-lang-label', 'uiLang'],
    ['tts-zen-tab-voice', 'tabVoice'], ['tts-zen-tab-read', 'tabRead'], ['tts-zen-tab-tr', 'tabTr'], ['tts-zen-tab-look', 'tabLook'],
-   ['tts-zen-inline-tr-label', 'inlineTr'], ['tts-zen-trmode-label', 'trMode'],
+   ['tts-zen-inline-tr-label', 'inlineTr'], ['tts-zen-autoopen-label', 'autoOpen'], ['tts-zen-trmode-label', 'trMode'],
    ['tts-zen-neural-hint-text', 'neuralHint'], ['tts-zen-try-neural', 'tryNeural'],
    ['tts-zen-translate-title', 'translateTitle'], ['tts-zen-speed-text', 'speed'],
    ['tts-zen-autonext-label', 'autoNext'], ['tts-zen-restart', 'restart'],
@@ -1194,7 +1292,11 @@ function applyLanguage(shadow) {
     engineSelect.options[0].textContent = T[lang].engineNative;
     engineSelect.options[1].textContent = T[lang].engineNeural;
     engineSelect.options[2].textContent = T[lang].engineLocal;
+    engineSelect.options[0].title = T[lang].tipNative;
+    engineSelect.options[1].title = T[lang].tipServer;
+    engineSelect.options[2].title = T[lang].tipLocal;
   }
+  renderVoiceInfo();
 
   // Update status
   var statusEl = shadow.getElementById('tts-zen-status');
@@ -1219,13 +1321,6 @@ function applyLanguage(shadow) {
     if (tool.dataset.spacing === 'down') tool.title = T[lang].lessSpacing;
     if (tool.dataset.spacing === 'up') tool.title = T[lang].moreSpacing;
   });
-  // Update generic site name in ALL_SITES
-  for (var i = 0; i < ALL_SITES.length; i++) {
-    if (ALL_SITES[i].id === 'generic') {
-      ALL_SITES[i].name = T[lang].generic;
-      ALL_SITES[i].domain = T[lang].otherSites;
-    }
-  }
   // Update add site input placeholder
   var addInput = shadow.getElementById('tts-zen-add-site-input');
   if (addInput) addInput.placeholder = T[lang].addSitePlaceholder;
@@ -1237,6 +1332,54 @@ function applyLanguage(shadow) {
       !shadow.getElementById('tts-zen-sites-overlay').classList.contains('hidden')) {
     renderSitesList();
   }
+  tipify(shadow);
+}
+
+// ---- Tooltips ----
+// Icon buttons show a tooltip in the panel's style instead of the system one.
+// The tooltip lives outside the panel, so the panel's rounded clip doesn't cut it.
+
+function tipify(shadow) {
+  shadow.querySelectorAll('#tts-zen-panel button[title], #tts-zen-collapsed[title], .preview-tool[title], #tts-zen-preview-close, #tts-zen-sites-close').forEach(function(b) {
+    var text = b.getAttribute('title');
+    if (!text) return;
+    b.setAttribute('data-tip', text);
+    b.setAttribute('aria-label', text);
+    b.removeAttribute('title');
+  });
+}
+
+function setupTooltips(shadow) {
+  var tip = shadow.getElementById('tts-zen-tip');
+  var timer = null, current = null;
+  function hide() { clearTimeout(timer); current = null; tip.hidden = true; }
+  function show(el) {
+    tip.textContent = el.getAttribute('data-tip');
+    tip.hidden = false;
+    var r = el.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
+    var top = r.top - h - 8 > 4 ? r.top - h - 8 : r.bottom + 8;
+    var left = Math.max(6, Math.min(window.innerWidth - w - 6, r.left + r.width / 2 - w / 2));
+    tip.style.top = top + 'px';
+    tip.style.left = left + 'px';
+  }
+  shadow.addEventListener('pointerover', function(e) {
+    var el = e.target.closest && e.target.closest('[data-tip]');
+    if (el === current) return;
+    hide();
+    if (!el || el.classList.contains('dragging')) return;
+    current = el;
+    timer = setTimeout(function() { if (current === el) show(el); }, 380);
+  });
+  shadow.addEventListener('pointerout', function(e) {
+    var to = e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest('[data-tip]');
+    if (to !== current) hide();
+  });
+  shadow.addEventListener('pointerdown', hide, true);
+  shadow.addEventListener('focusin', function(e) {
+    var el = e.target.closest && e.target.closest('[data-tip]');
+    if (el && el.matches(':focus-visible')) { current = el; show(el); }
+  });
+  shadow.addEventListener('focusout', hide);
 }
 
 // ---- UI Helpers ----
@@ -1368,14 +1511,6 @@ export async function createPanel(shadow, handlers) {
   // Load settings FIRST — before any DOM creation
   await loadSettings();
   await loadCollapsedState();
-  await loadSiteSettings();
-
-  // If current site is disabled, abort silently
-  if (!isCurrentSiteAllowed()) {
-    var hostEl = document.getElementById('tts-zen-host');
-    if (hostEl) hostEl.remove();
-    return;
-  }
 
   const style = document.createElement('style');
   style.textContent = PANEL_CSS;
@@ -1422,13 +1557,16 @@ export async function createPanel(shadow, handlers) {
   const settingsPanel = shadow.getElementById('tts-zen-settings');
   settingsBtn.addEventListener('click', function() { settingsPanel.classList.toggle('collapsed'); });
   setupTabs(shadow);
+  setupTooltips(shadow);
 
   const voiceSelect = shadow.getElementById('tts-zen-voice');
   voiceSelect.addEventListener('change', function() {
-    if (state.currentEngine === 'local') { state.localVoice = voiceSelect.value; updateLocalRow(); }
+    if (state.currentEngine === 'local') { state.localVoice = voiceSelect.value; updateLocalRow(); warmLocalVoice(); }
     else state.currentVoice = voiceSelect.value;
     syncShared();
     saveSettings();
+    renderVoiceInfo();
+    if (handlers.onVoice) handlers.onVoice();
   });
   shadow.getElementById('tts-zen-local-dl').addEventListener('click', downloadLocalVoice);
   setupColors(shadow);
@@ -1444,6 +1582,7 @@ export async function createPanel(shadow, handlers) {
     window.__tts_zen_state.currentEngine = engineSelect.value;
     saveSettings();
     await loadVoices();
+    if (handlers.onEngine) handlers.onEngine(state.currentEngine);
   });
 
   const langSelect = shadow.getElementById('tts-zen-lang');
@@ -1473,6 +1612,10 @@ export async function createPanel(shadow, handlers) {
     engineSelect.value = 'server';
     engineSelect.dispatchEvent(new Event('change'));
   });
+
+  var autoOpen = shadow.getElementById('tts-zen-autoopen');
+  autoOpen.addEventListener('change', function() { setAutoSite(currentHost(), autoOpen.checked); });
+  loadAutoSites();
 
   var inlineTr = shadow.getElementById('tts-zen-inline-tr');
   inlineTr.checked = state.inlineTr;
@@ -1714,7 +1857,7 @@ export function setPickActive(on) {
 
 function applyCorner() {
   var corner = state.corner || 'br';
-  ['tts-zen-panel', 'tts-zen-collapsed'].forEach(function(id) {
+  ['tts-zen-panel', 'tts-zen-collapsed', 'tts-zen-bubble-ghost'].forEach(function(id) {
     var el = getEl(id);
     if (el) el.dataset.corner = corner;
   });
@@ -1728,43 +1871,74 @@ function setCorner(corner) {
 
 var suppressClick = false;
 
+function nearestCorner(cx, cy) {
+  return (cy < window.innerHeight / 2 ? 't' : 'b') + (cx < window.innerWidth / 2 ? 'l' : 'r');
+}
+
 function setupBubble(shadow) {
   var bubble = shadow.getElementById('tts-zen-collapsed');
+  var ghost = shadow.getElementById('tts-zen-bubble-ghost');
   var drag = null;
+  var reduce = function() { return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; };
+
+  // The bubble follows the pointer with a light spring, kept inside the window
+  function frame() {
+    if (!drag || !drag.moved) return;
+    var k = reduce() ? 1 : 0.35;
+    drag.cx += (drag.tx - drag.cx) * k;
+    drag.cy += (drag.ty - drag.cy) * k;
+    bubble.style.transform = 'translate(' + drag.cx.toFixed(1) + 'px,' + drag.cy.toFixed(1) + 'px) scale(1.08)';
+    var r = drag.home;
+    var corner = nearestCorner(r.left + r.width / 2 + drag.cx, r.top + r.height / 2 + drag.cy);
+    if (ghost.dataset.corner !== corner) ghost.dataset.corner = corner;
+    drag.raf = requestAnimationFrame(frame);
+  }
 
   bubble.addEventListener('pointerdown', function(e) {
     if (e.button !== 0) return;
-    drag = { x: e.clientX, y: e.clientY, moved: false, id: e.pointerId };
+    var home = bubble.getBoundingClientRect();
+    drag = { x: e.clientX, y: e.clientY, moved: false, id: e.pointerId, home: home, tx: 0, ty: 0, cx: 0, cy: 0 };
     bubble.setPointerCapture(e.pointerId);
   });
   bubble.addEventListener('pointermove', function(e) {
     if (!drag) return;
     var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     if (!drag.moved && Math.hypot(dx, dy) < 5) return;
-    drag.moved = true;
-    bubble.classList.add('dragging');
-    bubble.style.transform = 'translate(' + dx + 'px,' + dy + 'px) scale(1.08)';
+    var r = drag.home, m = 6;
+    drag.tx = Math.max(m - r.left, Math.min(window.innerWidth - m - r.right, dx));
+    drag.ty = Math.max(m - r.top, Math.min(window.innerHeight - m - r.bottom, dy));
+    if (!drag.moved) {
+      drag.moved = true;
+      bubble.getAnimations().forEach(function(a) { a.cancel(); });
+      bubble.classList.add('dragging');
+      ghost.dataset.corner = state.corner || 'br';
+      ghost.classList.add('show');
+      drag.raf = requestAnimationFrame(frame);
+    }
   });
-  function end(e) {
+  function end() {
     if (!drag) return;
     var d = drag;
     drag = null;
+    cancelAnimationFrame(d.raf);
+    ghost.classList.remove('show');
     if (!d.moved) return;
     suppressClick = true;
-    // FLIP: remember where it was dropped, move the anchor to the nearest
-    // corner, then animate from the drop point into the corner
+    // FLIP with the Web Animations API: remember where it was dropped, anchor it
+    // to the nearest corner, then fly from the drop point into the corner
     var before = bubble.getBoundingClientRect();
-    var cx = before.left + before.width / 2, cy = before.top + before.height / 2;
-    var corner = (cy < window.innerHeight / 2 ? 't' : 'b') + (cx < window.innerWidth / 2 ? 'l' : 'r');
+    var corner = nearestCorner(before.left + before.width / 2, before.top + before.height / 2);
     bubble.style.transform = '';
-    bubble.classList.remove('dragging');
     setCorner(corner);
     var after = bubble.getBoundingClientRect();
-    bubble.style.transform = 'translate(' + (before.left - after.left) + 'px,' + (before.top - after.top) + 'px)';
-    void bubble.offsetWidth;
-    bubble.classList.add('settling');
-    bubble.style.transform = '';
-    setTimeout(function() { bubble.classList.remove('settling'); }, 450);
+    var dx = before.left - after.left, dy = before.top - after.top;
+    bubble.classList.remove('dragging');
+    if (reduce() || !bubble.animate) return;
+    var dist = Math.hypot(dx, dy);
+    bubble.animate([
+      { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(1.08)' },
+      { transform: 'translate(0,0) scale(1)' }
+    ], { duration: Math.round(Math.max(350, Math.min(650, 300 + dist * 0.45))), easing: 'cubic-bezier(.34,1.3,.64,1)' });
   }
   bubble.addEventListener('pointerup', end);
   bubble.addEventListener('pointercancel', end);
@@ -1783,8 +1957,22 @@ function setupBubble(shadow) {
     else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleCollapse(); return; }
     else return;
     e.preventDefault();
-    setCorner(v + h);
+    moveBubbleTo(v + h);
   });
+}
+
+// Keyboard: animate between corners too
+function moveBubbleTo(corner) {
+  var bubble = getEl('tts-zen-collapsed');
+  if (!bubble || corner === state.corner) return;
+  var before = bubble.getBoundingClientRect();
+  setCorner(corner);
+  var after = bubble.getBoundingClientRect();
+  if (!bubble.animate || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
+  bubble.animate([
+    { transform: 'translate(' + (before.left - after.left) + 'px,' + (before.top - after.top) + 'px)' },
+    { transform: 'translate(0,0)' }
+  ], { duration: 480, easing: 'cubic-bezier(.34,1.3,.64,1)' });
 }
 
 // ---- Minimize / Collapse ----
@@ -1837,6 +2025,7 @@ export function showPreview(text) {
   renderPreviewContent(content);
   applyPreviewStyle();
   overlay.classList.remove('hidden');
+  suppressCaption(true);
 }
 
 function renderPreviewContent(content) {
@@ -1877,6 +2066,7 @@ export function updatePreviewSentences() {
 
 function closeOverlay(overlay) {
   if (!overlay || overlay.classList.contains('hidden')) return;
+  suppressCaption(false);
   overlay.classList.add('closing');
   overlay.style.opacity = '0';
   setTimeout(function() { overlay.classList.add('hidden'); overlay.classList.remove('closing'); overlay.style.opacity = ''; }, 190);
@@ -1938,174 +2128,158 @@ export function setPauseIcon(isPlaying) {
 }
 
 
-// ---- Site Manager ----
+// ---- Supported sites and "always open here" ----
+// The panel only appears when turned on with the toolbar button. Sites listed
+// in autoSites open it by themselves. The presets are the sites with their own
+// extractor; any other page is read with the generic one.
 
-var ALL_SITES = [
-  { id: 'wattpad.com', name: 'Wattpad', domain: 'wattpad.com' },
-  { id: 'archiveofourown.org', name: 'AO3', domain: 'archiveofourown.org' },
-  { id: 'fanfiction.net', name: 'FanFiction', domain: 'fanfiction.net' },
-  { id: 'webnovel.com', name: 'Webnovel', domain: 'webnovel.com' },
-  { id: 'generic', name: 'Genérico', domain: 'otros sitios' },
+var PRESETS = [
+  { id: 'archiveofourown.org', name: 'Archive of Our Own', icon: 'icons/sites/ao3.svg', what: 'presetNext' },
+  { id: 'fanfiction.net', name: 'FanFiction.net', icon: 'icons/sites/fanfiction.svg', what: 'presetNext' },
+  { id: 'wattpad.com', name: 'Wattpad', icon: 'icons/sites/wattpad.svg', what: 'presetNext' },
+  { id: 'webnovel.com', name: 'Webnovel', icon: 'icons/sites/webnovel.svg', what: 'presetScroll' }
 ];
 
-var fallbackIcons = {
-  'wattpad.com': 'icons/sites/wattpad.svg',
-  'archiveofourown.org': 'icons/sites/ao3.svg',
-  'fanfiction.net': 'icons/sites/fanfiction.svg',
-  'webnovel.com': 'icons/sites/webnovel.svg',
-};
+var autoSites = [];
 
-function faviconUrl(domain) {
-  if (domain === 'otros sitios') return '';
-  return 'https://www.google.com/s2/favicons?domain=' + domain + '&sz=32';
+function currentHost() { return window.location.hostname; }
+
+async function loadAutoSites() {
+  try { autoSites = (await browser.storage.local.get('autoSites')).autoSites || []; } catch (_) { autoSites = []; }
+  renderAutoOpen();
 }
 
-function faviconFallback(domain) {
-  var path = fallbackIcons[domain];
-  if (!path) return '';
-  try { return browser.runtime.getURL(path); } catch (_) { return ''; }
+async function saveAutoSites() {
+  try { await browser.storage.local.set({ autoSites: autoSites }); } catch (_) {}
+  renderAutoOpen();
 }
 
-// Default: all enabled
-var enabledSites = {};
+function setAutoSite(host, on) {
+  if (!host) return;
+  autoSites = autoSites.filter(function(h) { return h !== host; });
+  if (on) autoSites.push(host);
+  saveAutoSites();
+}
 
-async function loadSiteSettings() {
-  try {
-    var stored = await browser.storage.local.get(['enabledSites', 'customSites']);
-    if (stored.enabledSites) {
-      enabledSites = stored.enabledSites;
-    } else {
-      ALL_SITES.forEach(function(s) { enabledSites[s.id] = true; });
-    }
-    if (stored.customSites) {
-      stored.customSites.forEach(function(s) {
-        if (!ALL_SITES.some(function(x) { return x.id === s.id; })) {
-          ALL_SITES.push(s);
-          if (enabledSites[s.id] === undefined) enabledSites[s.id] = true;
-        }
-      });
-    }
-    window.__tts_zen_enabled_sites = enabledSites;
-  } catch (_) {
-    ALL_SITES.forEach(function(s) { enabledSites[s.id] = true; });
-    window.__tts_zen_enabled_sites = enabledSites;
+function renderAutoOpen() {
+  var box = getEl('tts-zen-autoopen');
+  if (box) {
+    box.checked = autoSites.includes(currentHost());
+    box.disabled = !currentHost() || window.location.protocol === 'moz-extension:';
   }
+  var row = getEl('tts-zen-autoopen-row');
+  if (row) row.hidden = !currentHost() || window.location.protocol === 'moz-extension:';
+  var overlay = getEl('tts-zen-sites-overlay');
+  if (overlay && !overlay.classList.contains('hidden')) renderSitesList();
 }
 
-async function saveSiteSettings() {
-  var custom = ALL_SITES.filter(function(s) {
-    return !['wattpad.com', 'archiveofourown.org', 'fanfiction.net', 'webnovel.com', 'generic'].includes(s.id);
-  });
-  try { await browser.storage.local.set({ enabledSites: enabledSites, customSites: custom }); } catch (_) {}
-  window.__tts_zen_enabled_sites = enabledSites;
+function iconUrl(path) {
+  try { return browser.runtime.getURL(path); } catch (_) { return ''; }
 }
 
 function renderSitesList() {
   var list = getEl('tts-zen-sites-list');
   if (!list) return;
   list.replaceChildren();
-  ALL_SITES.forEach(function(site) {
-    var enabled = enabledSites[site.id] !== false;
-    var row = document.createElement('div');
-    row.className = 'site-row';
+
+  function section(text) {
+    var h = document.createElement('div');
+    h.className = 'sites-section';
+    h.textContent = text;
+    list.appendChild(h);
+  }
+  function row(icon, name, detail, action) {
+    var r = document.createElement('div');
+    r.className = 'site-row';
     var left = document.createElement('div');
     left.className = 'site-row-left';
-    if (site.id === 'generic') {
-      var iconDiv = document.createElement('div');
-      iconDiv.className = 'site-row-icon';
-      iconDiv.textContent = '+';
-      left.appendChild(iconDiv);
+    if (icon) {
+      var img = document.createElement('img');
+      img.className = 'site-row-icon';
+      img.src = icon; img.width = 20; img.height = 20; img.alt = '';
+      left.appendChild(img);
     } else {
-      var iconImg = document.createElement('img');
-      iconImg.className = 'site-row-icon';
-      iconImg.src = faviconUrl(site.domain);
-      iconImg.width = 20;
-      iconImg.height = 20;
-      iconImg.onerror = function() { var fb = faviconFallback(site.id); if (fb) this.src = fb; };
-      left.appendChild(iconImg);
+      var dot = document.createElement('div');
+      dot.className = 'site-row-icon';
+      dot.textContent = '◆';
+      left.appendChild(dot);
     }
     var info = document.createElement('div');
     info.className = 'site-row-info';
-    var nameEl = document.createElement('div');
-    nameEl.className = 'site-row-name';
-    nameEl.textContent = site.name;
-    var domainEl = document.createElement('div');
-    domainEl.className = 'site-row-domain';
-    domainEl.textContent = site.domain;
-    info.appendChild(nameEl);
-    info.appendChild(domainEl);
+    var n = document.createElement('div');
+    n.className = 'site-row-name';
+    n.textContent = name;
+    var d = document.createElement('div');
+    d.className = 'site-row-domain';
+    d.textContent = detail;
+    info.append(n, d);
     left.appendChild(info);
-    row.appendChild(left);
+    r.appendChild(left);
+    if (action) r.appendChild(action);
+    list.appendChild(r);
+  }
 
-    var toggle = document.createElement('button');
-    toggle.className = 'site-toggle' + (enabled ? ' on' : '');
-    toggle.dataset.site = site.id;
-    row.appendChild(toggle);
+  section(t('presetsTitle'));
+  PRESETS.forEach(function(p) { row(iconUrl(p.icon), p.name, p.id + ' · ' + t(p.what)); });
+  row(null, t('generic'), t('presetGeneric'));
 
-    toggle.addEventListener('click', function() {
-      var siteId = this.dataset.site;
-      enabledSites[siteId] = !(enabledSites[siteId] !== false);
-      this.classList.toggle('on', enabledSites[siteId] !== false);
-      saveSiteSettings();
-    });
-
-    list.appendChild(row);
+  section(t('autoTitle'));
+  var hint = document.createElement('p');
+  hint.className = 'sites-hint';
+  hint.textContent = t('autoHint');
+  list.appendChild(hint);
+  autoSites.slice().sort().forEach(function(host) {
+    var del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'site-remove';
+    del.textContent = '✕';
+    del.setAttribute('data-tip', t('remove'));
+    del.setAttribute('aria-label', t('remove') + ' ' + host);
+    del.addEventListener('click', function() { setAutoSite(host, false); });
+    var preset = PRESETS.find(function(p) { return host.endsWith(p.id); });
+    row(preset ? iconUrl(preset.icon) : null, host, preset ? preset.name : t('generic'), del);
   });
 
-  // Add site input
   var addRow = document.createElement('div');
   addRow.className = 'site-row site-add-row';
   var input = document.createElement('input');
   input.id = 'tts-zen-add-site-input';
   input.type = 'text';
   input.placeholder = t('addSitePlaceholder');
-
   var addBtn = document.createElement('button');
   addBtn.id = 'tts-zen-add-site-btn';
+  addBtn.type = 'button';
   addBtn.textContent = t('addSite');
-
-  addRow.appendChild(input);
-  addRow.appendChild(addBtn);
-
+  addRow.append(input, addBtn);
   list.appendChild(addRow);
-
   addBtn.addEventListener('click', function() {
-    var domain = input.value.trim().toLowerCase();
-    if (!domain || domain === 'otros sitios') return;
-    // Remove protocol and path
-    domain = domain.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
-    if (!domain.includes('.')) return;
-
-    // Check duplicate
-    if (ALL_SITES.some(function(s) { return s.id === domain; })) return;
-
-    ALL_SITES.push({ id: domain, name: domain.split('.')[0], domain: domain });
-    enabledSites[domain] = true;
-    saveSiteSettings();
-    input.value = '';
-    renderSitesList(); // re-render
+    var domain = input.value.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    if (!domain.includes('.') || autoSites.includes(domain)) return;
+    setAutoSite(domain, true);
   });
-
-  input.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') addBtn.click();
-  });
+  input.addEventListener('keydown', function(e) { if (e.key === 'Enter') addBtn.click(); });
 }
 
 function showSitesModal() {
   renderSitesList();
   var overlay = getEl('tts-zen-sites-overlay');
-  if (overlay) overlay.classList.remove('hidden');
+  if (overlay) { overlay.classList.remove('hidden'); suppressCaption(true); }
 }
 
 function hideSitesModal() { closeOverlay(getEl('tts-zen-sites-overlay')); }
 
-function isCurrentSiteAllowed() {
-  var sites = window.__tts_zen_enabled_sites || enabledSites;
-  var host = window.location.hostname;
-  for (var siteId in sites) {
-    if (siteId === 'generic') continue;
-    if (host.includes(siteId)) return sites[siteId] !== false;
-  }
-  return sites['generic'] !== false;
-}
+// ---- Showing and hiding the whole panel (toolbar button) ----
 
+export function setPanelVisible(on) {
+  var host = document.getElementById('tts-zen-host');
+  if (!host) return;
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (on) {
+    host.style.display = '';
+    if (!reduce && host.animate) host.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 180, easing: 'ease-out' });
+    return;
+  }
+  var done = function() { host.style.display = 'none'; };
+  if (reduce || !host.animate) { done(); return; }
+  host.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 160, easing: 'ease-in' }).onfinish = done;
+}

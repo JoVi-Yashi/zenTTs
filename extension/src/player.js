@@ -23,12 +23,14 @@ export function createPlayer(hooks) {
   function setState(s) { state = s; hooks.onState(s); }
 
   function context(run) {
-    var opts = hooks.options();
+    // Voice settings are read live, so a change applies from the next utterance
+    var localOverride = null;
     return {
       sentences: sentences,
-      voice: opts.voice,
-      localVoice: opts.localVoice,
-      lang: opts.lang,
+      get voice() { return hooks.options().voice; },
+      get localVoice() { return localOverride || hooks.options().localVoice; },
+      set localVoice(v) { localOverride = v; },
+      get lang() { return hooks.options().lang; },
       rate: function() { return hooks.options().rate; },
       onSentence: function(i) {
         if (run !== runId) return;

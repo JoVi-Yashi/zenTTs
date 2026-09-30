@@ -4,7 +4,7 @@
 // continues with the next chapter in the same page.
 import { Readability } from '@mozilla/readability';
 import { createPanel, setStatus, setButtonsEnabled, setCounter, setPauseIcon, setResume, updatePreviewSentences,
-         setDetectedLanguage, setTranslateOffer, setTranslateProgress, refreshPacks, setPickActive } from './panel.js';
+         setDetectedLanguage, setTranslateOffer, setTranslateProgress, refreshPacks, setPickActive, setPanelVisible } from './panel.js';
 import { siteFor } from './sites.js';
 import { createPlayer } from './player.js';
 import { textHash, loadProgress, saveProgress, flushProgress, clearProgress, pruneProgress } from './progress.js';
@@ -13,18 +13,8 @@ import * as marker from './highlight.js';
 // ---- URL Guard ----
 const RESTRICTED_PROTOCOLS = ['edge:', 'about:', 'file:', 'chrome:', 'moz-extension:'];
 
-function shouldInject() {
-  var proto = window.location.protocol;
-  if (RESTRICTED_PROTOCOLS.includes(proto)) return false;
-
-  var sites = window.__tts_zen_enabled_sites || {};
-  var host = window.location.hostname;
-  for (var siteId in sites) {
-    if (siteId === 'generic') continue;
-    if (host.includes(siteId)) return sites[siteId] !== false;
-  }
-  return sites['generic'] !== false;
-}
+// The PDF reader (an extension page) provides its own paragraphs
+var embed = window.__zentts_embed || null;
 
 // ---- Shared state with the panel ----
 
@@ -72,7 +62,11 @@ function ts(key, arg) {
 
 // ---- Extraction ----
 
-var site = siteFor(window.location.hostname);
+// In the PDF reader the "site" is the document itself: no next chapter
+var site = embed ? {
+  id: 'pdf', container: function() { return null; }, paragraphs: function() { return []; },
+  chapterKey: function() { return embed.key; }, nextUrl: function() { return null; }
+} : siteFor(window.location.hostname);
 var chapterDoc = document;           // document the current chapter came from
 var chapterUrl = new URL(window.location.href);
 
@@ -94,6 +88,10 @@ function cleanText(text) {
 
 // Returns [{el, text}] — el is null when the text came from Readability
 function extractParagraphs() {
+  if (embed) {
+    return embed.paragraphs().map(function(p) { return { el: p.el, text: cleanText(p.text) }; })
+      .filter(function(p) { return p.text.length >= 2; });
+  }
   var container = site.container(document);
   if (container) {
     var paras = site.paragraphs(container)
@@ -314,6 +312,13 @@ async function translateRest(rest, gen) {
   var bg = background = { gen: gen, done: false, progress: 0, waiters: [] };
   try {
     for (var k = 0; k < rest.length; k += BATCH) {
+      // Offline translation and the Piper voice share the CPU: with the local
+      // voice, only stay a couple of batches ahead of what is being read
+      while (plan.mode === 'offline' && st().currentEngine === 'local' && player.state === 'playing' &&
+             gen === chapterGen && paragraphs.length - readingParagraph() > BATCH * 2) {
+        await nextSentenceTick();
+      }
+      if (gen !== chapterGen) return;
       var batch = rest.slice(k, k + BATCH);
       var out;
       try { out = await translateWith(plan.mode, batch, plan.from, plan.to); }
@@ -336,6 +341,16 @@ async function translateRest(rest, gen) {
     notifyWaiters();
     if (gen === chapterGen && player.state === 'playing') setStatus(playingStatus());
   }
+}
+
+function readingParagraph() {
+  var s = sentences[player.index];
+  return s ? s.refIdx : 0;
+}
+
+var sentenceTicks = [];
+function nextSentenceTick() {
+  return new Promise(function(r) { sentenceTicks.push(r); setTimeout(r, 4000); });
 }
 
 function playingStatus() {
@@ -391,6 +406,8 @@ var player = createPlayer({
     return { voice: s.currentVoice, localVoice: s.localVoice, rate: s.currentRate || 1, lang: lang };
   },
   onSentence: function(i) {
+    var ticks = sentenceTicks; sentenceTicks = [];
+    ticks.forEach(function(r) { r(); });
     var s = sentences[i];
     setCounter(i + 1, sentences.length);
     currentWord = -1;
@@ -745,12 +762,25 @@ browser.runtime.onMessage.addListener(function(msg) {
 
 // ---- Controls ----
 
+var restartOnResume = false;   // voice or engine changed while paused
+
 function handlePause() {
   if (player.state === 'playing') player.pause();
-  else if (player.state === 'paused') player.resume();
+  else if (player.state === 'paused') {
+    if (restartOnResume) { restartOnResume = false; player.start(player.index, st().currentEngine || 'native'); }
+    else player.resume();
+  }
+}
+
+// A new voice or engine applies right away: the current sentence starts over
+// with it (audio already generated with the old voice is dropped)
+function applyVoiceChange() {
+  if (player.state === 'playing') player.start(player.index, st().currentEngine || 'native');
+  else if (player.state === 'paused') restartOnResume = true;
 }
 
 function handleStop() {
+  restartOnResume = false;
   stopContentObserver();
   player.stop();
   clearHighlight();
@@ -763,9 +793,10 @@ function handlePrev() { if (player.index >= 0) player.jump(player.index - 1); }
 function handleNext() { if (player.index >= 0) player.jump(player.index + 1); }
 
 // ---- Initialization ----
+// The panel only appears once it is turned on for this tab with the toolbar
+// button (or the site is set to always open it).
 
-// Default enabled sites (panel.js overrides from storage after async load)
-window.__tts_zen_enabled_sites = { 'wattpad.com': true, 'archiveofourown.org': true, 'fanfiction.net': true, 'webnovel.com': true, 'generic': true };
+var panelReady = null;
 
 function injectPanel() {
   const host = document.createElement('div');
@@ -774,7 +805,7 @@ function injectPanel() {
   document.body.appendChild(host);
 
   const shadow = host.attachShadow({ mode: 'open' });
-  createPanel(shadow, {
+  return createPanel(shadow, {
     onRead: handleRead,
     onRestart: handleRestart,
     onPause: handlePause,
@@ -784,6 +815,8 @@ function injectPanel() {
     onRate: function(r) { player.setRate(r); },
     onPick: togglePick,
     onTranslate: onTranslateChoice,
+    onVoice: applyVoiceChange,
+    onEngine: applyVoiceChange,
     onInlineTr: function(on) {
       if (!on) { marker.hideCaption(); return; }
       var s = sentences[player.index];
@@ -796,15 +829,44 @@ function injectPanel() {
     checkPendingAutoplay();
     pruneProgress();
   });
-
-  window.addEventListener('pagehide', flushProgress);
-  // Back/forward after an in-page chapter swap: reload so the page matches the URL
-  window.addEventListener('popstate', function() { if (chapterUrl.href !== window.location.href) window.location.reload(); });
 }
 
-function tryInject() {
-  if (document.body) injectPanel();
-  else requestAnimationFrame(tryInject);
+function whenBody() {
+  return new Promise(function(r) {
+    (function wait() { if (document.body) r(); else requestAnimationFrame(wait); })();
+  });
 }
 
-if (shouldInject()) tryInject();
+async function showPanel() {
+  if (!panelReady) {
+    panelReady = whenBody().then(injectPanel);
+    window.addEventListener('pagehide', flushProgress);
+    // Back/forward after an in-page chapter swap: reload so the page matches the URL
+    window.addEventListener('popstate', function() { if (chapterUrl.href !== window.location.href) window.location.reload(); });
+  } else {
+    await panelReady;
+    setPanelVisible(true);
+  }
+}
+
+async function hidePanel() {
+  if (!panelReady) return;
+  await panelReady;
+  endPick();
+  if (player.state !== 'idle') handleStop();
+  setPanelVisible(false);
+}
+
+browser.runtime.onMessage.addListener(function(msg) {
+  if (msg && msg.action === 'panel_toggle') { if (msg.on) showPanel(); else hidePanel(); }
+});
+
+async function boot() {
+  if (embed) { showPanel(); return; }
+  if (RESTRICTED_PROTOCOLS.includes(window.location.protocol) || window.top !== window) return;
+  var state = null;
+  try { state = await browser.runtime.sendMessage({ action: 'panel_state' }); } catch (_) {}
+  if (state && state.on) showPanel();
+}
+
+boot();

@@ -50,12 +50,11 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
 
     case 'tr_download': {
-      const tabId = sender.tab && sender.tab.id;
       let last = 0;
       offline.download(message.from, message.to, fraction => {
-        if (tabId === undefined || (fraction < 1 && Date.now() - last < 200)) return;
+        if (fraction < 1 && Date.now() - last < 200) return;
         last = Date.now();
-        browser.tabs.sendMessage(tabId, { action: 'tr_progress', from: message.from, to: message.to, fraction }).catch(() => {});
+        notify(sender, { action: 'tr_progress', from: message.from, to: message.to, fraction });
       })
         .then(() => sendResponse({ success: true }))
         .catch(err => sendResponse({ success: false, error: err.message }));
@@ -93,7 +92,25 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
 
     case 'local_download':
-      handleLocalDownload(message.voiceId, sender.tab && sender.tab.id)
+      handleLocalDownload(message.voiceId, sender)
+        .then(sendResponse)
+        .catch(err => sendResponse({ success: false, error: err.message }));
+      return true;
+
+    case 'panel_state':
+      isActive(sender.tab)
+        .then(on => sendResponse({ success: true, on }))
+        .catch(() => sendResponse({ success: true, on: false }));
+      return true;
+
+    case 'panel_set':
+      // The panel itself turned off (e.g. "Always open here" unchecked and hidden)
+      if (sender.tab) setTabActive(sender.tab.id, !!message.on);
+      sendResponse({ success: true });
+      return false;
+
+    case 'local_warm':
+      warmVoice(message.voiceId)
         .then(sendResponse)
         .catch(err => sendResponse({ success: false, error: err.message }));
       return true;
@@ -288,7 +305,7 @@ async function fetchWithProgress(url, onProgress) {
 
 const downloads = {};
 
-async function handleLocalDownload(voiceId, tabId) {
+async function handleLocalDownload(voiceId, sender) {
   const path = PATH_MAP[voiceId];
   if (!path) throw new Error('unknown voice ' + voiceId);
   if (!downloads[voiceId]) {
@@ -299,11 +316,11 @@ async function handleLocalDownload(voiceId, tabId) {
       const config = await fetchWithProgress(`${base}/${path}.json`);
       let last = 0;
       const model = await fetchWithProgress(`${base}/${path}`, (loaded, total) => {
-        if (tabId === undefined || Date.now() - last < 250) return;
+        if (Date.now() - last < 250) return;
         last = Date.now();
         // Content-Length can be missing behind the CDN redirect: fall back to the catalog size
         const known = total || ((catalog || []).find(c => c.key === voiceId) || {}).size || 0;
-        browser.tabs.sendMessage(tabId, { action: 'local_progress', voiceId, loaded, total: known }).catch(() => {});
+        notify(sender, { action: 'local_progress', voiceId, loaded, total: known });
       });
       // Model first, config last: a voice counts as stored only when both exist
       await saveFile(dir, file, model);
@@ -325,18 +342,131 @@ async function sessionFor(voiceId) {
   return session;
 }
 
-function handleLocalSpeak(text, voiceId) {
-  // One inference at a time: the ONNX session is not re-entrant
-  const job = queue.then(async () => {
-    const stored = await storedVoices();
-    if (!stored.includes(voiceId)) throw new Error('voice not downloaded: ' + voiceId);
-    const tts = await sessionFor(voiceId);
-    const wav = await tts.predict(text);
-    return { success: true, audio: await wav.arrayBuffer() };
-  });
+// Voices known to be stored, so each sentence doesn't list the OPFS folder
+const readyVoices = new Set();
+
+async function ensureStored(voiceId) {
+  if (readyVoices.has(voiceId)) return;
+  if (!(await storedVoices()).includes(voiceId)) throw new Error('voice not downloaded: ' + voiceId);
+  readyVoices.add(voiceId);
+}
+
+// One inference at a time: the ONNX session is not re-entrant
+function enqueue(fn) {
+  const job = queue.then(fn);
   queue = job.catch(() => {});
   return job;
 }
+
+// Loads the model ahead of time, so the first sentence doesn't wait for it
+function warmVoice(voiceId) {
+  return enqueue(async () => {
+    await ensureStored(voiceId);
+    const t0 = performance.now();
+    await sessionFor(voiceId);
+    return { success: true, ms: Math.round(performance.now() - t0) };
+  });
+}
+
+function handleLocalSpeak(text, voiceId) {
+  return enqueue(async () => {
+    await ensureStored(voiceId);
+    const tts = await sessionFor(voiceId);
+    const t0 = performance.now();
+    const wav = await tts.predict(text);
+    // Synthesis time, to compare with the audio length (is the voice keeping up?)
+    return { success: true, audio: await wav.arrayBuffer(), ms: Math.round(performance.now() - t0) };
+  });
+}
+
+// ---- Progress messages ----
+// Content scripts get them through tabs.sendMessage; the PDF reader is an
+// extension page, which gets runtime messages instead.
+
+function notify(sender, msg) {
+  const tabId = sender && sender.tab && sender.tab.id;
+  if (tabId !== undefined) browser.tabs.sendMessage(tabId, msg).catch(() => {});
+  if (sender && sender.url && sender.url.startsWith(browser.runtime.getURL(''))) {
+    browser.runtime.sendMessage(msg).catch(() => {});
+  }
+}
+
+// ---- Toolbar button: show the panel per tab ----
+// Nothing appears by itself: the button (or Alt+Shift+Z) turns the panel on or
+// off in that tab. The choice lives in session storage, so it survives
+// reloads and chapter changes in the tab. Sites marked "always open here"
+// (autoSites) show it in every tab, unless it was turned off in that tab.
+
+const TABS_KEY = 'activeTabs';
+
+function hostOf(url) {
+  try { return new URL(url).hostname; } catch (_) { return ''; }
+}
+
+function isPdfUrl(url) {
+  try { return /\.pdf$/i.test(new URL(url).pathname); } catch (_) { return false; }
+}
+
+async function tabStates() {
+  try { return (await browser.storage.session.get(TABS_KEY))[TABS_KEY] || {}; } catch (_) { return {}; }
+}
+
+async function isActive(tab) {
+  if (!tab) return false;
+  const states = await tabStates();
+  if (tab.id in states) return states[tab.id];
+  const { autoSites } = await browser.storage.local.get('autoSites');
+  return (autoSites || []).includes(hostOf(tab.url));
+}
+
+async function setTabActive(tabId, on) {
+  const states = await tabStates();
+  states[tabId] = on;
+  try { await browser.storage.session.set({ [TABS_KEY]: states }); } catch (_) {}
+  showBadge(tabId, on);
+}
+
+function showBadge(tabId, on) {
+  browser.action.setBadgeText({ tabId, text: on ? '●' : '' }).catch(() => {});
+  browser.action.setBadgeBackgroundColor({ tabId, color: '#9a3b25' }).catch(() => {});
+  browser.action.setTitle({ tabId, title: on ? 'zenTTS · activo (clic para ocultar)' : 'zenTTS · clic para mostrar' }).catch(() => {});
+}
+
+function openReader(tab) {
+  const url = browser.runtime.getURL('reader.html') + '?src=' + encodeURIComponent(tab.url);
+  return browser.tabs.update(tab.id, { url });
+}
+
+async function toggle(tab) {
+  if (!tab) return;
+  if (isPdfUrl(tab.url)) return openReader(tab);
+  const on = !(await isActive(tab));
+  await setTabActive(tab.id, on);
+  browser.tabs.sendMessage(tab.id, { action: 'panel_toggle', on }).catch(() => {});
+}
+
+browser.action.onClicked.addListener(toggle);
+
+if (browser.commands && browser.commands.onCommand) {
+  browser.commands.onCommand.addListener(async (command) => {
+    if (command !== 'toggle-panel') return;
+    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+    toggle(tab);
+  });
+}
+
+// Tab badges are reset when a tab navigates: put them back
+browser.tabs.onUpdated.addListener(async (tabId, info, tab) => {
+  if (info.status !== 'complete') return;
+  showBadge(tabId, await isActive(tab));
+});
+
+browser.tabs.onRemoved.addListener(async (tabId) => {
+  const states = await tabStates();
+  if (!(tabId in states)) return;
+  delete states[tabId];
+  try { await browser.storage.session.set({ [TABS_KEY]: states }); } catch (_) {}
+});
 
 // ---- Browser theme → panel ----
 // Zen keeps its own accent and workspace gradient inside the browser UI, out of

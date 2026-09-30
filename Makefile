@@ -1,4 +1,4 @@
-.PHONY: install build-extension extension launcher gui stop install-desktop flatpak flatpak-install flatpak-run
+.PHONY: install build-extension extension package launcher gui stop install-desktop flatpak flatpak-install flatpak-run
 
 install:
 	gem install sinatra puma rackup gtk3 --user-install
@@ -14,6 +14,14 @@ build-extension:
 
 extension:
 	cd extension && npm install && node build.js
+
+# Release zip for about:debugging / AMO: only what the browser loads
+VERSION := $(shell sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' extension/manifest.json)
+package: build-extension
+	@mkdir -p dist
+	@rm -f dist/zentts-$(VERSION).zip
+	cd extension && zip -qr ../dist/zentts-$(VERSION).zip manifest.json background.js content.js reader.js reader.html icons vendor worker
+	@echo "✅ dist/zentts-$(VERSION).zip"
 
 # ── Launcher ───────────────────────────────────────────
 

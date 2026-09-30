@@ -35,6 +35,11 @@
   </screenshots>
 
   <releases>
+    <release version="1.0.0" date="2026-09-30">
+      <description>
+        <p>Toolbar button to show the panel per tab, PDF reader, offline translation, Piper voices by quality, sentence and word highlighting, and a movable panel.</p>
+      </description>
+    </release>
     <release version="0.4.0" date="2026-08-05">
       <description>
         <p>Ruby port — Sinatra server replaces FastAPI. Dual engine selector (Native + edge-tts). Flatpak support.</p>
