@@ -10,8 +10,8 @@ Built for Wattpad, AO3, FanFiction and Webnovel readers; works on any article an
 
 **How to use it:** press the zenTTS button in the browser toolbar (or `Alt+Shift+Z`), then **Read**. The panel never appears on a page by itself.
 
-> [!WARNING]
-> The extension is not on addons.mozilla.org yet: load it as a temporary add-on in `about:debugging` (see [Installation](#installation)).
+> [!TIP]
+> Now available on addons.mozilla.org: [download zenTTS](https://addons.mozilla.org/en-US/firefox/addon/tts-zen/).
 
 <p align="center"><img alt="zenTTS panel" src="docs/screenshot.png" width="640"></p>
 
@@ -84,6 +84,7 @@ make build-extension
 
 ### Load the extension in Zen
 
+- **From addons.mozilla.org (recommended):** [install zenTTS](https://addons.mozilla.org/en-US/firefox/addon/tts-zen/) — one click, with automatic updates.
 - **From the release:** download `zentts-1.0.0.zip` from [Releases](https://github.com/JoVi-Yashi/zenTTs/releases/latest) → `about:debugging` → **This Zen** → **Load Temporary Add-on** → pick the zip.
 - **From source:** `make extension` (or `make build-extension` once dependencies are installed) and pick `extension/manifest.json` in `about:debugging`. `make package` builds `dist/zentts-1.0.0.zip`.
 
