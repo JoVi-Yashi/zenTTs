@@ -28,9 +28,9 @@ var init_piper_o91UDS6e = __esm({
       return function(moduleArg = {}) {
         var Module = moduleArg;
         var readyPromiseResolve, readyPromiseReject;
-        Module["ready"] = new Promise((resolve, reject) => {
+        Module["ready"] = new Promise((resolve, reject2) => {
           readyPromiseResolve = resolve;
-          readyPromiseReject = reject;
+          readyPromiseReject = reject2;
         });
         if (!Module.expectedDataFileDownloads) {
           Module.expectedDataFileDownloads = 0;
@@ -81,8 +81,8 @@ var init_piper_o91UDS6e = __esm({
                   var total = 0;
                   var loaded = 0;
                   var num = 0;
-                  for (var download in Module.dataFileDownloads) {
-                    var data = Module.dataFileDownloads[download];
+                  for (var download2 in Module.dataFileDownloads) {
+                    var data = Module.dataFileDownloads[download2];
                     total += data.total;
                     loaded += data.loaded;
                     num++;
@@ -218,7 +218,7 @@ var init_piper_o91UDS6e = __esm({
         var moduleOverrides = Object.assign({}, Module);
         var arguments_ = [];
         var thisProgram = "./this.program";
-        var quit_ = (status, toThrow) => {
+        var quit_ = (status2, toThrow) => {
           throw toThrow;
         };
         var ENVIRONMENT_IS_WEB = typeof window == "object";
@@ -262,8 +262,8 @@ var init_piper_o91UDS6e = __esm({
             thisProgram = process.argv[1].replace(/\\/g, "/");
           }
           arguments_ = process.argv.slice(2);
-          quit_ = (status, toThrow) => {
-            process.exitCode = status;
+          quit_ = (status2, toThrow) => {
+            process.exitCode = status2;
             throw toThrow;
           };
           Module["inspect"] = () => "[Emscripten Module object]";
@@ -448,8 +448,8 @@ var init_piper_o91UDS6e = __esm({
                 return response["arrayBuffer"]();
               }).catch(() => getBinarySync(binaryFile));
             } else if (readAsync) {
-              return new Promise((resolve, reject) => {
-                readAsync(binaryFile, (response) => resolve(new Uint8Array(response)), reject);
+              return new Promise((resolve, reject2) => {
+                readAsync(binaryFile, (response) => resolve(new Uint8Array(response)), reject2);
               });
             }
           }
@@ -501,10 +501,10 @@ var init_piper_o91UDS6e = __esm({
         }
         var tempDouble;
         var tempI64;
-        function ExitStatus(status) {
+        function ExitStatus(status2) {
           this.name = "ExitStatus";
-          this.message = `Program terminated with exit(${status})`;
-          this.status = status;
+          this.message = `Program terminated with exit(${status2})`;
+          this.status = status2;
         }
         var callRuntimeCallbacks = (callbacks) => {
           while (callbacks.length > 0) {
@@ -2747,9 +2747,9 @@ var init_piper_o91UDS6e = __esm({
           }
           quit_(code, new ExitStatus(code));
         };
-        var exitJS = (status, implicit) => {
-          EXITSTATUS = status;
-          _proc_exit(status);
+        var exitJS = (status2, implicit) => {
+          EXITSTATUS = status2;
+          _proc_exit(status2);
         };
         var _exit = exitJS;
         function _fd_close(fd) {
@@ -12506,6 +12506,657 @@ async function voices() {
   }
 }
 
+// node_modules/@browsermt/bergamot-translator/translator.js
+if (!(typeof window !== "undefined" && window.Worker)) {
+  globalThis.Worker = class {
+    #worker;
+    constructor(url) {
+      this.#worker = new Promise(async (accept) => {
+        const { Worker: Worker2 } = await import(
+          /* webpackIgnore: true */
+          "node:worker_threads"
+        );
+        accept(new Worker2(url));
+      });
+    }
+    addEventListener(eventName, callback) {
+      this.#worker.then((worker) => worker.on(eventName, (data) => callback({ data })));
+    }
+    postMessage(message) {
+      this.#worker.then((worker) => worker.postMessage(message));
+    }
+    terminate() {
+      this.#worker.then((worker) => worker.terminate());
+    }
+  };
+}
+var CancelledError = class extends Error {
+};
+var TranslatorBacking = class {
+  /**
+   * @param {{
+   *  cacheSize?: number,
+   *  useNativeIntGemm?: boolean,
+   *  downloadTimeout?: number,
+   *  registryUrl?: string
+   *  pivotLanguage?: string?
+   *  onerror?: (err: Error)
+   * }} options
+   */
+  constructor(options) {
+    this.options = options || {};
+    this.registryUrl = this.options.registryUrl || "https://bergamot.s3.amazonaws.com/models/index.json";
+    this.downloadTimeout = "downloadTimeout" in this.options ? parseInt(this.options.downloadTimeout) : 6e4;
+    this.registry = this.loadModelRegistery();
+    this.buffers = /* @__PURE__ */ new Map();
+    this.pivotLanguage = "pivotLanguage" in this.options ? options.pivotLanguage : "en";
+    this.models = /* @__PURE__ */ new Map();
+    this.onerror = this.options.onerror || ((err) => console.error("WASM Translation Worker error:", err));
+  }
+  /**
+   * Loads a worker thread, and wraps it in a message passing proxy. I.e. it
+   * exposes the entire interface of TranslationWorker here, and all calls
+   * to it are async. Do note that you can only pass arguments that survive
+   * being copied into a message. 
+   * @return {Promise<{worker:Worker, exports:Proxy<TranslationWorker>}>}
+   */
+  async loadWorker() {
+    const worker = new Worker(new URL("./worker/translator-worker.js", import.meta.url));
+    let serial = 0;
+    const pending = /* @__PURE__ */ new Map();
+    const call = (name, ...args) => new Promise((accept, reject2) => {
+      const id = ++serial;
+      pending.set(id, {
+        accept,
+        reject: reject2,
+        callsite: {
+          // for debugging which call caused the error
+          message: `${name}(${args.map((arg) => String(arg)).join(", ")})`,
+          stack: new Error().stack
+        }
+      });
+      worker.postMessage({ id, name, args });
+    });
+    worker.addEventListener("message", function({ data: { id, result, error } }) {
+      if (!pending.has(id)) {
+        console.debug("Received message with unknown id:", arguments[0]);
+        throw new Error(`BergamotTranslator received response from worker to unknown call '${id}'`);
+      }
+      const { accept, reject: reject2, callsite } = pending.get(id);
+      pending.delete(id);
+      if (error !== void 0)
+        reject2(Object.assign(new Error(), error, {
+          message: error.message + ` (response to ${callsite.message})`,
+          stack: error.stack ? `${error.stack}
+${callsite.stack}` : callsite.stack
+        }));
+      else
+        accept(result);
+    });
+    worker.addEventListener("error", this.onerror.bind(this));
+    await call("initialize", this.options);
+    return {
+      worker,
+      exports: new Proxy({}, {
+        get(target, name, receiver) {
+          if (name !== "then")
+            return (...args) => call(name, ...args);
+        }
+      })
+    };
+  }
+  /**
+   * Loads the model registry. Uses the registry shipped with this extension,
+   * but formatted a bit easier to use, and future-proofed to be swapped out
+   * with a TranslateLocally type registry.
+   * @return {Promise<{
+   *   from: string,
+   *   to: string,
+   *   files: {
+   *     [part:string]: {
+   *       name: string,
+   *       size: number,
+   *       expectedSha256Hash: string
+   *     }
+   *   }[]
+   * }>}
+   */
+  async loadModelRegistery() {
+    const response = await fetch(this.registryUrl, { credentials: "omit" });
+    const registry2 = await response.json();
+    return Array.from(Object.entries(registry2), ([key, files]) => {
+      return {
+        from: key.substring(0, 2),
+        to: key.substring(2, 4),
+        files
+      };
+    });
+  }
+  /**
+   * Gets or loads translation model data. Caching wrapper around
+   * `loadTranslationModel()`.
+   * @param {{from:string, to:string}}
+   * @return {Promise<{
+   *   model: ArrayBuffer,
+   *   vocab: ArrayBuffer,
+   *   shortlist: ArrayBuffer,
+   *   qualityModel: ArrayBuffer?
+   * }>}
+   */
+  getTranslationModel({ from, to: to2 }, options) {
+    const key = JSON.stringify({ from, to: to2 });
+    if (!this.buffers.has(key)) {
+      const promise = this.loadTranslationModel({ from, to: to2 }, options);
+      this.buffers.set(key, promise);
+      promise.catch((err) => this.buffers.delete(key));
+    }
+    return this.buffers.get(key);
+  }
+  /**
+   * Downloads a translation model and returns a set of
+   * ArrayBuffers. These can then be passed to a TranslationWorker thread
+   * to instantiate a TranslationModel inside the WASM vm.
+   * @param {{from:string, to:string}}
+   * @param {{signal:AbortSignal?}?}
+   * @return {Promise<{
+   *   model: ArrayBuffer,
+   *   vocab: ArrayBuffer,
+   *   shortlist: ArrayBuffer,
+   *   qualityModel: ArrayBuffer?
+   *   config: string?
+   * }>}
+   */
+  async loadTranslationModel({ from, to: to2 }, options) {
+    performance.mark(`loadTranslationModule.${JSON.stringify({ from, to: to2 })}`);
+    const entries = (await this.registry).filter((model) => model.from == from && model.to == to2);
+    if (!entries)
+      throw new Error(`No model for '${from}' -> '${to2}'`);
+    const files = entries[0].files;
+    const abort = () => reject(new CancelledError("abort signal"));
+    const escape = new Promise((accept, reject2) => {
+      if (options?.signal)
+        options.signal.addEventListener("abort", abort);
+    });
+    const buffers = Object.fromEntries(await Promise.race([
+      Promise.all(Object.entries(files).map(async ([part, file]) => {
+        if (file === void 0 || file.name === void 0)
+          return [part, null];
+        try {
+          return [part, await this.fetch(file.name, file.expectedSha256Hash, options)];
+        } catch (cause) {
+          throw new Error(`Could not fetch ${file.name} for ${from}->${to2} model`, { cause });
+        }
+      })),
+      escape
+    ]));
+    if (options?.signal)
+      options.signal.removeEventListener("abort", abort);
+    performance.measure("loadTranslationModel", `loadTranslationModule.${JSON.stringify({ from, to: to2 })}`);
+    let vocabs = [];
+    if (buffers.vocab)
+      vocabs = [buffers.vocab];
+    else if (buffers.trgvocab && buffers.srcvocab)
+      vocabs = [buffers.srcvocab, buffers.trgvocab];
+    else
+      throw new Error(`Could not identify vocab files for ${from}->${to2} model among: ${Array.from(Object.keys(files)).join(" ")}`);
+    let config = {};
+    if (files.model.name.endsWith("intgemm8.bin"))
+      config["gemm-precision"] = "int8shiftAll";
+    if (files.qualityModel)
+      config["skip-cost"] = false;
+    if (files.config)
+      Object.assign(config, files.config);
+    return {
+      model: buffers.model,
+      shortlist: buffers.lex,
+      vocabs,
+      qualityModel: buffers.qualityModel,
+      config
+    };
+  }
+  /**
+   * Helper to download file from the web. Verifies the checksum.
+   * @param {string} url
+   * @param {string?} checksum sha256 checksum as hexadecimal string
+   * @param {{signal:AbortSignal}?} extra fetch options
+   * @returns {Promise<ArrayBuffer>}
+   */
+  async fetch(url, checksum, extra) {
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    const timeout = this.downloadTimeout ? setTimeout(abort, this.downloadTimeout) : null;
+    try {
+      if (extra?.signal)
+        extra.signal.addEventListener("abort", abort);
+      const options = {
+        credentials: "omit",
+        signal: controller.signal
+      };
+      if (checksum)
+        options["integrity"] = `sha256-${this.hexToBase64(checksum)}`;
+      if (typeof window === "undefined")
+        delete options["integrity"];
+      const response = await fetch(url, options);
+      return await response.arrayBuffer();
+    } finally {
+      if (timeout)
+        clearTimeout(timeout);
+      if (extra?.signal)
+        extra.signal.removeEventListener("abort", abort);
+    }
+  }
+  /**
+   * Converts the hexadecimal hashes from the registry to something we can use with
+   * the fetch() method.
+   */
+  hexToBase64(hexstring) {
+    return btoa(hexstring.match(/\w{2}/g).map(function(a) {
+      return String.fromCharCode(parseInt(a, 16));
+    }).join(""));
+  }
+  /**
+   * Crappy named method that gives you a list of models to translate from
+   * one language into the other. Generally this will be the same as you
+   * just put in if there is a direct model, but it could return a list of
+   * two models if you need to pivot through a third language.
+   * Returns just [{from:str,to:str}...]. To be used something like this:
+   * ```
+   * const models = await this.getModels(from, to);
+   * models.forEach(({from, to}) => {
+   *   const buffers = await this.loadTranslationModel({from,to});
+   *   [TranslationWorker].loadTranslationModel({from,to}, buffers)
+   * });
+   * ```
+   * @returns {Promise<TranslationModel[]>}
+   */
+  getModels({ from, to: to2 }) {
+    const key = JSON.stringify({ from, to: to2 });
+    if (!this.models.has(key))
+      this.models.set(key, this.findModels(from, to2));
+    return this.models.get(key);
+  }
+  /**
+   * Find model (or model pair) to translate from `from` to `to`.
+   * @param {string} from
+   * @param {string} to
+   * @returns {Promise<TranslationModel[]>}
+   */
+  async findModels(from, to2) {
+    const registry2 = await this.registry;
+    let direct = [], outbound = [], inbound = [];
+    registry2.forEach((model) => {
+      if (model.from === from && model.to === to2)
+        direct.push(model);
+      else if (model.from === from && model.to === this.pivotLanguage)
+        outbound.push(model);
+      else if (model.to === to2 && model.from === this.pivotLanguage)
+        inbound.push(model);
+    });
+    if (direct.length)
+      return [direct[0]];
+    if (outbound.length && inbound.length)
+      return [outbound[0], inbound[0]];
+    throw new Error(`No model available to translate from '${from}' to '${to2}'`);
+  }
+};
+var BatchTranslator = class {
+  /**
+   * @param {{
+   *  cacheSize?: number,
+   *  useNativeIntGemm?: boolean,
+   *  workers?: number,
+   *  batchSize?: number,
+   *  downloadTimeout?: number,
+   *  workerUrl?: string,
+   *  registryUrl?: string
+   *  pivotLanguage?: string?
+   * }} options
+   */
+  constructor(options, backing) {
+    if (!backing)
+      backing = new TranslatorBacking(options);
+    this.backing = backing;
+    this.workers = [];
+    this.workerLimit = Math.max(options?.workers || 0, 1);
+    this.queue = [];
+    this.batchSerial = 0;
+    this.batchSize = Math.max(options?.batchSize || 8, 1);
+    this.onerror = options?.onerror || ((err) => console.error("WASM Translation Worker error:", err));
+  }
+  /**
+   * Destructor that stops and cleans up.
+   */
+  async delete() {
+    this.remove(() => true);
+    this.workers.forEach(({ worker }) => worker.terminate());
+  }
+  /**
+   * Makes sure queued work gets send to a worker. Will delay it till `idle`
+   * to make sure the batches have been filled to some degree. Will keep
+   * calling itself as long as there is work in the queue, but it does not
+   * hurt to call it multiple times. This function always returns immediately.
+   */
+  notify() {
+    setTimeout(async () => {
+      if (!this.queue.length)
+        return;
+      let worker = this.workers.find((worker2) => worker2.idle);
+      if (!worker && this.workers.length < this.workerLimit) {
+        try {
+          const placeholder = { idle: false };
+          this.workers.push(placeholder);
+          Object.assign(placeholder, await this.backing.loadWorker());
+          worker = placeholder;
+        } catch (e) {
+          this.onerror(new Error(`Could not initialise translation worker: ${e.message}`));
+        }
+      }
+      if (!worker)
+        return;
+      const batch = this.queue.shift();
+      worker.idle = false;
+      try {
+        await this.consumeBatch(batch, worker.exports);
+      } catch (e) {
+        batch.requests.forEach(({ reject: reject2 }) => reject2(e));
+      }
+      worker.idle = true;
+      if (this.queue.length)
+        this.notify();
+    });
+  }
+  /**
+   * The only real public call you need!
+   * ```
+   * const {target: {text:string}} = await this.translate({
+   *   from: 'de',
+   *   to: 'en',
+   *   text: 'Hallo Welt!',
+   *   html: false, // optional
+   *   priority: 0 // optional, like `nice` lower numbers are translated first
+   * })
+   * ```
+   * @param {TranslationRequest} request
+   * @returns {Promise<TranslationResponse>}
+   */
+  translate(request) {
+    const { from, to: to2, priority } = request;
+    return new Promise(async (resolve, reject2) => {
+      try {
+        const key = JSON.stringify({ from, to: to2 });
+        const models = await this.backing.getModels(request);
+        this.enqueue({ key, models, request, resolve, reject: reject2, priority });
+        this.notify();
+      } catch (e) {
+        reject2(e);
+      }
+    });
+  }
+  /**
+   * Prune pending requests by testing each one of them to whether they're
+   * still relevant. Used to prune translation requests from tabs that got
+   * closed.
+   * @param {(request:TranslationRequest) => boolean} filter evaluates to true if request should be removed
+   */
+  remove(filter) {
+    const queue2 = this.queue;
+    this.queue = [];
+    queue2.forEach((batch) => {
+      batch.requests.forEach(({ request, resolve, reject: reject2 }) => {
+        if (filter(request)) {
+          reject2(Object.assign(new CancelledError("removed by filter"), { request }));
+          return;
+        }
+        this.enqueue({
+          key: batch.key,
+          priority: batch.priority,
+          models: batch.models,
+          request,
+          resolve,
+          reject: reject2
+        });
+      });
+    });
+  }
+  /**
+   * Internal function used to put a request in a batch that still has space.
+   * Also responsible for keeping the batches in order of priority. Called by
+   * `translate()` but also used when filtering pending requests.
+   * @param {{request:TranslateRequest, models:TranslationModel[], key:String, priority:Number?, resolve:(TranslateResponse)=>any, reject:(Error)=>any}}
+   */
+  enqueue({ key, models, request, resolve, reject: reject2, priority }) {
+    if (priority === void 0)
+      priority = 0;
+    let batch = this.queue.find((batch2) => {
+      return batch2.key === key && batch2.priority === priority && batch2.requests.length < this.batchSize;
+    });
+    if (!batch) {
+      batch = { id: ++this.batchSerial, key, priority, models, requests: [] };
+      this.queue.push(batch);
+      this.queue.sort((a, b) => a.priority - b.priority);
+    }
+    batch.requests.push({ request, resolve, reject: reject2 });
+  }
+  /**
+   * Internal method that uses a worker thread to process a batch. You can
+   * wait for the batch to be done by awaiting this call. You should only
+   * then reuse the worker otherwise you'll just clog up its message queue.
+   */
+  async consumeBatch(batch, worker) {
+    performance.mark("BergamotBatchTranslator.start");
+    await Promise.all(batch.models.map(async ({ from, to: to2 }) => {
+      if (!await worker.hasTranslationModel({ from, to: to2 })) {
+        const buffers = await this.backing.getTranslationModel({ from, to: to2 });
+        await worker.loadTranslationModel({ from, to: to2 }, buffers);
+      }
+    }));
+    const responses = await worker.translate({
+      models: batch.models.map(({ from, to: to2 }) => ({ from, to: to2 })),
+      texts: batch.requests.map(({ request: { text, html, qualityScores } }) => ({
+        text: text.toString(),
+        html: !!html,
+        qualityScores: !!qualityScores
+      }))
+    });
+    batch.requests.forEach(({ request, resolve, reject: reject2 }, i) => {
+      resolve({
+        request,
+        // Include request for easy reference? Will allow you
+        // to specify custom properties and use that to link
+        // request & response back to each other.
+        ...responses[i]
+        // {target: {text: String}}
+      });
+    });
+    performance.measure("BergamotBatchTranslator", "BergamotBatchTranslator.start");
+  }
+};
+
+// src/translator.js
+var REGISTRY = "https://storage.googleapis.com/moz-fx-translations-data--303e-prod-translations-data/db/models.json";
+var PARTS = { model: "model", lexicalShortlist: "shortlist", vocab: "vocab" };
+var PIVOT = "en";
+function normLang(code) {
+  if (!code) return "";
+  const c = String(code).toLowerCase().replace("-", "_");
+  if (c === "zh_hant" || c === "zh_tw" || c === "zh_hk") return "zh_hant";
+  return c.split("_")[0];
+}
+var registry = null;
+async function loadRegistry() {
+  if (registry) return registry;
+  const resp = await fetch(REGISTRY, { credentials: "omit" });
+  if (!resp.ok) throw new Error("registry HTTP " + resp.status);
+  const data = await resp.json();
+  const models = {};
+  for (const [pair, list] of Object.entries(data.models || {})) {
+    const released = list.find((m) => m.releaseStatus) || null;
+    if (released) models[pair] = released;
+  }
+  registry = { baseUrl: data.baseUrl, models };
+  return registry;
+}
+async function route(from, to2) {
+  const { models } = await loadRegistry();
+  const direct = from + "-" + to2;
+  if (models[direct]) return [direct];
+  const a = from + "-" + PIVOT, b = PIVOT + "-" + to2;
+  if (from !== PIVOT && to2 !== PIVOT && models[a] && models[b]) return [a, b];
+  return null;
+}
+function sizeOf(entry) {
+  return Math.round((entry.files.model.uncompressedSize || 3e7) * 0.8 / 1048576);
+}
+async function packsDir(create) {
+  const root = await navigator.storage.getDirectory();
+  return root.getDirectoryHandle("translations", { create: true });
+}
+async function pairDir(pair, create) {
+  const dir = await packsDir();
+  return dir.getDirectoryHandle(pair, { create: !!create });
+}
+async function hasPack(pair) {
+  try {
+    const dir = await pairDir(pair);
+    await dir.getFileHandle("done");
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+async function listPacks() {
+  const out = [];
+  try {
+    const dir = await packsDir();
+    for await (const [name, handle] of dir.entries()) {
+      if (handle.kind !== "directory" || !await hasPack(name)) continue;
+      let bytes = 0;
+      for await (const [, f] of handle.entries()) if (f.kind === "file") bytes += (await f.getFile()).size;
+      const [from, to2] = name.split("-");
+      out.push({ from, to: to2, bytes });
+    }
+  } catch (_) {
+  }
+  return out;
+}
+async function removePack(pair) {
+  const dir = await packsDir();
+  await dir.removeEntry(pair, { recursive: true });
+}
+async function status(from, to2) {
+  from = normLang(from);
+  to2 = normLang(to2);
+  if (!from || !to2 || from === to2) return { needed: false };
+  let pairs;
+  try {
+    pairs = await route(from, to2);
+  } catch (e) {
+    return { needed: true, supported: null, error: e.message };
+  }
+  if (!pairs) return { needed: true, supported: false };
+  const missing = [];
+  for (const p of pairs) if (!await hasPack(p)) missing.push(p);
+  const sizeMB = missing.reduce((n, p) => n + sizeOf(registry.models[p]), 0);
+  return { needed: true, supported: true, pairs, missing, ready: missing.length === 0, sizeMB };
+}
+async function sha256(buf) {
+  const hash = await crypto.subtle.digest("SHA-256", buf);
+  return Array.from(new Uint8Array(hash), (b) => b.toString(16).padStart(2, "0")).join("");
+}
+async function gunzip(buf) {
+  const stream = new Blob([buf]).stream().pipeThrough(new DecompressionStream("gzip"));
+  return new Response(stream).arrayBuffer();
+}
+async function fetchPart(url, onBytes) {
+  const resp = await fetch(url, { credentials: "omit" });
+  if (!resp.ok) throw new Error("HTTP " + resp.status);
+  const reader = resp.body.getReader();
+  const chunks = [];
+  for (; ; ) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    onBytes(value.length);
+  }
+  return new Blob(chunks).arrayBuffer();
+}
+var downloads = /* @__PURE__ */ new Map();
+function download(from, to2, onProgress) {
+  const key = normLang(from) + "-" + normLang(to2);
+  if (!downloads.has(key)) {
+    downloads.set(key, (async () => {
+      const st = await status(from, to2);
+      if (!st.supported) throw new Error("no model for " + key);
+      const total = st.missing.reduce((n, p) => n + sizeOf(registry.models[p]) * 1048576, 0) || 1;
+      let got = 0;
+      for (const pair of st.missing) {
+        const entry = registry.models[pair];
+        const dir = await pairDir(pair, true);
+        for (const [part, name] of Object.entries(PARTS)) {
+          const file = entry.files[part];
+          const gz = await fetchPart(registry.baseUrl + "/" + file.path, (n) => {
+            got += n;
+            if (onProgress) onProgress(Math.min(0.99, got / total));
+          });
+          const raw = await gunzip(gz);
+          if (file.uncompressedHash && await sha256(raw) !== file.uncompressedHash) {
+            await removePack(pair).catch(() => {
+            });
+            throw new Error("checksum mismatch for " + pair + " " + part);
+          }
+          const handle = await dir.getFileHandle(name, { create: true });
+          const w2 = await handle.createWritable();
+          await w2.write(raw);
+          await w2.close();
+        }
+        const done = await dir.getFileHandle("done", { create: true });
+        const w = await done.createWritable();
+        await w.write("ok");
+        await w.close();
+      }
+      if (onProgress) onProgress(1);
+    })().finally(() => downloads.delete(key)));
+  }
+  return downloads.get(key);
+}
+async function readPack(pair) {
+  const dir = await pairDir(pair);
+  const read = async (name) => (await (await dir.getFileHandle(name)).getFile()).arrayBuffer();
+  return { model: await read("model"), shortlist: await read("shortlist"), vocabs: [await read("vocab")], qualityModel: null };
+}
+var LocalBacking = class extends TranslatorBacking {
+  async loadModelRegistery() {
+    return (await listPacks()).map((p) => ({ from: p.from, to: p.to, files: {} }));
+  }
+  async loadTranslationModel({ from, to: to2 }) {
+    return readPack(from + "-" + to2);
+  }
+  async getModels({ from, to: to2 }) {
+    const pairs = await route(from, to2);
+    if (!pairs) throw new Error("no route " + from + "\u2192" + to2);
+    return pairs.map((p) => {
+      const [a, b] = p.split("-");
+      return { from: a, to: b };
+    });
+  }
+};
+var translator = null;
+function getTranslator() {
+  if (!translator) translator = new BatchTranslator({ workers: 1, batchSize: 8 }, new LocalBacking({ registryUrl: REGISTRY }));
+  return translator;
+}
+async function translate(from, to2, texts) {
+  from = normLang(from);
+  to2 = normLang(to2);
+  const st = await status(from, to2);
+  if (!st.needed) return texts;
+  if (!st.ready) throw new Error("translation pack missing: " + st.missing.join(", "));
+  const tr = getTranslator();
+  return Promise.all(texts.map(
+    (text) => text.trim() ? tr.translate({ from, to: to2, text, html: false }).then((r) => r.target.text) : Promise.resolve(text)
+  ));
+}
+
 // src/background.js
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   switch (message.action) {
@@ -12526,6 +13177,29 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
     case "extract_url":
       handleExtractUrl(message.url, message.voice, message.rate).then(sendResponse).catch((err) => sendResponse({ success: false, error: err.message }));
+      return true;
+    case "tr_status":
+      status(message.from, message.to).then((st) => sendResponse(Object.assign({ success: true }, st))).catch((err) => sendResponse({ success: false, error: err.message }));
+      return true;
+    case "tr_download": {
+      const tabId = sender.tab && sender.tab.id;
+      let last = 0;
+      download(message.from, message.to, (fraction) => {
+        if (tabId === void 0 || fraction < 1 && Date.now() - last < 200) return;
+        last = Date.now();
+        browser.tabs.sendMessage(tabId, { action: "tr_progress", from: message.from, to: message.to, fraction }).catch(() => {
+        });
+      }).then(() => sendResponse({ success: true })).catch((err) => sendResponse({ success: false, error: err.message }));
+      return true;
+    }
+    case "tr_translate":
+      translate(message.from, message.to, message.texts).then((texts) => sendResponse({ success: true, texts })).catch((err) => sendResponse({ success: false, error: err.message }));
+      return true;
+    case "tr_list":
+      listPacks().then((packs) => sendResponse({ success: true, packs })).catch((err) => sendResponse({ success: false, error: err.message }));
+      return true;
+    case "tr_remove":
+      removePack(message.pair).then(() => sendResponse({ success: true })).catch((err) => sendResponse({ success: false, error: err.message }));
       return true;
     case "get_theme":
       browser.theme.getCurrent(sender.tab && sender.tab.windowId).then((theme) => sendResponse({ success: true, theme })).catch((err) => sendResponse({ success: false, error: err.message }));
@@ -12681,12 +13355,12 @@ async function fetchWithProgress(url, onProgress) {
   }
   return new Blob(chunks);
 }
-var downloads = {};
+var downloads2 = {};
 async function handleLocalDownload(voiceId, tabId) {
   const path = PATH_MAP[voiceId];
   if (!path) throw new Error("unknown voice " + voiceId);
-  if (!downloads[voiceId]) {
-    downloads[voiceId] = (async () => {
+  if (!downloads2[voiceId]) {
+    downloads2[voiceId] = (async () => {
       const dir = await modelDir();
       const file = path.split("/").pop();
       const config = await fetchWithProgress(`${HF_BASE}/${path}.json`);
@@ -12700,10 +13374,10 @@ async function handleLocalDownload(voiceId, tabId) {
       await saveFile(dir, file, model);
       await saveFile(dir, file + ".json", config);
     })().finally(() => {
-      delete downloads[voiceId];
+      delete downloads2[voiceId];
     });
   }
-  await downloads[voiceId];
+  await downloads2[voiceId];
   return { success: true };
 }
 var session = null;

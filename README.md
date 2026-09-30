@@ -104,6 +104,15 @@ Wattpad, AO3, FanFiction y Webnovel tienen extractores optimizados con selectore
 ### Siguiente capítulo automático
 En AO3, FanFiction.net y Wattpad, al terminar un capítulo se carga el siguiente en la misma página y la lectura sigue sola. Se desactiva en ⚙ → "Seguir con el siguiente capítulo".
 
+### Idioma detectado y traducción sin conexión
+zenTTS detecta el idioma del capítulo con el detector de Firefox. Si no coincide con el idioma en el que quieres escuchar (⚙ → "Leer en": automático, un idioma concreto o el original), te ofrece descargar un paquete de traducción de Firefox Translations (unos 25 MB por dirección). Después traduce en tu equipo, sin conexión. Los pares sin modelo directo pasan por el inglés. También puedes leer en el idioma original o, con el servidor en marcha, traducir en línea. Los paquetes se gestionan en ⚙ → Paquetes de traducción.
+
+### Empezar donde tú elijas
+Pulsa el botón de la mira en el panel y haz clic en la frase por la que quieres empezar; al pasar el ratón se marca la frase. Sin pulsar el botón, los clics en la página no hacen nada. Esc cancela.
+
+### Burbuja movible
+Minimizado, zenTTS es una burbuja que puedes arrastrar a cualquier esquina; se queda ahí y el panel se abre en esa misma esquina.
+
 ### Colores del navegador
 El panel sigue el modo claro u oscuro y, si tienes instalado un tema de Firefox, toma sus colores. Zen no deja que las extensiones lean su color de acento, así que en ⚙ → Aspecto puedes elegir uno o pegar el valor de `zen.theme.accent-color` (en `about:config`) para que coincida.
 

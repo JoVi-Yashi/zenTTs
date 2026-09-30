@@ -26,7 +26,8 @@
   "host_permissions": [
     "http://localhost:8765/*",
     "https://huggingface.co/*",
-    "https://*.hf.co/*"
+    "https://*.hf.co/*",
+    "https://storage.googleapis.com/*"
   ],
   "icons": {
     "16": "icons/icon-16.png",

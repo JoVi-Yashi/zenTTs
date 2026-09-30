@@ -3,7 +3,8 @@
 // sentences to the player, highlights along, remembers where you were and
 // continues with the next chapter in the same page.
 import { Readability } from '@mozilla/readability';
-import { createPanel, setStatus, setButtonsEnabled, setCounter, setPauseIcon, setResume, updatePreviewSentences } from './panel.js';
+import { createPanel, setStatus, setButtonsEnabled, setCounter, setPauseIcon, setResume, updatePreviewSentences,
+         setDetectedLanguage, setTranslateOffer, setTranslateProgress, refreshPacks, setPickActive } from './panel.js';
 import { siteFor } from './sites.js';
 import { createPlayer } from './player.js';
 import { textHash, loadProgress, saveProgress, flushProgress, clearProgress, pruneProgress } from './progress.js';
@@ -30,7 +31,7 @@ function shouldInject() {
 window.__tts_zen_state = {
   currentVoice: 'es-ES-AlvaroNeural', localVoice: 'es_ES-davefx-medium',
   currentRate: 1.0, currentEngine: 'native', serverAvailable: false,
-  lang: 'es', langIn: 'auto', langOut: 'es', autoNext: true, wordHighlight: true
+  lang: 'es', readLang: 'auto', speechLang: null, autoNext: true, wordHighlight: true
 };
 
 function st() { return window.__tts_zen_state; }
@@ -40,6 +41,8 @@ function ts(key, arg) {
     es: {
       ready: 'Listo', playing: 'Reproduciendo…', paused: 'Pausado', stopped: 'Detenido',
       starting: 'Preparando lectura…', translating: 'Traduciendo…',
+      trChoose: 'Elige cómo leer este texto', trFailed: 'No se pudo traducir — leyendo en el idioma original',
+      picking: 'Haz clic en la frase por la que quieres empezar · Esc para cancelar',
       noTextFound: 'No se encontró texto en esta página',
       voiceError: 'No se pudo leer con ninguna voz',
       fallback_local: 'edge-tts no respondió — usando voz local',
@@ -50,6 +53,8 @@ function ts(key, arg) {
     en: {
       ready: 'Ready', playing: 'Playing…', paused: 'Paused', stopped: 'Stopped',
       starting: 'Getting ready…', translating: 'Translating…',
+      trChoose: 'Choose how to read this text', trFailed: 'Could not translate — reading in the original language',
+      picking: 'Click the sentence you want to start from · Esc to cancel',
       noTextFound: 'No text found on this page',
       voiceError: 'Could not read with any voice',
       fallback_local: 'edge-tts did not answer — using the local voice',
@@ -133,22 +138,134 @@ function buildSentences(paras) {
   return list;
 }
 
-async function translateParagraphs(paras) {
-  var to = st().langOut;
-  if (!to || to === 'auto') return paras;
-  setStatus(ts('translating'));
-  try {
-    var resp = await browser.runtime.sendMessage({
-      action: 'translate', texts: paras.map(function(p) { return p.text; }), from: st().langIn || 'auto', to: to
-    });
-    if (resp && Array.isArray(resp.texts) && resp.texts.length === paras.length) {
-      return paras.map(function(p, i) { return { el: p.el, text: cleanText(resp.texts[i] || p.text) }; });
-    }
-  } catch (e) {
-    console.error('[zenTTS] translate:', e.message || e);
-  }
-  return paras;
+// ---- Language: detect, decide, translate ----
+
+function normLang(code) {
+  if (!code) return null;
+  var c = String(code).toLowerCase().replace('-', '_');
+  if (c === 'zh_hant' || c === 'zh_tw' || c === 'zh_hk') return 'zh_hant';
+  return c.split('_')[0] || null;
 }
+
+// Firefox's own detector (CLD2); the page's lang attribute as a fallback
+async function detectLanguage(text) {
+  try {
+    var r = await browser.i18n.detectLanguage(text);
+    var top = r && r.languages && r.languages[0];
+    if (top && (r.isReliable || top.percentage >= 80) && top.language !== 'und') return normLang(top.language);
+  } catch (_) {}
+  return normLang(document.documentElement.lang);
+}
+
+// Language the user wants to listen in, or null for "original language"
+function targetLanguage() {
+  var want = st().readLang || 'auto';
+  if (want === 'original') return null;
+  if (want === 'auto') {
+    try { return normLang(browser.i18n.getUILanguage()); } catch (_) { return normLang(st().lang); }
+  }
+  return normLang(want);
+}
+
+var chapterTranslation = null;   // { mode: 'offline' | 'online', from, to }
+var pendingOffer = null;         // resolves the translation offer shown in the panel
+
+function withTexts(paras, texts) {
+  return paras.map(function(p, i) { return { el: p.el, text: cleanText(texts[i] || p.text) }; });
+}
+
+async function translateWith(mode, paras, from, to) {
+  setStatus(ts('translating'));
+  var texts = paras.map(function(p) { return p.text; });
+  var resp = await browser.runtime.sendMessage(mode === 'offline'
+    ? { action: 'tr_translate', from: from, to: to, texts: texts }
+    : { action: 'translate', from: from, to: to, texts: texts });
+  if (!resp || !Array.isArray(resp.texts) || resp.texts.length !== paras.length) throw new Error((resp && resp.error) || 'translate');
+  return withTexts(paras, resp.texts);
+}
+
+async function serverUp() {
+  try { var r = await browser.runtime.sendMessage({ action: 'health' }); return !!(r && r.success); } catch (_) { return false; }
+}
+
+function choiceKey(from, to) { return 'trChoice:' + from + '-' + to; }
+
+// Shows the offer in the panel and waits for "download" / "online" / "original"
+function askTranslation(info) {
+  setTranslateOffer(info);
+  setStatus(ts('trChoose'));
+  return new Promise(function(resolve) { pendingOffer = resolve; });
+}
+
+function onTranslateChoice(choice) {
+  if (pendingOffer) { var r = pendingOffer; pendingOffer = null; r(choice); }
+}
+
+// Returns the paragraphs in the language to be read, translating if needed
+async function resolveLanguage(paras) {
+  chapterTranslation = null;
+  var sample = paras.map(function(p) { return p.text; }).join('\n').slice(0, 2500);
+  var from = await detectLanguage(sample);
+  var to = targetLanguage();
+  st().speechLang = from;
+  setDetectedLanguage(from);
+  try {
+    if (!from || !to || from === to) return paras;
+
+    var status = await browser.runtime.sendMessage({ action: 'tr_status', from: from, to: to }).catch(function() { return null; });
+    if (status && status.needed === false) return paras;
+    if (status && status.ready) return await useTranslation('offline', paras, from, to);
+
+    var remembered = (await browser.storage.local.get(choiceKey(from, to)))[choiceKey(from, to)];
+    if (remembered === 'original') return paras;
+    var online = await serverUp();
+    if (remembered === 'online' && online) return await useTranslation('online', paras, from, to);
+    var supported = !!(status && status.supported);
+    if (!supported && !online) return paras;
+
+    var choice = await askTranslation({
+      from: from, to: to, supported: supported, online: online,
+      sizeMB: status && status.sizeMB, pivot: status && status.pairs && status.pairs.length > 1 ? status.pairs : null
+    });
+    if (choice === 'original') {
+      await browser.storage.local.set({ [choiceKey(from, to)]: 'original' });
+      return paras;
+    }
+    if (choice === 'online') {
+      await browser.storage.local.set({ [choiceKey(from, to)]: 'online' });
+      return await useTranslation('online', paras, from, to);
+    }
+    // download the pack(s), then translate offline
+    setTranslateProgress(0);
+    var dl = await browser.runtime.sendMessage({ action: 'tr_download', from: from, to: to });
+    if (!dl || !dl.success) throw new Error((dl && dl.error) || 'download');
+    refreshPacks();
+    return await useTranslation('offline', paras, from, to);
+  } catch (e) {
+    console.error('[zenTTS] translation:', e.message || e);
+    setStatus(ts('trFailed'), true);
+    st().speechLang = from;
+    return paras;
+  } finally {
+    setTranslateOffer(null);
+    setDetectedLanguage(st().speechLang ? from : null);
+  }
+}
+
+async function useTranslation(mode, paras, from, to) {
+  var out = await translateWith(mode, paras, from, to);
+  chapterTranslation = { mode: mode, from: from, to: to };
+  st().speechLang = to;
+  return out;
+}
+
+// New paragraphs of an infinite-scroll page follow the chapter's decision
+async function translateMore(paras) {
+  if (!chapterTranslation) return paras;
+  try { return await translateWith(chapterTranslation.mode, paras, chapterTranslation.from, chapterTranslation.to); }
+  catch (_) { return paras; }
+}
+
 
 // ---- Page highlight ----
 // highlight.js marks the sentence and the spoken word on the page itself
@@ -184,7 +301,7 @@ var engineNote = null;    // shown instead of "Playing…" after a fallback
 var player = createPlayer({
   options: function() {
     var s = st();
-    var lang = s.langOut && s.langOut !== 'auto' ? s.langOut : (document.documentElement.lang || 'es');
+    var lang = s.speechLang || normLang(document.documentElement.lang) || 'es';
     return { voice: s.currentVoice, localVoice: s.localVoice, rate: s.currentRate || 1, lang: lang };
   },
   onSentence: function(i) {
@@ -244,7 +361,7 @@ async function prepareChapter() {
 
   chapterKey = site.chapterKey(chapterUrl);
   chapterHash = textHash(paras.map(function(p) { return p.text; }).join('\n'));
-  paragraphs = await translateParagraphs(paras);
+  paragraphs = await resolveLanguage(paras);
   sentences = buildSentences(paragraphs);
   window.__tts_zen_sentences = sentences;
   window.__tts_zen_last_text = paragraphs.map(function(p) { return p.text; }).join('\n\n');
@@ -395,7 +512,7 @@ async function checkForNewParagraphs(root) {
       if (text.length >= 20) fresh.push({ el: el, text: text });
     });
     if (!fresh.length) return;
-    fresh = await translateParagraphs(fresh);
+    fresh = await translateMore(fresh);
     var base = paragraphs.length;
     paragraphs.push.apply(paragraphs, fresh);
     var more = [];
@@ -406,6 +523,91 @@ async function checkForNewParagraphs(root) {
     checking = false;
   }
 }
+
+// ---- "Choose where to start" ----
+// Only after pressing the panel button: hovering previews the sentence, a
+// click starts reading there, Esc (or the button again) cancels.
+
+var picking = false;
+
+function pickStyle(on) {
+  var id = 'zentts-pick-style';
+  var el = document.getElementById(id);
+  if (on && !el) {
+    el = document.createElement('style');
+    el.id = id;
+    el.textContent = 'html.zentts-picking, html.zentts-picking * { cursor: crosshair !important; }';
+    (document.head || document.documentElement).appendChild(el);
+  }
+  document.documentElement.classList.toggle('zentts-picking', on);
+}
+
+function fromPanel(e) {
+  var host = document.getElementById('tts-zen-host');
+  return host && e.composedPath && e.composedPath().includes(host);
+}
+
+function sentenceUnder(e) {
+  var i = marker.sentenceAtPoint(e.clientX, e.clientY, paragraphs, sentences);
+  return i;
+}
+
+function onPickMove(e) {
+  if (fromPanel(e)) { marker.clearPick(); return; }
+  var i = sentenceUnder(e);
+  if (i < 0) { marker.clearPick(); return; }
+  var s = sentences[i];
+  marker.showPick(paragraphs[s.refIdx].el, s.text, s.hint);
+}
+
+function onPickClick(e) {
+  if (fromPanel(e)) return;
+  e.preventDefault();
+  e.stopPropagation();
+  var i = sentenceUnder(e);
+  endPick();
+  if (i >= 0) {
+    resumeAt = null;
+    setResume(null);
+    player.start(i, st().currentEngine || 'native');
+  }
+}
+
+function onPickKey(e) {
+  if (e.key === 'Escape') { e.preventDefault(); endPick(); setStatus(ts('ready')); }
+}
+
+function endPick() {
+  if (!picking) return;
+  picking = false;
+  setPickActive(false);
+  pickStyle(false);
+  marker.clearPick();
+  document.removeEventListener('mousemove', onPickMove, true);
+  document.removeEventListener('click', onPickClick, true);
+  document.removeEventListener('keydown', onPickKey, true);
+}
+
+async function togglePick() {
+  if (picking) { endPick(); setStatus(ts('ready')); return; }
+  if (!prepared) {
+    setStatus(ts('starting'));
+    if (!(await prepareChapter())) { setStatus(ts('noTextFound'), true); return; }
+  }
+  if (player.state === 'playing') player.pause();
+  picking = true;
+  setPickActive(true);
+  pickStyle(true);
+  setStatus(ts('picking'));
+  document.addEventListener('mousemove', onPickMove, true);
+  document.addEventListener('click', onPickClick, true);
+  document.addEventListener('keydown', onPickKey, true);
+}
+
+// Download progress for translation packs comes from the background page
+browser.runtime.onMessage.addListener(function(msg) {
+  if (msg && msg.action === 'tr_progress') setTranslateProgress(msg.fraction);
+});
 
 // ---- Controls ----
 
@@ -445,7 +647,11 @@ function injectPanel() {
     onStop: handleStop,
     onPrev: handlePrev,
     onNext: handleNext,
-    onRate: function(r) { player.setRate(r); }
+    onRate: function(r) { player.setRate(r); },
+    onPick: togglePick,
+    onTranslate: onTranslateChoice,
+    // A different "read in" language applies from the next reading
+    onReadLang: function() { if (player.state === 'idle') prepared = false; }
   }).then(function() {
     offerResume();
     checkPendingAutoplay();

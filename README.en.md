@@ -101,6 +101,15 @@ The sentence being read is marked on the page itself and the spoken word is high
 ### Next chapter, automatically
 On AO3, FanFiction.net and Wattpad, when a chapter ends the next one loads in the same page and reading continues. Turn it off in ⚙ → "Continue with the next chapter".
 
+### Language detection and offline translation
+zenTTS detects the chapter's language with Firefox's own detector. If it differs from the language you want to listen in (⚙ → "Read in": automatic, a specific language or the original), it offers to download a Firefox Translations pack (about 25 MB per direction). After that it translates on your computer, offline. Pairs without a direct model go through English. You can also read in the original language or, with the server running, translate online. Packs are managed in ⚙ → Translation packs.
+
+### Start where you choose
+Press the crosshair button in the panel and click the sentence you want to start from; hovering marks the sentence. Without the button, clicks on the page do nothing. Esc cancels.
+
+### Movable bubble
+When minimized, zenTTS is a bubble you can drag to any corner; it stays there and the panel opens in that same corner.
+
 ### Browser colors
 The panel follows light and dark mode and, if a Firefox theme is installed, takes its colors. Zen does not let extensions read its accent color, so in ⚙ → Appearance you can pick one or paste the value of `zen.theme.accent-color` (from `about:config`) to match.
 
