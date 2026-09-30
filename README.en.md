@@ -106,11 +106,24 @@ A 3D bookshelf with what you read (**Library** button in the PDF reader, or ⚙ 
 - **PDF:** the PDFs you open or add. **Add PDFs** takes several at once (or drop them on the shelf); each file is compared by its content (SHA-256), so a repeated PDF is not duplicated: you're told, and the one already there is highlighted. A copy is kept, so PDFs from your computer open from here without choosing them again.
 - **Web:** the works zenTTS has read to you on web pages, one shelf per site (AO3, FanFiction, Wattpad, Webnovel and the rest by domain), with the chapter you're on. **Keep reading** opens that chapter. It can be turned off in ⚙ ("Remember what I read on the web").
 
-Each book shows its spine (color and thickness from the book); hovering pulls it out and turns its cover to you, and choosing it brings it to the middle, turning, with the shelf blurred behind. From its card you continue reading, change the cover, back cover and spine color, and add tags, which work as shelves of their own.
+Each book shows its spine (color and thickness from the book), with a matte cloth-and-paper finish; at rest only the spine shows, so books never overlap even on a full shelf. Hovering pulls it out and turns its cover to you, and choosing it brings it to the middle, turning, with the shelf blurred behind. From its card you continue reading, change the cover, back cover and spine color, and add tags, which work as shelves of their own.
 
-**Book details:** "Find details…" (or "Review details" after adding PDFs) looks the book up by its title, or by the ISBN if it's printed in the PDF, in Open Library and Google Books, and shows you the matches to choose the right one. Title, author, year, publisher, ISBN and cover are applied. The first time it asks for access to those two sites; nothing is sent unless you use it.
+**Series and volume:** the series and volume are taken from the file name, dropping tags such as `[RVN]`, `(z-lib.org)` or `epub` (`[RVN] Mushoku_Tensei_Vol_15.pdf` → *Mushoku Tensei*, vol. 15). With the "Title and series" order, a saga's volumes stay together and in numeric order (1, 2 … 10, not 1, 10, 2). You change them by hand in the book's card; details found online never touch them.
 
-In ⚙ you choose the wood, the order and the size of the books.
+**Book details:** "Find details…" (or "Review details" after adding PDFs) searches in steps and stops as soon as there are good matches:
+
+1. by the ISBN, if it's printed in the PDF (Open Library and Google Books);
+2. by series and volume, in your language and in any;
+3. by keywords only (the series, its main words);
+4. on **AniList** and **MyAnimeList** for light novels, manga and webnovels (whenever the name suggests one, or if the steps before find nothing).
+
+The window shows what was read from the name (series, volume, "Light novel / manga") as chips you can correct, and the 4 most relevant matches with cover, author, year, publisher, ISBN, source and language; "Show more results" opens the rest. If nothing turns up it switches to **Type them in**: title, author, series, volume, year, publisher, ISBN and a cover from a link (URL) or an image on your computer, with a button that searches the web for covers.
+
+**Your language and your order:** in ⚙ → "Language of the details" you choose which language you want the details in (by default the book's own, detected when it's added). If the ISBN leads to an edition in another language, yours is also searched by title, and the other one is marked "Other edition". When you choose a match you see **what would change, field by field** (with the current and the new cover, and that edition's language) and tick what to take: for example, keep your Spanish title and take the cover and the year. For an edition in another language, title, author and ISBN come ticked only where your book has none.
+
+The first time it asks for access to Open Library, Google Books, AniList and MyAnimeList; nothing is sent unless you use it.
+
+In ⚙ you choose the wood, the order, the size of the books and the language of the details.
 
 ### Voice performance and which translation to pick
 - **High-quality** Local voices do much more work per second of audio, and Piper runs on a single thread inside the browser: on modest computers they can fall behind the reading and leave pauses between sentences. zenTTS loads the voice ahead of time, cuts long sentences and generates several ahead; if it still can't keep up, ⚙ → Voice says so. **Standard** quality is the best balance.
@@ -177,7 +190,12 @@ zenTTs/
 │   ├── src/background.js   # Server proxy + Piper
 │   ├── src/panel.js        # Panel UI, settings, sites
 │   ├── src/reader.js       # PDF reader (pdf.js)
+│   ├── src/library.js      # 3D library (PDF / Web)
+│   ├── src/books.js        # Library data and files
+│   ├── src/pdfimport.js    # Adding PDFs: duplicates, covers, ISBN, language
+│   ├── src/lookup.js       # Book details: the name, stepped search, sources
 │   ├── reader.html         # Reader page
+│   ├── library.html        # Library page
 │   └── icons/
 ├── server.rb               # REST API Ruby/Sinatra
 ├── gui.rb                  # GTK3 desktop app
@@ -206,4 +224,6 @@ zenTTs/
 
 MIT
 
-Site logos are trademarks of their owners and are used only to show which sites zenTTS works with. The AO3 and Wattpad ones come from [Simple Icons](https://simpleicons.org) (CC0); the FanFiction.net and Webnovel ones are based on [Arcticons](https://github.com/Arcticons-Team/Arcticons) (CC BY-SA 4.0).
+Site logos are trademarks of their owners and are used only to show which sites zenTTS works with. Book details come from [Open Library](https://openlibrary.org), [Google Books](https://books.google.com), [AniList](https://anilist.co) and [MyAnimeList](https://myanimelist.net) (through [Jikan](https://jikan.moe)), only when you search.
+
+The AO3 and Wattpad ones come from [Simple Icons](https://simpleicons.org) (CC0); the FanFiction.net and Webnovel ones are based on [Arcticons](https://github.com/Arcticons-Team/Arcticons) (CC BY-SA 4.0).

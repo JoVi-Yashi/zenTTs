@@ -4,10 +4,19 @@
 
 ### Arreglos
 - **Estantería sin parpadeo:** al pasar el ratón por el borde de un libro, este ya no entra y sale del hover sin parar. Su caja no se mueve (los vecinos se apartan con transformaciones), las caras 3D no reciben el puntero y el libro se levanta tras una breve intención. Al recargar la estantería solo se animan los libros nuevos.
+- **Libros que se montaban en una balda llena:** cada libro se ve ahora de frente (perspectiva propia) y en reposo solo muestra el lomo; antes los de la derecha enseñaban su tapa encima del vecino. Al levantar uno, los vecinos se apartan sin salirse del mueble.
+- **Acabado mate:** lomos y tapas sin brillo de plástico, con sombras suaves y un grano de tela y papel.
 
 ### Nuevo
 - **Añadir varios PDF a la vez** (o soltarlos sobre la estantería), con progreso y resumen. Los repetidos se detectan por su contenido (SHA-256), no se duplican y se resalta el que ya estaba; un PDF abierto antes en el lector tampoco se duplica al añadirlo.
-- **Datos del libro:** búsqueda en Open Library y Google Books por título, o por el ISBN impreso en el PDF, con una ventana de coincidencias para elegir la correcta. Aplica título, autor, año, editorial, ISBN y portada. Se ofrece al añadir PDF ("Revisar datos") y desde la ficha ("Buscar datos…"). Los permisos se piden solo al usarlo.
+- **Datos del libro:** se ofrece al añadir PDF ("Revisar datos") y desde la ficha ("Buscar datos…"); los permisos se piden solo al usarlo.
+  - El nombre se limpia (etiquetas, formato, fuentes) y se separan la serie, el volumen y el capítulo.
+  - Búsqueda por pasos: ISBN → serie y volumen (en tu idioma y en cualquiera) → palabras clave → AniList y MyAnimeList para novelas ligeras, manga y webnovels.
+  - Las 4 coincidencias más relevantes, con fuente e idioma de la edición, y "Ver más resultados".
+  - **Vista previa campo por campo** antes de aplicar: eliges qué tomar (título, autor, año, editorial, ISBN, portada).
+  - **Escribir a mano**, con portada desde una URL o una imagen, y un botón para buscar portadas en la web.
+- **Idioma de los datos:** ajuste en ⚙ (por defecto, el idioma del libro, detectado al añadirlo). Una edición en otro idioma no renombra tu libro: su título, autor e ISBN solo vienen marcados si le faltan al tuyo.
+- **Serie y volumen:** se guardan aparte del título y deciden el orden "Título y serie" (orden numérico de volúmenes). Los datos de internet nunca los cambian; se editan en la ficha.
 - **Biblioteca PDF / Web:** selector arriba a la derecha. La vista Web muestra las obras que zenTTS te ha leído en páginas web, una balda por sitio, con su capítulo y "Seguir leyendo". Se puede desactivar ("Recordar lo que leo en la web").
 - Página y READMEs con la biblioteca.
 - **Logos de los sitios:** AO3, FanFiction.net, Wattpad y Webnovel llevan su logo en el panel (Sitios compatibles), en la biblioteca y en la página, en lugar de una letra genérica.

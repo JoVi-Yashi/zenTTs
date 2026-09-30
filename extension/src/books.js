@@ -8,9 +8,21 @@
 // Keeping a copy of the PDF is what lets a local file be reopened from the
 // shelf: Firefox never lets an extension read it again from disk.
 
+import { parseTitle, sortKeyOf } from './lookup.js';
+
 var KEY = 'library';
 
-export var DEFAULT_SETTINGS = { wood: 'oak', sort: 'recent', size: 'm', keepCopies: true };
+export var DEFAULT_SETTINGS = { wood: 'oak', sort: 'recent', size: 'm', keepCopies: true, metaLang: 'auto' };
+
+// Series, volume and sort key of a book, from its file name (where the volume
+// usually is) or its title. Details found online never change these, so a
+// saga keeps its volumes together and in order whatever title each shows.
+export function seriesFields(name, title) {
+  var a = parseTitle(name || ''), b = parseTitle(title || '');
+  var series = a.series || b.series || title || name || '';
+  var volume = a.volume != null ? a.volume : b.volume;
+  return { series: series, volume: volume == null ? null : volume, sortKey: sortKeyOf(series, volume) };
+}
 
 // Short stable id from the reader's progress key ("pdf:<url>" or "pdf:<name>:<size>")
 export function bookId(key) {
@@ -22,8 +34,13 @@ export function bookId(key) {
 export async function loadLibrary() {
   var got = {};
   try { got = (await browser.storage.local.get(KEY))[KEY] || {}; } catch (_) {}
+  var books = got.books || {};
+  // Books shelved before 1.1 get their series and sort key
+  Object.values(books).forEach(function(b) {
+    if (!b.sortKey && b.id && b.id.charAt(0) === 'b') Object.assign(b, seriesFields(b.name, b.title));
+  });
   return {
-    books: got.books || {},
+    books: books,
     tags: got.tags || [],
     settings: Object.assign({}, DEFAULT_SETTINGS, got.settings || {})
   };

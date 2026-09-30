@@ -5,7 +5,8 @@
 // from the web and from your disk, or added twice, is a single book.
 
 import * as pdfjsLib from 'pdfjs-dist';
-import { bookId, loadLibrary, updateBook, writeFile, readFile, dominantColor, clothColor, realAuthor, canvasBlob } from './books.js';
+import { cleanTitle } from './lookup.js';
+import { bookId, loadLibrary, updateBook, writeFile, readFile, dominantColor, clothColor, realAuthor, canvasBlob, seriesFields } from './books.js';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = browser.runtime.getURL('vendor/pdfjs/pdf.worker.min.mjs');
 
@@ -61,25 +62,43 @@ export function isbnIn(text) {
   return null;
 }
 
+async function pageText(doc, n) {
+  try { return (await (await doc.getPage(n)).getTextContent()).items.map(function(it) { return it.str; }).join(' '); }
+  catch (_) { return ''; }
+}
+
 // Looks in the first pages and the last two
 export async function findIsbn(doc) {
   var pages = [];
   for (var n = 1; n <= Math.min(6, doc.numPages); n++) pages.push(n);
   for (var k = Math.max(7, doc.numPages - 1); k <= doc.numPages; k++) pages.push(k);
   for (var i = 0; i < pages.length; i++) {
-    try {
-      var tc = await (await doc.getPage(pages[i])).getTextContent();
-      var found = isbnIn(tc.items.map(function(it) { return it.str; }).join(' '));
-      if (found) return found;
-    } catch (_) {}
+    var found = isbnIn(await pageText(doc, pages[i]));
+    if (found) return found;
   }
   return null;
+}
+
+// ---- The book's language: the PDF's own Language, else detected from its text ----
+
+export async function findLanguage(doc, metaLang) {
+  var m = /^([a-z]{2})\b/i.exec(metaLang || '');
+  if (m) return m[1].toLowerCase();
+  var text = '';
+  for (var n = 1; n <= Math.min(12, doc.numPages) && text.length < 4000; n++) text += ' ' + await pageText(doc, n);
+  text = text.replace(/\s+/g, ' ').trim();
+  if (text.length < 80) return null;
+  try {
+    var r = await browser.i18n.detectLanguage(text.slice(0, 6000));
+    var best = r && r.isReliable !== false && r.languages && r.languages[0];
+    return best && best.percentage >= 50 ? best.language.slice(0, 2) : null;
+  } catch (_) { return null; }
 }
 
 // ---- Shelving ----
 
 // Adds or updates the book for an open document. info: { data, name, key, src,
-// title, author }. Returns { id, key, duplicate } — key is the existing book's
+// title, author, lang }. Returns { id, key, duplicate } — key is the existing book's
 // if the same PDF was already on the shelf (so "continue" keeps its place).
 export async function shelveDocument(doc, info) {
   var hash = await sha256Hex(info.data);
@@ -95,6 +114,9 @@ export async function shelveDocument(doc, info) {
     name: prev.name || info.name, pages: doc.numPages, openedAt: Date.now(),
     src: info.src || prev.src || null, size: info.data.byteLength
   };
+  // Series, volume and the key that keeps a saga in order: from the file name
+  // (or the title), never from details found later
+  if (!prev.sortKey) Object.assign(patch, seriesFields(prev.name || info.name, patch.title));
   if (lib.settings.keepCopies && !(await readFile(id, 'pdf'))) {
     try { await writeFile(id, 'pdf', new Blob([info.data], { type: 'application/pdf' })); patch.hasFile = true; } catch (_) {}
   }
@@ -119,6 +141,10 @@ export async function shelveDocument(doc, info) {
         var isbn = await findIsbn(doc);
         if (isbn) await updateBook(id, { isbnFound: isbn });
       }
+      if (!book.lang) {
+        var lang = await findLanguage(doc, info.lang);
+        if (lang) await updateBook(id, { lang: lang });
+      }
     } catch (e) { console.error('[zenTTS] cover:', e.message || e); }
   })();
   return { id: id, key: key, duplicate: !!existing, done: rest };
@@ -138,10 +164,10 @@ export async function importFile(file) {
   try {
     var meta = null;
     try { meta = await doc.getMetadata(); } catch (_) {}
-    var title = (meta && meta.info && meta.info.Title) || file.name.replace(/\.pdf$/i, '');
+    var title = (meta && meta.info && meta.info.Title) || cleanTitle(file.name);
     var res = await shelveDocument(doc, {
       data: data, name: file.name, key: 'pdf:' + file.name + ':' + file.size,
-      title: title, author: meta && meta.info && meta.info.Author
+      title: title, author: meta && meta.info && meta.info.Author, lang: meta && meta.info && meta.info.Language
     });
     await res.done;
     var after = await loadLibrary();

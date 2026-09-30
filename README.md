@@ -106,11 +106,24 @@ Una estantería 3D con lo que lees (botón **Biblioteca** en el lector de PDF, o
 - **PDF:** los PDF que abres o añades. **Añadir PDF** acepta varios a la vez (o suéltalos sobre la estantería); cada archivo se compara por su contenido (SHA-256), así que un PDF repetido no se duplica: se avisa y se resalta el que ya estaba. Se guarda una copia, de modo que los PDF de tu equipo se abren desde aquí sin volver a elegirlos.
 - **Web:** las obras que zenTTS te ha leído en páginas web, una balda por sitio (AO3, FanFiction, Wattpad, Webnovel y el resto por dominio), con el capítulo por el que vas. **Seguir leyendo** abre ese capítulo. Se puede desactivar en ⚙ ("Recordar lo que leo en la web").
 
-Cada libro muestra su lomo (color y grosor según el libro); al pasar el ratón sale y gira su portada hacia ti, y al elegirlo pasa al centro girando, con la estantería desenfocada detrás. Desde su ficha sigues leyendo, cambias portada, contraportada y color del lomo, y le pones etiquetas, que funcionan como estanterías propias.
+Cada libro muestra su lomo (color y grosor según el libro), con un acabado mate de tela y papel; en reposo solo se ve el lomo, así que los libros nunca se montan unos sobre otros aunque la balda esté llena. Al pasar el ratón sale y gira su portada hacia ti, y al elegirlo pasa al centro girando, con la estantería desenfocada detrás. Desde su ficha sigues leyendo, cambias portada, contraportada y color del lomo, y le pones etiquetas, que funcionan como estanterías propias.
 
-**Datos del libro:** "Buscar datos…" (o "Revisar datos" después de añadir PDF) busca el libro por su título, o por el ISBN si viene impreso en el PDF, en Open Library y Google Books, y te muestra las coincidencias para que elijas la correcta. Se aplican título, autor, año, editorial, ISBN y portada. La primera vez pide permiso para acceder a esos dos sitios; nada se envía si no lo usas.
+**Serie y volumen:** del nombre del archivo se sacan la serie y el volumen, quitando etiquetas como `[RVN]`, `(z-lib.org)` o `epub` (`[RVN] Mushoku_Tensei_Vol_15.pdf` → *Mushoku Tensei*, vol. 15). Con el orden "Título y serie", los volúmenes de una saga quedan juntos y en orden numérico (1, 2 … 10, no 1, 10, 2). Los cambias a mano en la ficha del libro; los datos encontrados en internet nunca los tocan.
 
-En ⚙ eliges la madera, el orden y el tamaño de los libros.
+**Datos del libro:** "Buscar datos…" (o "Revisar datos" después de añadir PDF) busca por pasos y se detiene en cuanto hay buenas coincidencias:
+
+1. por el ISBN, si viene impreso en el PDF (Open Library y Google Books);
+2. por serie y volumen, en tu idioma y en cualquiera;
+3. solo por palabras clave (la serie, sus palabras principales);
+4. en **AniList** y **MyAnimeList** para novelas ligeras, manga y webnovels (siempre que el nombre lo sugiera, o si lo anterior no da resultados).
+
+La ventana muestra lo que se entendió del nombre (serie, volumen, "Novela ligera / manga") en chips que puedes corregir, y las 4 coincidencias más relevantes con portada, autor, año, editorial, ISBN, fuente e idioma; "Ver más resultados" despliega el resto. Si nada aparece, pasa a **Escribir a mano**: título, autor, serie, volumen, año, editorial, ISBN y portada desde un enlace (URL) o una imagen de tu equipo, con un botón que busca portadas en la web.
+
+**Tu idioma y tu orden:** en ⚙ → "Idioma de los datos" eliges en qué idioma quieres los datos (por defecto, el del libro, que se detecta al añadirlo). Si el ISBN lleva a una edición en otro idioma, también se busca la de tu idioma por título, y la otra aparece marcada como "Otra edición". Al elegir una coincidencia ves **qué cambiaría, campo por campo** (con la portada actual y la nueva, y el idioma de esa edición) y marcas lo que quieres tomar: por ejemplo, conservar tu título en español y quedarte con la portada y el año. Si la edición es de otro idioma, el título, el autor y el ISBN solo vienen marcados si a tu libro le faltan.
+
+La primera vez pide permiso para acceder a Open Library, Google Books, AniList y MyAnimeList; nada se envía si no lo usas.
+
+En ⚙ eliges la madera, el orden, el tamaño de los libros y el idioma de los datos.
 
 ### Rendimiento de las voces y qué traducción elegir
 - Las voces Local de **alta calidad** hacen bastante más cálculo por segundo de audio y Piper corre en un solo hilo dentro del navegador: en equipos modestos pueden ir más lentas que la lectura y dejar pausas entre frases. zenTTS precarga la voz, parte las frases largas y genera varias por delante; si aun así no llega, lo avisa en ⚙ → Voz. La calidad **Normal** es el mejor equilibrio.
@@ -177,7 +190,12 @@ zenTTs/
 │   ├── src/background.js   # Proxy al servidor + Piper
 │   ├── src/panel.js        # UI del panel, settings, sitios
 │   ├── src/reader.js       # Lector de PDF (pdf.js)
+│   ├── src/library.js      # Biblioteca 3D (PDF / Web)
+│   ├── src/books.js        # Datos y archivos de la biblioteca
+│   ├── src/pdfimport.js    # Añadir PDF: duplicados, portadas, ISBN, idioma
+│   ├── src/lookup.js       # Datos del libro: nombre, búsqueda por pasos, fuentes
 │   ├── reader.html         # Página del lector
+│   ├── library.html        # Página de la biblioteca
 │   └── icons/
 ├── server.rb               # API REST Ruby/Sinatra
 ├── gui.rb                  # App de escritorio GTK3
@@ -206,4 +224,6 @@ zenTTs/
 
 MIT
 
-Los logos de los sitios son marcas de sus dueños y se usan solo para indicar con qué sitios funciona zenTTS. Los de AO3 y Wattpad vienen de [Simple Icons](https://simpleicons.org) (CC0); los de FanFiction.net y Webnovel están hechos a partir de [Arcticons](https://github.com/Arcticons-Team/Arcticons) (CC BY-SA 4.0).
+Los logos de los sitios son marcas de sus dueños y se usan solo para indicar con qué sitios funciona zenTTS. Los datos de los libros vienen de [Open Library](https://openlibrary.org), [Google Books](https://books.google.com), [AniList](https://anilist.co) y [MyAnimeList](https://myanimelist.net) (por medio de [Jikan](https://jikan.moe)), solo cuando buscas.
+
+Los de AO3 y Wattpad vienen de [Simple Icons](https://simpleicons.org) (CC0); los de FanFiction.net y Webnovel están hechos a partir de [Arcticons](https://github.com/Arcticons-Team/Arcticons) (CC BY-SA 4.0).
