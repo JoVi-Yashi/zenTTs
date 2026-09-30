@@ -32,8 +32,9 @@ const PANEL_HTML = `
         </svg>
       </button>
       <button id="tts-zen-minimize" title="Minimizar">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <line x1="5" y1="12" x2="19" y2="12"></line>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="7" y1="7" x2="17" y2="17"></line>
+          <polyline points="17 9 17 17 9 17"></polyline>
         </svg>
       </button>
     </div>
@@ -42,105 +43,137 @@ const PANEL_HTML = `
   <div id="tts-zen-body">
     <div id="tts-zen-settings" class="collapsed">
      <div class="settings-inner">
-      <div class="setting-row">
-        <label id="tts-zen-voice-label">Voz</label>
-        <div class="select-wrap">
-          <select id="tts-zen-voice"></select>
+      <div class="tabs" role="tablist" id="tts-zen-tabs">
+        <button type="button" role="tab" data-tab="voice" id="tts-zen-tab-voice">Voz</button>
+        <button type="button" role="tab" data-tab="read" id="tts-zen-tab-read">Lectura</button>
+        <button type="button" role="tab" data-tab="tr" id="tts-zen-tab-tr">Traducir</button>
+        <button type="button" role="tab" data-tab="look" id="tts-zen-tab-look">Aspecto</button>
+        <i class="tab-ink"></i>
+      </div>
+      <div class="tab-pages">
+       <section class="tab-page" data-page="voice" role="tabpanel">
+        <div class="setting-row">
+          <label id="tts-zen-engine-label">Motor</label>
+          <div class="select-wrap">
+            <select id="tts-zen-engine">
+              <option value="native">Nativo (Browser)</option>
+              <option value="server">Neural (edge-tts)</option>
+              <option value="local">Local (Piper)</option>
+            </select>
+          </div>
         </div>
-      </div>
-      <div class="setting-row">
-        <label id="tts-zen-engine-label">Motor</label>
-        <div class="select-wrap">
-          <select id="tts-zen-engine">
-            <option value="native">Nativo (Browser)</option>
-            <option value="server">Neural (edge-tts)</option>
-            <option value="local">Local (Piper)</option>
-          </select>
+        <div class="setting-row">
+          <label id="tts-zen-voice-label">Voz</label>
+          <div class="select-wrap">
+            <select id="tts-zen-voice"></select>
+          </div>
         </div>
-      </div>
-      <div class="setting-row" id="tts-zen-voice-hint" hidden>
-        <label></label>
-        <div class="hint-text"><span id="tts-zen-voice-hint-text">Las voces del sistema suenan robóticas.</span>
-          <button type="button" class="link-btn" id="tts-zen-try-local">Probar voz Local</button></div>
-      </div>
-      <div class="setting-row" id="tts-zen-local-row" hidden>
-        <label></label>
-        <div class="local-dl">
-          <button id="tts-zen-local-dl" type="button">Descargar voz</button>
-          <span id="tts-zen-local-progress"></span>
+        <div class="setting-row" id="tts-zen-voice-hint" hidden>
+          <label></label>
+          <div class="hint-text"><span id="tts-zen-voice-hint-text">Las voces del sistema suenan robóticas.</span>
+            <button type="button" class="link-btn" id="tts-zen-try-local">Probar voz Local</button></div>
         </div>
-      </div>
-      <div class="setting-row">
-        <label id="tts-zen-lang-label">Idioma</label>
-        <div class="select-wrap">
-          <select id="tts-zen-lang">
-            <option value="es">Español</option>
-            <option value="en">English</option>
-          </select>
+        <div class="setting-row" id="tts-zen-local-row" hidden>
+          <label></label>
+          <button id="tts-zen-local-dl" type="button" class="fill-btn"><span class="fill-label"></span><span class="water" aria-hidden="true"><span class="fill-label"></span></span><i class="wave" aria-hidden="true"></i></button>
         </div>
-      </div>
-      <div class="setting-row">
-        <label id="tts-zen-readlang-label">Leer en</label>
-        <div class="select-wrap">
-          <select id="tts-zen-readlang">
-            <option value="auto">Auto</option>
-            <option value="original">Idioma original</option>
-            <option value="es">Español</option>
-            <option value="en">English</option>
-            <option value="fr">Français</option>
-            <option value="de">Deutsch</option>
-            <option value="it">Italiano</option>
-            <option value="pt">Português</option>
-            <option value="ja">日本語</option>
-            <option value="ko">한국어</option>
-            <option value="zh">中文</option>
-            <option value="ru">Русский</option>
-          </select>
+        <div class="setting-row" id="tts-zen-neural-hint" hidden>
+          <label></label>
+          <div class="hint-text"><span id="tts-zen-neural-hint-text">¿Aún más natural? El motor Neural usa voces de Microsoft.</span>
+            <button type="button" class="link-btn" id="tts-zen-try-neural">Usar Neural</button></div>
         </div>
-      </div>
-      <div class="setting-row" id="tts-zen-detected-row" hidden>
-        <label></label>
-        <div class="hint-text" id="tts-zen-detected"></div>
-      </div>
-      <div class="setting-row">
-        <label id="tts-zen-speed-text">Velocidad</label>
-        <div class="speed-group">
-          <input type="range" id="tts-zen-speed" min="50" max="300" value="100" step="10">
-          <span id="tts-zen-speed-label">1.0x</span>
+        <div class="setting-row">
+          <label id="tts-zen-speed-text">Velocidad</label>
+          <div class="speed-group">
+            <input type="range" id="tts-zen-speed" min="50" max="300" value="100" step="10">
+            <span id="tts-zen-speed-label">1.0x</span>
+          </div>
         </div>
-      </div>
-      <label class="check-row">
-        <input type="checkbox" id="tts-zen-autonext">
-        <span id="tts-zen-autonext-label">Seguir con el siguiente capítulo</span>
-      </label>
-      <div class="setting-row section-header">
-        <span id="tts-zen-look-title">Aspecto</span>
-      </div>
-      <label class="check-row">
-        <input type="checkbox" id="tts-zen-follow-theme">
-        <span id="tts-zen-follow-label">Usar los colores del tema del navegador</span>
-      </label>
-      <label class="check-row">
-        <input type="checkbox" id="tts-zen-word-hl">
-        <span id="tts-zen-word-hl-label">Resaltar la palabra que suena</span>
-      </label>
-      <div class="setting-row">
-        <label id="tts-zen-accent-label">Acento</label>
-        <div class="accent-group" id="tts-zen-accent-group">
-          <button type="button" class="swatch swatch-auto" data-accent="" title="Auto">A</button>
-          ${ACCENT_PRESETS.map(function(c) { return '<button type="button" class="swatch" data-accent="' + c + '" style="--c:' + c + '" title="' + c + '"></button>'; }).join('')}
-          <span class="swatch swatch-custom" id="tts-zen-accent-custom" title="Otro color">+<input type="color" id="tts-zen-accent-picker"></span>
+       </section>
+       <section class="tab-page" data-page="read" role="tabpanel">
+        <div class="setting-row">
+          <label id="tts-zen-readlang-label">Leer en</label>
+          <div class="select-wrap">
+            <select id="tts-zen-readlang">
+              <option value="auto">Auto</option>
+              <option value="original">Idioma original</option>
+              <option value="es">Español</option>
+              <option value="en">English</option>
+              <option value="fr">Français</option>
+              <option value="de">Deutsch</option>
+              <option value="it">Italiano</option>
+              <option value="pt">Português</option>
+              <option value="ja">日本語</option>
+              <option value="ko">한국어</option>
+              <option value="zh">中文</option>
+              <option value="ru">Русский</option>
+            </select>
+          </div>
         </div>
+        <div class="setting-row" id="tts-zen-detected-row" hidden>
+          <label></label>
+          <div class="hint-text" id="tts-zen-detected"></div>
+        </div>
+        <label class="check-row">
+          <input type="checkbox" id="tts-zen-autonext">
+          <span id="tts-zen-autonext-label">Seguir con el siguiente capítulo</span>
+        </label>
+        <label class="check-row">
+          <input type="checkbox" id="tts-zen-inline-tr">
+          <span id="tts-zen-inline-tr-label">Mostrar la traducción junto al texto</span>
+        </label>
+       </section>
+       <section class="tab-page" data-page="tr" role="tabpanel">
+        <div class="setting-row">
+          <label id="tts-zen-trmode-label">Traducir con</label>
+          <div class="select-wrap">
+            <select id="tts-zen-trmode">
+              <option value="ask">Preguntar</option>
+              <option value="offline">Paquete sin conexión</option>
+              <option value="online">En línea</option>
+              <option value="never">No traducir</option>
+            </select>
+          </div>
+        </div>
+        <div id="tts-zen-trchoices" class="packs"></div>
+        <div class="setting-row section-header">
+          <span id="tts-zen-packs-title">Paquetes de traducción</span>
+        </div>
+        <div id="tts-zen-packs" class="packs"></div>
+       </section>
+       <section class="tab-page" data-page="look" role="tabpanel">
+        <div class="setting-row">
+          <label id="tts-zen-lang-label">Interfaz</label>
+          <div class="select-wrap">
+            <select id="tts-zen-lang">
+              <option value="es">Español</option>
+              <option value="en">English</option>
+            </select>
+          </div>
+        </div>
+        <label class="check-row">
+          <input type="checkbox" id="tts-zen-follow-theme">
+          <span id="tts-zen-follow-label">Usar los colores del tema del navegador</span>
+        </label>
+        <label class="check-row">
+          <input type="checkbox" id="tts-zen-word-hl">
+          <span id="tts-zen-word-hl-label">Resaltar la palabra que suena</span>
+        </label>
+        <div class="setting-row">
+          <label id="tts-zen-accent-label">Acento</label>
+          <div class="accent-group" id="tts-zen-accent-group">
+            <button type="button" class="swatch swatch-auto" data-accent="" title="Auto">A</button>
+            ${ACCENT_PRESETS.map(function(c) { return '<button type="button" class="swatch" data-accent="' + c + '" style="--c:' + c + '" title="' + c + '"></button>'; }).join('')}
+            <span class="swatch swatch-custom" id="tts-zen-accent-custom" title="Otro color">+<input type="color" id="tts-zen-accent-picker"></span>
+          </div>
+        </div>
+        <div class="setting-row">
+          <label></label>
+          <input type="text" id="tts-zen-accent-hex" placeholder="Pegar color de Zen" spellcheck="false" autocomplete="off">
+        </div>
+        <div class="accent-hint" id="tts-zen-accent-hint" title="about:config → zen.theme.accent-color">zen.theme.accent-color</div>
+       </section>
       </div>
-      <div class="setting-row">
-        <label></label>
-        <input type="text" id="tts-zen-accent-hex" placeholder="Pegar color de Zen" spellcheck="false" autocomplete="off">
-      </div>
-      <div class="accent-hint" id="tts-zen-accent-hint" title="about:config → zen.theme.accent-color">zen.theme.accent-color</div>
-      <div class="setting-row section-header">
-        <span id="tts-zen-packs-title">Paquetes de traducción</span>
-      </div>
-      <div id="tts-zen-packs" class="packs"></div>
      </div>
     </div>
 
@@ -160,13 +193,14 @@ const PANEL_HTML = `
     </div>
 
     <div id="tts-zen-translate-bar" hidden>
+     <div class="tb-inner">
       <div id="tts-zen-translate-msg"></div>
       <div class="tb-actions">
-        <button type="button" id="tts-zen-tr-download" class="tb-main"></button>
+        <button type="button" id="tts-zen-tr-download" class="fill-btn tb-main"><span class="fill-label"></span><span class="water" aria-hidden="true"><span class="fill-label"></span></span><i class="wave" aria-hidden="true"></i></button>
         <button type="button" id="tts-zen-tr-online" hidden></button>
         <button type="button" id="tts-zen-tr-original"></button>
       </div>
-      <div class="tb-progress" hidden><i id="tts-zen-tr-progress"></i></div>
+     </div>
     </div>
 
     <div id="tts-zen-controls">
@@ -313,7 +347,22 @@ button:focus-visible, select:focus-visible, input:focus-visible {
   transform: scale(.35); opacity: 0; visibility: hidden; pointer-events: none;
   transition: transform .2s cubic-bezier(.4,0,.6,1), opacity .16s ease, visibility 0s .2s;
 }
-#tts-zen-body { overflow-y: auto; min-height: 0; }
+#tts-zen-body { overflow-y: auto; min-height: 0; display: flex; flex-direction: column; }
+
+/* The panel turns towards its corner: in a bottom corner the header (and the
+   settings it opens) sit at the bottom; in a left corner the header buttons
+   are mirrored, so "minimize" is always the button nearest the corner. */
+#tts-zen-panel[data-corner^="b"] { flex-direction: column-reverse; }
+#tts-zen-panel[data-corner^="b"] #tts-zen-header { border-bottom: none; border-top: 1px solid var(--rule); }
+#tts-zen-panel[data-corner^="b"] #tts-zen-settings { order: 99; border-bottom: none; border-top: 1px solid var(--rule); }
+#tts-zen-panel[data-corner^="b"] #tts-zen-settings.collapsed { border-top-color: transparent; }
+#tts-zen-panel[data-corner$="l"] #tts-zen-header,
+#tts-zen-panel[data-corner$="l"] #tts-zen-header-right { flex-direction: row-reverse; }
+#tts-zen-panel[data-corner$="l"] #tts-zen-header { padding: 8px 14px 8px 8px; }
+#tts-zen-minimize svg { transition: transform .3s cubic-bezier(.2,.8,.2,1); }
+#tts-zen-panel[data-corner="bl"] #tts-zen-minimize svg { transform: rotate(90deg); }
+#tts-zen-panel[data-corner="tl"] #tts-zen-minimize svg { transform: rotate(180deg); }
+#tts-zen-panel[data-corner="tr"] #tts-zen-minimize svg { transform: rotate(270deg); }
 
 button { transition: transform .08s ease, background-color .15s ease, color .15s ease, opacity .15s ease; }
 button:active:not(:disabled) { transform: scale(.96); }
@@ -348,10 +397,37 @@ button:active:not(:disabled) { transform: scale(.96); }
 #tts-zen-settings.collapsed { grid-template-rows: 0fr; border-bottom-color: transparent; }
 .settings-inner {
   min-height: 0; overflow: hidden;
-  padding: 12px 14px; display: flex; flex-direction: column; gap: 8px;
+  padding: 10px 14px 12px; display: flex; flex-direction: column; gap: 10px;
   transition: padding .26s cubic-bezier(.2,.8,.2,1), opacity .2s ease;
 }
 #tts-zen-settings.collapsed .settings-inner { padding-top: 0; padding-bottom: 0; opacity: 0; }
+
+/* Settings tabs: a segmented control with a sliding marker */
+.tabs {
+  position: relative; display: grid; grid-template-columns: repeat(4, 1fr);
+  padding: 2px; border-radius: 6px; background: var(--paper); border: 1px solid var(--rule);
+}
+.tabs button {
+  position: relative; z-index: 1; min-width: 0; padding: 4px 2px; border: none; border-radius: 4px;
+  background: transparent; color: var(--ink-soft); font: 11.5px var(--sans); cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tabs button:hover { color: var(--ink); }
+.tabs button[aria-selected="true"] { color: var(--ink); font-weight: 600; }
+.tab-ink {
+  position: absolute; top: 2px; bottom: 2px; left: 2px; width: calc((100% - 4px) / 4);
+  border-radius: 4px; background: var(--sheet); box-shadow: 0 1px 2px rgba(0,0,0,.12);
+  transform: translateX(calc(var(--tab, 0) * 100%));
+  transition: transform .28s cubic-bezier(.2,.8,.2,1);
+}
+/* All pages share one grid cell; the area's height follows the active page
+   with a transition, so short tabs leave no gap and switching never jumps */
+.tab-pages { display: grid; overflow: hidden; transition: height .26s cubic-bezier(.2,.8,.2,1); }
+.tab-page {
+  grid-area: 1 / 1; align-self: start; min-width: 0; display: flex; flex-direction: column; gap: 8px;
+  transition: opacity .2s ease, transform .24s cubic-bezier(.2,.8,.2,1), visibility 0s;
+}
+.tab-page:not(.active) { opacity: 0; visibility: hidden; pointer-events: none; transform: translateX(var(--from, 12px)); transition: opacity .12s ease, transform .2s ease, visibility 0s .2s; }
 
 .setting-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .setting-row label { flex-shrink: 0; min-width: 64px; max-width: 40%; font-size: 12px; color: var(--ink-soft); }
@@ -415,14 +491,38 @@ button:active:not(:disabled) { transform: scale(.96); }
 }
 #tts-zen-controls button.primary:hover:not(:disabled) { background: var(--ink); opacity: 0.88; }
 
-.local-dl { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; }
-#tts-zen-local-dl {
-  white-space: nowrap; padding: 4px 10px; border-radius: 4px; border: 1px solid var(--ink);
+/* Download buttons fill up like water while downloading: the "water" layer is
+   a copy of the label in inverted colors, clipped to the progress, with a
+   rippling edge. */
+.fill-btn {
+  position: relative; overflow: hidden; flex: 1; min-width: 0;
+  padding: 5px 10px; border-radius: 4px; border: 1px solid var(--ink);
   background: transparent; color: var(--ink); font: 12px var(--sans); cursor: pointer;
+  text-align: center; white-space: nowrap; --p: 0%;
+  transition: opacity .25s ease, transform .08s ease, background-color .15s ease;
 }
-#tts-zen-local-dl:hover:not(:disabled) { background: var(--hover); }
-#tts-zen-local-dl:disabled { opacity: 0.5; cursor: default; }
-#tts-zen-local-progress { font-size: 12px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.fill-btn:hover:not(:disabled) { background: var(--hover); }
+.fill-btn .fill-label { display: block; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.fill-btn .water {
+  position: absolute; inset: 0; padding: inherit; display: flex; align-items: center; justify-content: center;
+  background: var(--ink); color: var(--sheet);
+  clip-path: inset(0 calc(100% - var(--p)) 0 0);
+  transition: clip-path .3s ease;
+}
+.fill-btn .water .fill-label { width: 100%; }
+.fill-btn .wave {
+  position: absolute; top: 0; bottom: 0; left: calc(var(--p) - 1px); width: 7px; display: none;
+  background: var(--ink);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='7' height='12'%3E%3Cpath d='M0 0 Q7 3 0 6 Q7 9 0 12Z'/%3E%3C/svg%3E") 0 0 / 7px 12px repeat-y;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='7' height='12'%3E%3Cpath d='M0 0 Q7 3 0 6 Q7 9 0 12Z'/%3E%3C/svg%3E") 0 0 / 7px 12px repeat-y;
+  animation: ripple .9s linear infinite;
+  transition: left .3s ease;
+}
+.fill-btn.filling { cursor: progress; }
+.fill-btn.filling .wave { display: block; }
+.fill-btn.filling:hover { background: transparent; }
+.fill-btn.done { opacity: 0; }
+@keyframes ripple { to { -webkit-mask-position: 0 12px; mask-position: 0 12px; } }
 .check-row { display: flex; align-items: flex-start; gap: 8px; font-size: 12px; line-height: 1.35; color: var(--ink-soft); cursor: pointer; }
 .check-row input { accent-color: var(--ink); margin: 1px 0 0; flex-shrink: 0; }
 
@@ -434,22 +534,26 @@ button:active:not(:disabled) { transform: scale(.96); }
 
 /* Translation offer */
 #tts-zen-translate-bar {
-  margin: 10px 14px 0; padding: 10px 12px; border-radius: 6px;
+  display: grid; grid-template-rows: 1fr; margin: 4px 14px 12px;
+  animation: bar-in .24s cubic-bezier(.2,.8,.2,1);
+  transition: grid-template-rows .28s cubic-bezier(.4,0,.2,1), margin .28s cubic-bezier(.4,0,.2,1), opacity .2s ease;
+}
+#tts-zen-translate-bar.closing { grid-template-rows: 0fr; margin-top: 0; margin-bottom: 0; opacity: 0; }
+.tb-inner {
+  min-height: 0; overflow: hidden; padding: 10px 12px; border-radius: 6px;
   background: var(--paper); border: 1px solid var(--rule);
   font-size: 12px; line-height: 1.4; color: var(--ink);
-  animation: bar-in .24s cubic-bezier(.2,.8,.2,1);
 }
+#tts-zen-translate-bar.closing .tb-inner { padding-top: 0; padding-bottom: 0; border-width: 0; transition: padding .28s ease; }
 @keyframes bar-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 .tb-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.tb-actions button {
+.tb-actions .fill-btn { flex: 1 1 100%; font-weight: 600; }
+.tb-actions button:not(.fill-btn) {
   padding: 4px 10px; border-radius: 4px; border: 1px solid var(--rule);
   background: transparent; color: var(--ink); font: 12px var(--sans); cursor: pointer;
 }
-.tb-actions button.tb-main { background: var(--ink); border-color: var(--ink); color: var(--sheet); font-weight: 600; }
-.tb-actions button:hover:not(:disabled) { opacity: .88; }
-.tb-actions button:disabled { opacity: .5; cursor: default; }
-.tb-progress { height: 3px; margin-top: 8px; border-radius: 2px; background: var(--rule); overflow: hidden; }
-.tb-progress i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s ease; }
+.tb-actions button:not(.fill-btn):hover:not(:disabled) { background: var(--hover); }
+.tb-actions button:disabled:not(.filling) { opacity: .5; cursor: default; }
 
 .packs { display: flex; flex-direction: column; gap: 4px; }
 .pack-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--ink); }
@@ -460,6 +564,7 @@ button:active:not(:disabled) { transform: scale(.96); }
 }
 .pack-row button:hover { background: var(--hover); color: var(--ink); }
 .packs-empty { font-size: 12px; color: var(--ink-soft); }
+.pack-row .muted { color: var(--ink-soft); }
 
 #tts-zen-pick.active { background: var(--ink); border-color: var(--ink); color: var(--sheet); }
 [hidden] { display: none !important; }
@@ -486,7 +591,7 @@ button:active:not(:disabled) { transform: scale(.96); }
 }
 #tts-zen-accent-hex:focus { border-color: var(--ink-soft); }
 #tts-zen-accent-hex.invalid { border-color: var(--accent); }
-.accent-hint { margin: -4px 0 0 74px; font: 10px var(--mono); color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.accent-hint { margin: -2px 0 0 74px; font: 10px var(--mono); color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 #tts-zen-resume-row { text-align: center; padding: 0 14px 6px; }
 #tts-zen-restart {
@@ -662,8 +767,14 @@ var T = {
     detected: 'Detectado: %s', packs: 'Paquetes de traducción', noPacks: 'Ninguno descargado',
     remove: 'Borrar', pick: 'Elegir dónde empezar', roboticHint: 'Las voces del sistema suenan robóticas.',
     tryLocal: 'Probar voz Local', trFound: 'Texto en %s.', trNeedsTwo: 'Hacen falta dos paquetes (%s).',
-    trDownload: 'Descargar traducción %s (%s MB)', trOnline: 'Traducir en línea', trOriginal: 'Leer en %s',
-    trDownloading: 'Descargando traducción… %s', trFailed: 'No se pudo descargar la traducción'
+    trDownload: 'Descargar %s · %s MB', trOnline: 'Traducir en línea', trOriginal: 'Leer en %s',
+    trDownloading: 'Descargando… %s', trFailed: 'No se pudo descargar la traducción',
+    tabVoice: 'Voz', tabRead: 'Lectura', tabTr: 'Traducir', tabLook: 'Aspecto', uiLang: 'Interfaz',
+    inlineTr: 'Mostrar la traducción junto al texto', trMode: 'Traducir con', trAsk: 'Preguntar',
+    trOffline: 'Paquete sin conexión', trOnlineMode: 'En línea', trNever: 'No traducir',
+    remembered: 'Elecciones recordadas', forget: 'Olvidar', neuralHint: '¿Aún más natural? El motor Neural usa voces de Microsoft.',
+    tryNeural: 'Usar Neural', qHigh: 'Alta calidad', qMedium: 'Normal', qLow: 'Ligera',
+    retry: 'No se pudo descargar · Reintentar', downloadPct: 'Descargando… %s'
   },
   en: {
     minimize: 'Minimize', preview: 'View extracted text', sites: 'Manage sites',
@@ -687,8 +798,14 @@ var T = {
     detected: 'Detected: %s', packs: 'Translation packs', noPacks: 'None downloaded',
     remove: 'Delete', pick: 'Choose where to start', roboticHint: 'System voices sound robotic.',
     tryLocal: 'Try the Local voice', trFound: 'Text in %s.', trNeedsTwo: 'Needs two packs (%s).',
-    trDownload: 'Download %s translation (%s MB)', trOnline: 'Translate online', trOriginal: 'Read in %s',
-    trDownloading: 'Downloading translation… %s', trFailed: 'Could not download the translation'
+    trDownload: 'Download %s · %s MB', trOnline: 'Translate online', trOriginal: 'Read in %s',
+    trDownloading: 'Downloading… %s', trFailed: 'Could not download the translation',
+    tabVoice: 'Voice', tabRead: 'Reading', tabTr: 'Translate', tabLook: 'Look', uiLang: 'Interface',
+    inlineTr: 'Show the translation next to the text', trMode: 'Translate with', trAsk: 'Ask',
+    trOffline: 'Offline pack', trOnlineMode: 'Online', trNever: "Don't translate",
+    remembered: 'Remembered choices', forget: 'Forget', neuralHint: 'Even more natural? The Neural engine uses Microsoft voices.',
+    tryNeural: 'Use Neural', qHigh: 'High quality', qMedium: 'Standard', qLow: 'Light',
+    retry: 'Download failed · Retry', downloadPct: 'Downloading… %s'
   }
 };
 
@@ -722,6 +839,9 @@ let state = {
   followTheme: true,
   wordHighlight: true,
   readLang: 'auto',
+  trMode: 'ask',
+  inlineTr: true,
+  tab: 'voice',
   corner: 'br',
   lang: 'es'
 };
@@ -730,10 +850,13 @@ let state = {
 
 async function loadSettings() {
   try {
-    const stored = await browser.storage.local.get(['voice', 'rate', 'engine', 'lang', 'readLang', 'localVoice', 'autoNext', 'accent', 'followTheme', 'wordHighlight', 'corner']);
+    const stored = await browser.storage.local.get(['voice', 'rate', 'engine', 'lang', 'readLang', 'localVoice', 'autoNext', 'accent', 'followTheme', 'wordHighlight', 'corner', 'trMode', 'inlineTr', 'tab']);
     // "Leer en" replaces the old translate-to setting (langOut): start on Auto
     if (stored.readLang) state.readLang = stored.readLang;
     if (stored.corner) state.corner = stored.corner;
+    if (stored.trMode) state.trMode = stored.trMode;
+    if (typeof stored.inlineTr === 'boolean') state.inlineTr = stored.inlineTr;
+    if (stored.tab) state.tab = stored.tab;
     if (typeof stored.wordHighlight === 'boolean') state.wordHighlight = stored.wordHighlight;
     if (typeof stored.accent === 'string') state.accent = stored.accent;
     if (typeof stored.followTheme === 'boolean') state.followTheme = stored.followTheme;
@@ -757,13 +880,15 @@ function syncShared() {
   shared.currentEngine = state.currentEngine;
   shared.lang = state.lang;
   shared.readLang = state.readLang;
+  shared.trMode = state.trMode;
+  shared.inlineTr = state.inlineTr;
   shared.autoNext = state.autoNext;
   shared.wordHighlight = state.wordHighlight;
 }
 
 async function saveSettings() {
   try {
-    await browser.storage.local.set({ voice: state.currentVoice, rate: state.currentRate, engine: state.currentEngine, lang: state.lang, readLang: state.readLang, corner: state.corner, localVoice: state.localVoice, autoNext: state.autoNext, accent: state.accent, followTheme: state.followTheme, wordHighlight: state.wordHighlight });
+    await browser.storage.local.set({ voice: state.currentVoice, rate: state.currentRate, engine: state.currentEngine, lang: state.lang, readLang: state.readLang, corner: state.corner, trMode: state.trMode, inlineTr: state.inlineTr, tab: state.tab, localVoice: state.localVoice, autoNext: state.autoNext, accent: state.accent, followTheme: state.followTheme, wordHighlight: state.wordHighlight });
   } catch (_) {}
 }
 
@@ -773,12 +898,14 @@ function uiLang() {
   try { return browser.i18n.getUILanguage().slice(0, 2).toLowerCase(); } catch (_) { return state.lang; }
 }
 
-// Language the text will be spoken in: set by the content script once the page
-// language is detected (and translated or not); until then, the likely target
+// Language the text will be spoken in: set by the content script once it has
+// decided whether to translate; until then, the reading language (the page's
+// own language only with "Original language")
 function outLang() {
   var shared = window.__tts_zen_state;
   if (shared && shared.speechLang) return shared.speechLang;
-  if (state.readLang && state.readLang !== 'auto' && state.readLang !== 'original') return state.readLang;
+  if (state.readLang === 'original') return detectedLang || uiLang();
+  if (state.readLang && state.readLang !== 'auto') return state.readLang;
   return uiLang();
 }
 
@@ -796,6 +923,8 @@ function cleanVoiceName(v) {
 async function loadVoices() {
   var localRow = getEl('tts-zen-local-row');
   if (localRow) localRow.hidden = state.currentEngine !== 'local';
+  var neural = getEl('tts-zen-neural-hint');
+  if (neural) neural.hidden = state.currentEngine !== 'local';
   var hint = getEl('tts-zen-voice-hint');
   if (hint) hint.hidden = true;
   if (state.currentEngine === 'server') return loadServerVoices();
@@ -850,6 +979,9 @@ async function loadServerVoices() {
 }
 
 var localStored = [];
+var localDownload = null;      // { voiceId, fraction } while a voice downloads
+
+var QUALITY = { high: 'qHigh', medium: 'qMedium', low: 'qLow', x_low: 'qLow' };
 
 async function loadLocalVoices() {
   setVoicePlaceholder(t('loadingVoices'));
@@ -858,59 +990,91 @@ async function loadLocalVoices() {
   if (state.currentEngine !== 'local') return;
   localStored = (resp && resp.stored) || [];
   var prefix = outLang().toLowerCase() + '_';
-  var catalog = ((resp && resp.catalog) || []).filter(function(v) {
+  var all = (resp && resp.catalog) || [];
+  var catalog = all.filter(function(v) {
     return v.key.toLowerCase().startsWith(prefix) || localStored.includes(v.key);
   });
-  if (!catalog.length) catalog = (resp && resp.catalog) || [];
+  if (!catalog.length) catalog = all;
   state.voices = catalog.map(function(v) {
-    var have = localStored.includes(v.key) ? ' · ' + t('downloaded') : '';
-    return { name: v.key, label: v.name + ' (' + v.quality + ')' + have, lang: v.language, size: v.size };
+    var region = (v.language || '').split('_')[1];
+    var parts = [v.name.replace(/_/g, ' ')];
+    if (region) parts.push(region);
+    if (localStored.includes(v.key)) parts.push(t('downloaded'));
+    else if (v.size) parts.push(Math.round(v.size / 1048576) + ' MB');
+    return {
+      name: v.key, label: parts.join(' · '), lang: v.language, size: v.size,
+      group: v.key.toLowerCase().startsWith(prefix) ? (QUALITY[v.quality] || 'qMedium') : null
+    };
   });
   if (!state.voices.some(function(v) { return v.name === state.localVoice; })) {
     var firstStored = state.voices.find(function(v) { return localStored.includes(v.name); });
-    if (firstStored) state.localVoice = firstStored.name;
-    else if (state.voices.length) state.localVoice = state.voices[0].name;
+    var standard = state.voices.find(function(v) { return v.group === 'qMedium'; });
+    state.localVoice = (firstStored || standard || state.voices[0] || {}).name || state.localVoice;
+    syncShared();
   }
   populateVoiceDropdown('localVoice');
   updateLocalRow();
 }
 
+// Sets a .fill-btn's label and water level (fraction 0..1, or null when idle)
+function setFill(btn, text, fraction) {
+  if (!btn) return;
+  btn.querySelectorAll('.fill-label').forEach(function(l) { l.textContent = text; });
+  btn.title = text;
+  var filling = fraction != null;
+  btn.classList.toggle('filling', filling);
+  btn.disabled = filling;
+  btn.style.setProperty('--p', filling ? Math.round(Math.max(0, Math.min(1, fraction)) * 100) + '%' : '0%');
+}
+
 function updateLocalRow() {
   var btn = getEl('tts-zen-local-dl');
-  var progress = getEl('tts-zen-local-progress');
-  if (!btn || !progress) return;
+  if (!btn) return;
   var have = localStored.includes(state.localVoice);
+  var row = getEl('tts-zen-local-row');
+  if (row && state.currentEngine === 'local') row.hidden = have && !localDownload;
+  if (!localDownload) btn.classList.remove('done');
+  if (localDownload && localDownload.voiceId === state.localVoice) {
+    setFill(btn, tf('downloadPct', Math.round(localDownload.fraction * 100) + ' %'), localDownload.fraction);
+    return;
+  }
   var voice = (state.voices || []).find(function(v) { return v.name === state.localVoice; });
   var mb = voice && voice.size ? ' · ' + Math.round(voice.size / 1048576) + ' MB' : '';
-  btn.hidden = have;
-  btn.disabled = false;
-  btn.textContent = t('downloadVoice') + mb;
-  progress.textContent = '';
+  setFill(btn, (btn.dataset.failed === state.localVoice ? t('retry') : t('downloadVoice') + mb), null);
 }
 
 async function downloadLocalVoice() {
   var btn = getEl('tts-zen-local-dl');
-  var progress = getEl('tts-zen-local-progress');
   var voiceId = state.localVoice;
-  if (btn) btn.disabled = true;
-  if (progress) progress.textContent = t('downloading');
+  if (localDownload) return;
+  localDownload = { voiceId: voiceId, fraction: 0 };
+  if (btn) delete btn.dataset.failed;
+  updateLocalRow();
   try {
     var resp = await browser.runtime.sendMessage({ action: 'local_download', voiceId: voiceId });
     if (!resp || !resp.success) throw new Error((resp && resp.error) || 'download');
+    localDownload.fraction = 1;
+    updateLocalRow();
+    // Let the water reach the end, then fade the button out
+    await new Promise(function(r) { setTimeout(r, 350); });
+    if (btn) btn.classList.add('done');
+    await new Promise(function(r) { setTimeout(r, 260); });
+    localDownload = null;
     await loadLocalVoices();
   } catch (e) {
     console.error('[zenTTS] download voice:', e.message || e);
-    if (btn) btn.disabled = false;
-    if (progress) progress.textContent = t('downloadFailed');
+    localDownload = null;
+    if (btn) btn.dataset.failed = voiceId;
+    updateLocalRow();
   }
 }
 
 // Download progress is pushed by the background page
 if (typeof browser !== 'undefined' && browser.runtime && browser.runtime.onMessage) {
   browser.runtime.onMessage.addListener(function(msg) {
-    if (!msg || msg.action !== 'local_progress' || msg.voiceId !== state.localVoice) return;
-    var progress = getEl('tts-zen-local-progress');
-    if (progress && msg.total) progress.textContent = Math.round(msg.loaded * 100 / msg.total) + ' %';
+    if (!msg || msg.action !== 'local_progress' || !localDownload || msg.voiceId !== localDownload.voiceId) return;
+    if (msg.total) localDownload.fraction = Math.min(0.99, msg.loaded / msg.total);
+    updateLocalRow();
   });
 }
 
@@ -943,15 +1107,19 @@ function populateVoiceDropdown(key) {
     syncShared();
   }
 
-  // Voices in the reading language first, grouped by region; the rest after
+  // Voices in the reading language first, grouped by region (Piper voices:
+  // by quality, best first); the rest after
   var want = outLang().toLowerCase();
   var groups = {};
   var others = [];
+  var byQuality = key === 'localVoice';
   state.voices.forEach(function(v) {
     var lang = v.lang || '';
-    if (lang.toLowerCase().replace('_', '-').startsWith(want)) (groups[lang] = groups[lang] || []).push(v);
+    var g = byQuality ? v.group : (lang.toLowerCase().replace('_', '-').startsWith(want) ? lang : null);
+    if (g) (groups[g] = groups[g] || []).push(v);
     else others.push(v);
   });
+  var order = byQuality ? ['qHigh', 'qMedium', 'qLow'].filter(function(g) { return groups[g]; }) : Object.keys(groups).sort();
   function option(v, withLang) {
     var opt = document.createElement('option');
     opt.value = v.name;
@@ -960,10 +1128,10 @@ function populateVoiceDropdown(key) {
     opt.selected = v.name === state[key];
     return opt;
   }
-  Object.keys(groups).sort().forEach(function(lang) {
+  order.forEach(function(g) {
     var optgroup = document.createElement('optgroup');
-    optgroup.label = langLabel(lang);
-    groups[lang].forEach(function(v) { optgroup.appendChild(option(v, false)); });
+    optgroup.label = byQuality ? t(g) : langLabel(g);
+    groups[g].forEach(function(v) { optgroup.appendChild(option(v, false)); });
     select.appendChild(optgroup);
   });
   if (others.length) {
@@ -980,7 +1148,10 @@ function populateVoiceDropdown(key) {
 function applyLanguage(shadow) {
   var lang = state.lang;
   // Update settings label texts
-  [['tts-zen-voice-label', 'voice'], ['tts-zen-engine-label', 'engine'], ['tts-zen-lang-label', 'langLabel'],
+  [['tts-zen-voice-label', 'voice'], ['tts-zen-engine-label', 'engine'], ['tts-zen-lang-label', 'uiLang'],
+   ['tts-zen-tab-voice', 'tabVoice'], ['tts-zen-tab-read', 'tabRead'], ['tts-zen-tab-tr', 'tabTr'], ['tts-zen-tab-look', 'tabLook'],
+   ['tts-zen-inline-tr-label', 'inlineTr'], ['tts-zen-trmode-label', 'trMode'],
+   ['tts-zen-neural-hint-text', 'neuralHint'], ['tts-zen-try-neural', 'tryNeural'],
    ['tts-zen-translate-title', 'translateTitle'], ['tts-zen-speed-text', 'speed'],
    ['tts-zen-autonext-label', 'autoNext'], ['tts-zen-restart', 'restart'],
    ['tts-zen-look-title', 'look'], ['tts-zen-word-hl-label', 'wordHighlight'],
@@ -991,6 +1162,9 @@ function applyLanguage(shadow) {
   });
   renderReadLabel();
   updateLocalRow();
+  var trModeSel = shadow.getElementById('tts-zen-trmode');
+  if (trModeSel) ['trAsk', 'trOffline', 'trOnlineMode', 'trNever'].forEach(function(k, i) { trModeSel.options[i].textContent = T[lang][k]; });
+  shadow.querySelectorAll('.tabs button').forEach(function(b) { b.title = b.textContent; });
   renderReadLangOptions();
   renderDetected();
   renderTranslateBar();
@@ -1247,6 +1421,7 @@ export async function createPanel(shadow, handlers) {
   const settingsBtn = shadow.getElementById('tts-zen-settings-btn');
   const settingsPanel = shadow.getElementById('tts-zen-settings');
   settingsBtn.addEventListener('click', function() { settingsPanel.classList.toggle('collapsed'); });
+  setupTabs(shadow);
 
   const voiceSelect = shadow.getElementById('tts-zen-voice');
   voiceSelect.addEventListener('change', function() {
@@ -1294,6 +1469,21 @@ export async function createPanel(shadow, handlers) {
     engineSelect.value = 'local';
     engineSelect.dispatchEvent(new Event('change'));
   });
+  shadow.getElementById('tts-zen-try-neural').addEventListener('click', function() {
+    engineSelect.value = 'server';
+    engineSelect.dispatchEvent(new Event('change'));
+  });
+
+  var inlineTr = shadow.getElementById('tts-zen-inline-tr');
+  inlineTr.checked = state.inlineTr;
+  inlineTr.addEventListener('change', function() {
+    state.inlineTr = inlineTr.checked; syncShared(); saveSettings();
+    if (handlers.onInlineTr) handlers.onInlineTr(state.inlineTr);
+  });
+
+  var trMode = shadow.getElementById('tts-zen-trmode');
+  trMode.value = state.trMode;
+  trMode.addEventListener('change', function() { state.trMode = trMode.value; syncShared(); saveSettings(); });
   shadow.getElementById('tts-zen-pick').addEventListener('click', function() { if (handlers.onPick) handlers.onPick(); });
   translateHandlers = handlers.onTranslate || null;
   ['download', 'online', 'original'].forEach(function(choice) {
@@ -1359,21 +1549,31 @@ export function setDetectedLanguage(code) {
 function renderTranslateBar() {
   var bar = getEl('tts-zen-translate-bar');
   if (!bar) return;
-  bar.hidden = !offer;
-  if (!offer) return;
+  if (!offer) { closeTranslateBar(bar); return; }
+  clearTimeout(bar._closing);
+  bar.classList.remove('closing');
+  bar.hidden = false;
   var msg = tf('trFound', languageName(offer.from));
   if (offer.pivot) msg += ' ' + tf('trNeedsTwo', offer.pivot.join(' + '));
   getEl('tts-zen-translate-msg').textContent = msg;
   var dl = getEl('tts-zen-tr-download');
   var pair = offer.from.toUpperCase() + '→' + offer.to.toUpperCase();
-  dl.textContent = offer.progress != null ? tf('trDownloading', Math.round(offer.progress * 100) + ' %') : tf('trDownload', pair, offer.sizeMB);
-  dl.disabled = offer.progress != null;
+  if (offer.progress != null) setFill(dl, tf('trDownloading', Math.round(offer.progress * 100) + ' %'), offer.progress);
+  else setFill(dl, tf('trDownload', pair, offer.sizeMB), null);
   dl.hidden = offer.supported === false;
-  getEl('tts-zen-tr-online').hidden = !offer.online;
+  var busy = offer.progress != null;
+  getEl('tts-zen-tr-online').hidden = !offer.online || busy;
   getEl('tts-zen-tr-online').textContent = t('trOnline');
+  getEl('tts-zen-tr-original').hidden = busy;
   getEl('tts-zen-tr-original').textContent = tf('trOriginal', languageName(offer.from));
-  bar.querySelector('.tb-progress').hidden = offer.progress == null;
-  getEl('tts-zen-tr-progress').style.width = Math.round((offer.progress || 0) * 100) + '%';
+}
+
+// Folds the offer away (height, margin and opacity), then hides it
+function closeTranslateBar(bar) {
+  if (bar.hidden || bar.classList.contains('closing')) return;
+  bar.classList.add('closing');
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  bar._closing = setTimeout(function() { bar.hidden = true; bar.classList.remove('closing'); }, reduce ? 0 : 300);
 }
 
 // info: { from, to, sizeMB, pivot?, online } or null to hide
@@ -1388,8 +1588,28 @@ export function setTranslateProgress(fraction) {
   renderTranslateBar();
 }
 
+function packRow(label, detail, title, onRemove) {
+  var row = document.createElement('div');
+  row.className = 'pack-row';
+  var name = document.createElement('span');
+  name.textContent = label;
+  var info = document.createElement('span');
+  info.textContent = detail;
+  var del = document.createElement('button');
+  del.type = 'button';
+  del.title = title;
+  del.textContent = '✕';
+  del.addEventListener('click', onRemove);
+  row.append(name, info, del);
+  return row;
+}
+
+var CHOICE_LABEL = { offline: 'trOffline', online: 'trOnlineMode', original: 'trNever' };
+
+// Translation tab: remembered per-pair choices, then the downloaded packs
 export async function refreshPacks() {
   var box = getEl('tts-zen-packs');
+  var choices = getEl('tts-zen-trchoices');
   if (!box) return;
   var list = [];
   try {
@@ -1402,26 +1622,85 @@ export async function refreshPacks() {
     empty.className = 'packs-empty';
     empty.textContent = t('noPacks');
     box.appendChild(empty);
-    return;
   }
   list.forEach(function(pk) {
-    var row = document.createElement('div');
-    row.className = 'pack-row';
-    var name = document.createElement('span');
-    name.textContent = languageName(pk.from) + ' → ' + languageName(pk.to);
-    var size = document.createElement('span');
-    size.textContent = Math.round(pk.bytes / 1048576) + ' MB';
-    var del = document.createElement('button');
-    del.type = 'button';
-    del.title = t('remove');
-    del.textContent = '✕';
-    del.addEventListener('click', async function() {
+    box.appendChild(packRow(languageName(pk.from) + ' → ' + languageName(pk.to), Math.round(pk.bytes / 1048576) + ' MB', t('remove'), async function() {
       try { await browser.runtime.sendMessage({ action: 'tr_remove', pair: pk.from + '-' + pk.to }); } catch (_) {}
       refreshPacks();
-    });
-    row.append(name, size, del);
-    box.appendChild(row);
+    }));
   });
+
+  if (!choices) return;
+  var stored = {};
+  try { stored = await browser.storage.local.get(null); } catch (_) {}
+  choices.replaceChildren();
+  Object.keys(stored).filter(function(k) { return k.indexOf('trChoice:') === 0; }).sort().forEach(function(k) {
+    var pair = k.slice(9).split('-');
+    choices.appendChild(packRow(languageName(pair[0]) + ' → ' + languageName(pair[1]), t(CHOICE_LABEL[stored[k]] || 'trAsk'), t('forget'), async function() {
+      try { await browser.storage.local.remove(k); } catch (_) {}
+      refreshPacks();
+    }));
+  });
+  choices.hidden = !choices.childElementCount;
+}
+
+// ---- Settings tabs ----
+
+var TABS = ['voice', 'read', 'tr', 'look'];
+
+function selectTab(shadow, name, focus) {
+  var i = Math.max(0, TABS.indexOf(name));
+  var prev = TABS.indexOf(state.tab);
+  state.tab = TABS[i];
+  var tabs = shadow.getElementById('tts-zen-tabs');
+  tabs.style.setProperty('--tab', i);
+  tabs.querySelectorAll('button').forEach(function(b) {
+    var on = b.dataset.tab === state.tab;
+    b.setAttribute('aria-selected', String(on));
+    b.tabIndex = on ? 0 : -1;
+    if (on && focus) b.focus();
+  });
+  shadow.querySelectorAll('.tab-page').forEach(function(pg) {
+    var on = pg.dataset.page === state.tab;
+    // New page slides in from the side of the tab it comes from
+    if (on) pg.style.setProperty('--from', (i >= prev ? 12 : -12) + 'px');
+    else pg.style.setProperty('--from', (TABS.indexOf(pg.dataset.page) < i ? -12 : 12) + 'px');
+    pg.classList.toggle('active', on);
+    pg.setAttribute('aria-hidden', String(!on));
+  });
+  fitTabHeight(shadow);
+  if (state.tab === 'tr') refreshPacks();
+}
+
+function fitTabHeight(shadow) {
+  var pages = shadow.querySelector('.tab-pages');
+  var active = shadow.querySelector('.tab-page.active');
+  if (pages && active) pages.style.height = active.offsetHeight + 'px';
+}
+
+function setupTabs(shadow) {
+  var tabs = shadow.getElementById('tts-zen-tabs');
+  tabs.addEventListener('click', function(e) {
+    var b = e.target.closest('button[data-tab]');
+    if (!b) return;
+    selectTab(shadow, b.dataset.tab);
+    saveSettings();
+  });
+  tabs.addEventListener('keydown', function(e) {
+    var i = TABS.indexOf(state.tab);
+    if (e.key === 'ArrowRight') i = (i + 1) % TABS.length;
+    else if (e.key === 'ArrowLeft') i = (i + TABS.length - 1) % TABS.length;
+    else return;
+    e.preventDefault();
+    selectTab(shadow, TABS[i], true);
+    saveSettings();
+  });
+  selectTab(shadow, state.tab);
+  // Rows appear and disappear (hints, download button, packs): keep the height in step
+  if (typeof ResizeObserver !== 'undefined') {
+    var ro = new ResizeObserver(function() { fitTabHeight(shadow); });
+    shadow.querySelectorAll('.tab-page').forEach(function(pg) { ro.observe(pg); });
+  }
 }
 
 export function setPickActive(on) {

@@ -21,7 +21,7 @@ Diseñado para lectores de Wattpad, AO3 y FanFiction. Construido sobre la [Web S
 |---|---|---|
 | **Nativo** | SpeechSynthesis del navegador | Panel → ⚙ → Motor: Nativo |
 | **Neural** | edge-tts · voces neurales de Microsoft | `ruby server.rb` + Panel → ⚙ → Motor: Neural |
-| **Local** | Piper en el navegador (WASM), sin conexión | Panel → ⚙ → Motor: Local → Descargar voz (~60 MB, una vez) |
+| **Local** | Piper en el navegador (WASM), sin conexión | Panel → ⚙ → Voz → Motor: Local → Descargar voz (~60 MB, una vez; ~110 MB las de alta calidad) |
 
 Si el motor Neural falla a mitad de lectura (edge-tts depende de un servicio de Microsoft que a veces no responde), zenTTS sigue desde la misma oración con la voz Local si tienes una descargada, o con la del navegador, y te lo indica en el panel.
 
@@ -105,13 +105,22 @@ Wattpad, AO3, FanFiction y Webnovel tienen extractores optimizados con selectore
 En AO3, FanFiction.net y Wattpad, al terminar un capítulo se carga el siguiente en la misma página y la lectura sigue sola. Se desactiva en ⚙ → "Seguir con el siguiente capítulo".
 
 ### Idioma detectado y traducción sin conexión
-zenTTS detecta el idioma del capítulo con el detector de Firefox. Si no coincide con el idioma en el que quieres escuchar (⚙ → "Leer en": automático, un idioma concreto o el original), te ofrece descargar un paquete de traducción de Firefox Translations (unos 25 MB por dirección). Después traduce en tu equipo, sin conexión. Los pares sin modelo directo pasan por el inglés. También puedes leer en el idioma original o, con el servidor en marcha, traducir en línea. Los paquetes se gestionan en ⚙ → Paquetes de traducción.
+zenTTS detecta el idioma del capítulo con el detector de Firefox. Si no coincide con el idioma en el que quieres escuchar (⚙ → "Leer en": automático, un idioma concreto o el original), te ofrece descargar un paquete de traducción de Firefox Translations (unos 25 MB por dirección). Después traduce en tu equipo, sin conexión. Los pares sin modelo directo pasan por el inglés. También puedes leer en el idioma original o, con el servidor en marcha, traducir en línea.
+
+La lectura empieza en cuanto están traducidos los primeros párrafos; el resto se traduce mientras escuchas. La frase traducida aparece en una tarjeta bajo el párrafo original, con la palabra que suena marcada (⚙ → Lectura → "Mostrar la traducción junto al texto").
+
+En ⚙ → Traducir eliges cómo traducir siempre (preguntar, paquete sin conexión, en línea o no traducir), ves las elecciones recordadas por idioma y puedes olvidarlas, y gestionas los paquetes descargados.
 
 ### Empezar donde tú elijas
 Pulsa el botón de la mira en el panel y haz clic en la frase por la que quieres empezar; al pasar el ratón se marca la frase. Sin pulsar el botón, los clics en la página no hacen nada. Esc cancela.
 
 ### Burbuja movible
-Minimizado, zenTTS es una burbuja que puedes arrastrar a cualquier esquina; se queda ahí y el panel se abre en esa misma esquina.
+Minimizado, zenTTS es una burbuja que puedes arrastrar a cualquier esquina; se queda ahí y el panel se abre en esa misma esquina, orientado hacia ella: en una esquina inferior la barra con los botones queda abajo, y el botón de minimizar siempre está en el lado de la esquina, con la flecha apuntando a ella.
+
+### Voces
+Las voces se ofrecen en el idioma en que se va a leer (el traducido, si traduces). Las voces Local (Piper) están agrupadas por calidad: alta (~110 MB), normal (~60 MB) y ligera; en español hay voces de España, México y Argentina. Los ajustes están en cuatro pestañas: Voz, Lectura, Traducir y Aspecto.
+
+Con el motor del navegador, Pausa detiene la voz aunque el sintetizador del sistema (speech-dispatcher en Linux) ignore la pausa; al continuar, retoma desde la última palabra.
 
 ### Colores del navegador
 El panel sigue el modo claro u oscuro y, si tienes instalado un tema de Firefox, toma sus colores. Zen no deja que las extensiones lean su color de acento, así que en ⚙ → Aspecto puedes elegir uno o pegar el valor de `zen.theme.accent-color` (en `about:config`) para que coincida.

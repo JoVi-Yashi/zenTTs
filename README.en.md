@@ -21,7 +21,7 @@ Built for Wattpad, AO3, and FanFiction readers. Powered by the [Web Speech API](
 |---|---|---|
 | **Native** | Browser SpeechSynthesis | Panel → ⚙ → Engine: Native |
 | **Neural** | edge-tts · Microsoft neural voices | `ruby server.rb` + Panel → ⚙ → Engine: Neural |
-| **Local** | Piper in the browser (WASM), works offline | Panel → ⚙ → Engine: Local → Download voice (~60 MB, once) |
+| **Local** | Piper in the browser (WASM), works offline | Panel → ⚙ → Voice → Engine: Local → Download voice (~60 MB, once; ~110 MB for high quality) |
 
 If the Neural engine fails mid-reading (edge-tts relies on a Microsoft service that sometimes stops answering), zenTTS carries on from the same sentence with the Local voice if you have one downloaded, or with the browser voice, and says so in the panel.
 
@@ -102,13 +102,22 @@ The sentence being read is marked on the page itself and the spoken word is high
 On AO3, FanFiction.net and Wattpad, when a chapter ends the next one loads in the same page and reading continues. Turn it off in ⚙ → "Continue with the next chapter".
 
 ### Language detection and offline translation
-zenTTS detects the chapter's language with Firefox's own detector. If it differs from the language you want to listen in (⚙ → "Read in": automatic, a specific language or the original), it offers to download a Firefox Translations pack (about 25 MB per direction). After that it translates on your computer, offline. Pairs without a direct model go through English. You can also read in the original language or, with the server running, translate online. Packs are managed in ⚙ → Translation packs.
+zenTTS detects the chapter's language with Firefox's own detector. If it differs from the language you want to listen in (⚙ → "Read in": automatic, a specific language or the original), it offers to download a Firefox Translations pack (about 25 MB per direction). After that it translates on your computer, offline. Pairs without a direct model go through English. You can also read in the original language or, with the server running, translate online.
+
+Reading starts as soon as the first paragraphs are translated; the rest is translated while you listen. The translated sentence appears in a card under the original paragraph, with the spoken word marked (⚙ → Reading → "Show the translation next to the text").
+
+In ⚙ → Translate you choose how to always translate (ask, offline pack, online or don't translate), see the choices remembered per language and forget them, and manage the downloaded packs.
 
 ### Start where you choose
 Press the crosshair button in the panel and click the sentence you want to start from; hovering marks the sentence. Without the button, clicks on the page do nothing. Esc cancels.
 
 ### Movable bubble
-When minimized, zenTTS is a bubble you can drag to any corner; it stays there and the panel opens in that same corner.
+When minimized, zenTTS is a bubble you can drag to any corner; it stays there and the panel opens in that same corner, turned towards it: in a bottom corner the bar with the buttons sits at the bottom, and the minimize button is always on the corner's side, its arrow pointing at it.
+
+### Voices
+Voices are offered in the language that will be read (the translated one, if you translate). Local (Piper) voices are grouped by quality: high (~110 MB), standard (~60 MB) and light; Spanish has voices from Spain, Mexico and Argentina. Settings live in four tabs: Voice, Reading, Translate and Look.
+
+With the browser engine, Pause stops the voice even when the system synthesizer (speech-dispatcher on Linux) ignores pausing; resuming picks up from the last word.
 
 ### Browser colors
 The panel follows light and dark mode and, if a Firefox theme is installed, takes its colors. Zen does not let extensions read its accent color, so in ⚙ → Appearance you can pick one or paste the value of `zen.theme.accent-color` (from `about:config`) to match.

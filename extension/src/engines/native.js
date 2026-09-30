@@ -49,26 +49,60 @@ export function createNativeEngine() {
     });
   }
 
+  // Word starts from `from` onwards, so a resumed sentence starts on a word
+  function wordStart(text, at) {
+    while (at > 0 && !/\s/.test(text[at - 1])) at--;
+    return at;
+  }
+
   return {
     name: 'native',
     available: function() { return Promise.resolve(typeof speechSynthesis !== 'undefined'); },
 
     // Speaks sentences[start..]; calls ctx.onSentence(i) as each begins.
+    // Pausing cancels the utterance (speech-dispatcher on Linux ignores
+    // speechSynthesis.pause()) and resuming speaks again from the last word.
     play: async function(start, ctx) {
-      var run = { cancelled: false };
+      var run = { cancelled: false, paused: null, word: 0 };
       running = run;
       for (var i = start; i < ctx.sentences.length; i++) {
         if (run.cancelled) return;
         ctx.onSentence(i);
-        await speak(ctx.sentences[i].text, ctx, ctx.onWord.bind(null, i));
-        // speechSynthesis keeps a paused utterance pending, so the await above
-        // only resolves once it is resumed and finished.
+        var text = ctx.sentences[i].text;
+        var from = 0;
+        for (;;) {
+          run.word = from;
+          var base = from;
+          await speak(text.slice(from), ctx, function(k, off) {
+            run.word = base + off;
+            ctx.onWord(k, base + off);
+          }.bind(null, i));
+          if (run.cancelled) return;
+          if (!run.paused) break;
+          await run.paused.promise;
+          if (run.cancelled) return;
+          from = wordStart(text, Math.min(run.word, text.length - 1));
+        }
       }
     },
-    pause: function() { speechSynthesis.pause(); },
-    resume: function() { speechSynthesis.resume(); },
+    pause: function() {
+      if (!running || running.paused) return;
+      var p = {};
+      p.promise = new Promise(function(r) { p.resolve = r; });
+      running.paused = p;
+      speechSynthesis.cancel();
+    },
+    resume: function() {
+      if (!running || !running.paused) return;
+      var p = running.paused;
+      running.paused = null;
+      p.resolve();
+    },
     stop: function() {
-      if (running) running.cancelled = true;
+      if (running) {
+        running.cancelled = true;
+        if (running.paused) running.paused.resolve();
+      }
       speechSynthesis.cancel();
     }
   };
