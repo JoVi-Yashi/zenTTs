@@ -80,6 +80,8 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
 
     case 'get_theme':
+      // Chrome has no theme API; the panel falls back to prefers-color-scheme
+      if (!browser.theme) { sendResponse({ success: false, error: 'no theme API' }); return false; }
       browser.theme.getCurrent(sender.tab && sender.tab.windowId)
         .then(theme => sendResponse({ success: true, theme }))
         .catch(err => sendResponse({ success: false, error: err.message }));
@@ -487,9 +489,12 @@ browser.tabs.onRemoved.addListener(async (tabId) => {
 // reach of extensions; a Firefox theme installed from AMO is readable, so tabs
 // are told whenever it changes.
 
-browser.theme.onUpdated.addListener(async ({ theme, windowId }) => {
-  const tabs = await browser.tabs.query(windowId ? { windowId } : {});
-  for (const tab of tabs) {
-    browser.tabs.sendMessage(tab.id, { action: 'theme_changed', theme }).catch(() => {});
-  }
-});
+// Chrome has no theme API at all, so this only runs on Firefox.
+if (browser.theme && browser.theme.onUpdated) {
+  browser.theme.onUpdated.addListener(async ({ theme, windowId }) => {
+    const tabs = await browser.tabs.query(windowId ? { windowId } : {});
+    for (const tab of tabs) {
+      browser.tabs.sendMessage(tab.id, { action: 'theme_changed', theme }).catch(() => {});
+    }
+  });
+}

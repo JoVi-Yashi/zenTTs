@@ -8,8 +8,7 @@
   "permissions": [
     "storage",
     "activeTab",
-    "unlimitedStorage",
-    "theme"
+    "unlimitedStorage"
   ],
   "host_permissions": [
     "http://localhost:8765/*",

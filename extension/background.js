@@ -13200,6 +13200,10 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
       removePack(message.pair).then(() => sendResponse({ success: true })).catch((err) => sendResponse({ success: false, error: err.message }));
       return true;
     case "get_theme":
+      if (!browser.theme) {
+        sendResponse({ success: false, error: "no theme API" });
+        return false;
+      }
       browser.theme.getCurrent(sender.tab && sender.tab.windowId).then((theme) => sendResponse({ success: true, theme })).catch((err) => sendResponse({ success: false, error: err.message }));
       return true;
     case "local_voices":
@@ -13540,13 +13544,15 @@ browser.tabs.onRemoved.addListener(async (tabId) => {
   } catch (_) {
   }
 });
-browser.theme.onUpdated.addListener(async ({ theme, windowId }) => {
-  const tabs = await browser.tabs.query(windowId ? { windowId } : {});
-  for (const tab of tabs) {
-    browser.tabs.sendMessage(tab.id, { action: "theme_changed", theme }).catch(() => {
-    });
-  }
-});
+if (browser.theme && browser.theme.onUpdated) {
+  browser.theme.onUpdated.addListener(async ({ theme, windowId }) => {
+    const tabs = await browser.tabs.query(windowId ? { windowId } : {});
+    for (const tab of tabs) {
+      browser.tabs.sendMessage(tab.id, { action: "theme_changed", theme }).catch(() => {
+      });
+    }
+  });
+}
 /*! Bundled license information:
 
 onnxruntime-web/dist/ort.wasm.bundle.min.mjs:
