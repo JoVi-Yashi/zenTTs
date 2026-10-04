@@ -4978,9 +4978,9 @@ button:active:not(:disabled) { transform: scale(.96); }
     PAUSE_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>';
     PRESETS = [
       { id: "archiveofourown.org", name: "Archive of Our Own", icon: "icons/sites/ao3.svg", what: "presetNext" },
-      { id: "fanfiction.net", name: "FanFiction.net", icon: "icons/sites/fanfiction.svg", what: "presetNext" },
+      { id: "fanfiction.net", name: "FanFiction.net", icon: "icons/sites/fanfiction.png", what: "presetNext" },
       { id: "wattpad.com", name: "Wattpad", icon: "icons/sites/wattpad.svg", what: "presetNext" },
-      { id: "webnovel.com", name: "Webnovel", icon: "icons/sites/webnovel.svg", what: "presetScroll" }
+      { id: "webnovel.com", name: "Webnovel", icon: "icons/sites/webnovel.png", what: "presetScroll" }
     ];
     autoSites = [];
   }

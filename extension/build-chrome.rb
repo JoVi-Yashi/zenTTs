@@ -29,9 +29,9 @@ FILES = %w[
   icons/icon-128.png
   icons/icon.svg
   icons/sites/ao3.svg
-  icons/sites/fanfiction.svg
+  icons/sites/fanfiction.png
   icons/sites/wattpad.svg
-  icons/sites/webnovel.svg
+  icons/sites/webnovel.png
   vendor/ort/ort-wasm-simd-threaded.wasm
   vendor/ort/ort-wasm-simd-threaded.mjs
   vendor/piper/piper_phonemize.wasm

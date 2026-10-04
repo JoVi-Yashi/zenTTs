@@ -2152,9 +2152,9 @@ export function setPauseIcon(isPlaying) {
 
 var PRESETS = [
   { id: 'archiveofourown.org', name: 'Archive of Our Own', icon: 'icons/sites/ao3.svg', what: 'presetNext' },
-  { id: 'fanfiction.net', name: 'FanFiction.net', icon: 'icons/sites/fanfiction.svg', what: 'presetNext' },
+  { id: 'fanfiction.net', name: 'FanFiction.net', icon: 'icons/sites/fanfiction.png', what: 'presetNext' },
   { id: 'wattpad.com', name: 'Wattpad', icon: 'icons/sites/wattpad.svg', what: 'presetNext' },
-  { id: 'webnovel.com', name: 'Webnovel', icon: 'icons/sites/webnovel.svg', what: 'presetScroll' }
+  { id: 'webnovel.com', name: 'Webnovel', icon: 'icons/sites/webnovel.png', what: 'presetScroll' }
 ];
 
 var autoSites = [];

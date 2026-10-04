@@ -39,7 +39,8 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "icons/sites/*.svg"
+        "icons/sites/*.svg",
+        "icons/sites/*.png"
       ],
       "matches": [
         "<all_urls>"

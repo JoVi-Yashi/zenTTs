@@ -22177,9 +22177,9 @@ var focusedId = null;
 var shown = /* @__PURE__ */ new Set();
 var SITE_LOOK = {
   ao3: { color: "#8f1d1d", icon: "icons/sites/ao3.svg" },
-  ffn: { color: "#2b3f78", icon: "icons/sites/fanfiction.svg" },
+  ffn: { color: "#2b3f78", icon: "icons/sites/fanfiction.png" },
   wattpad: { color: "#c9501f", icon: "icons/sites/wattpad.svg" },
-  webnovel: { color: "#23457a", icon: "icons/sites/webnovel.svg" }
+  webnovel: { color: "#23457a", icon: "icons/sites/webnovel.png" }
 };
 function asBook(w) {
   var look = SITE_LOOK[w.site] || {};

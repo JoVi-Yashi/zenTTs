@@ -124,9 +124,9 @@ var shown = new Set();     // books already on screen (only new ones slide in)
 // Web works look like books to the shelf: id, title, color, tags…
 var SITE_LOOK = {
   ao3: { color: '#8f1d1d', icon: 'icons/sites/ao3.svg' },
-  ffn: { color: '#2b3f78', icon: 'icons/sites/fanfiction.svg' },
+  ffn: { color: '#2b3f78', icon: 'icons/sites/fanfiction.png' },
   wattpad: { color: '#c9501f', icon: 'icons/sites/wattpad.svg' },
-  webnovel: { color: '#23457a', icon: 'icons/sites/webnovel.svg' }
+  webnovel: { color: '#23457a', icon: 'icons/sites/webnovel.png' }
 };
 
 function asBook(w) {
